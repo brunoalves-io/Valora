@@ -42,20 +42,26 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!supabase || !activeCompany) return;
+    const client = supabase;
+    const company = activeCompany;
+
+    if (!client || !company) {
+      setLoading(false);
+      return;
+    }
 
     async function load() {
       setLoading(true);
       const [txResult, accountsResult] = await Promise.all([
-        supabase
+        client
           .from("transactions")
           .select("id, description, amount, type, status, due_date, paid_at")
-          .eq("company_id", activeCompany.id)
+          .eq("company_id", company.id)
           .order("due_date", { ascending: true }),
-        supabase
+        client
           .from("financial_accounts")
           .select("opening_balance")
-          .eq("company_id", activeCompany.id)
+          .eq("company_id", company.id)
           .eq("active", true),
       ]);
 
@@ -72,7 +78,7 @@ export function Dashboard() {
     }
 
     void load();
-  }, [activeCompany]);
+  }, [activeCompany?.id]);
 
   const summary = useMemo(() => {
     const paid = transactions.filter((item) => item.status === "paid");
