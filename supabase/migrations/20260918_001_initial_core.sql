@@ -256,11 +256,21 @@ create policy "members can read transactions"
   on public.transactions for select
   using (public.is_company_member(company_id));
 
-drop policy if exists "managers can write transactions" on public.transactions;
-create policy "managers can write transactions"
-  on public.transactions for all
-  using (public.can_manage_company(company_id))
+drop policy if exists "managers can insert transactions" on public.transactions;
+create policy "managers can insert transactions"
+  on public.transactions for insert
   with check (
     public.can_manage_company(company_id)
     and created_by = auth.uid()
   );
+
+drop policy if exists "managers can update transactions" on public.transactions;
+create policy "managers can update transactions"
+  on public.transactions for update
+  using (public.can_manage_company(company_id))
+  with check (public.can_manage_company(company_id));
+
+drop policy if exists "managers can delete transactions" on public.transactions;
+create policy "managers can delete transactions"
+  on public.transactions for delete
+  using (public.can_manage_company(company_id));
