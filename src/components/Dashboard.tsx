@@ -42,13 +42,13 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const client = supabase;
-    const company = activeCompany;
-
-    if (!client || !company) {
+    if (!supabase || !activeCompany) {
       setLoading(false);
       return;
     }
+
+    const client = supabase;
+    const companyId = activeCompany.id;
 
     async function load() {
       setLoading(true);
@@ -56,12 +56,12 @@ export function Dashboard() {
         client
           .from("transactions")
           .select("id, description, amount, type, status, due_date, paid_at")
-          .eq("company_id", company.id)
+          .eq("company_id", companyId)
           .order("due_date", { ascending: true }),
         client
           .from("financial_accounts")
           .select("opening_balance")
-          .eq("company_id", company.id)
+          .eq("company_id", companyId)
           .eq("active", true),
       ]);
 
