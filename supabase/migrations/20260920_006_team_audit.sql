@@ -100,7 +100,7 @@ security definer
 set search_path = public, auth
 as $$
 begin
-  if not public.is_company_member(p_company_id) then
+  if not public.can_admin_company(p_company_id) then
     raise exception 'Not authorized';
   end if;
 
