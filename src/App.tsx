@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AccountsPage } from "./components/AccountsPage";
 import { AuthScreen } from "./components/AuthScreen";
 import { CategoriesPage } from "./components/CategoriesPage";
@@ -15,10 +15,11 @@ import { RecurrencesPage } from "./components/RecurrencesPage";
 import { RecurringSyncGate } from "./components/RecurringSyncGate";
 import { TeamPage } from "./components/TeamPage";
 import { AuditPage } from "./components/AuditPage";
+import { AlertsPage } from "./components/AlertsPage";
 import { TransactionsPage } from "./components/TransactionsPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
-import { isSupabaseConfigured } from "./lib/supabase";
+import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
 type Page =
   | "dashboard"
@@ -35,7 +36,8 @@ type Page =
   | "cards"
   | "recurrences"
   | "team"
-  | "audit";
+  | "audit"
+  | "alerts";
 
 const activeNav: Array<[string, string, Page]> = [
   ["⌂", "Início", "dashboard"],
@@ -51,6 +53,7 @@ const activeNav: Array<[string, string, Page]> = [
   ["▥", "Relatórios", "reports"],
   ["▣", "Cartões", "cards"],
   ["⟳", "Recorrências", "recurrences"],
+  ["●", "Alertas", "alerts"],
 ];
 
 const adminNav: Array<[string, string, Page]> = [
@@ -86,7 +89,15 @@ VITE_SUPABASE_PUBLISHABLE_KEY=...`}</pre>
   );
 }
 
-function CurrentPage({ page }: { page: Page }) {
+function CurrentPage({
+  page,
+  onNavigate,
+  onAlertsChanged,
+}: {
+  page: Page;
+  onNavigate: (page: Page) => void;
+  onAlertsChanged: () => void;
+}) {
   switch (page) {
     case "transactions":
       return <TransactionsPage />;
@@ -116,6 +127,13 @@ function CurrentPage({ page }: { page: Page }) {
       return <TeamPage />;
     case "audit":
       return <AuditPage />;
+    case "alerts":
+      return (
+        <AlertsPage
+          onNavigate={(target) => onNavigate(target)}
+          onChanged={onAlertsChanged}
+        />
+      );
     default:
       return <Dashboard />;
   }
@@ -123,8 +141,49 @@ function CurrentPage({ page }: { page: Page }) {
 
 function Workspace() {
   const [page, setPage] = useState<Page>("dashboard");
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
   const { companies, activeCompany, activeRole, selectCompany } = useCompany();
   const { user, signOut } = useAuth();
+
+  const refreshAlertCount = useCallback(async () => {
+    if (!supabase || !activeCompany) {
+      setUnreadAlerts(0);
+      return;
+    }
+
+    const { error: refreshError } = await supabase.rpc("refresh_company_alerts", {
+      p_company_id: activeCompany.id,
+    });
+
+    if (refreshError) return;
+
+    const { data, error } = await supabase.rpc("list_company_alerts", {
+      p_company_id: activeCompany.id,
+      p_include_dismissed: false,
+    });
+
+    if (error) return;
+
+    setUnreadAlerts(
+      ((data ?? []) as Array<{ is_read: boolean; is_dismissed: boolean }>).filter(
+        (item) => !item.is_read && !item.is_dismissed,
+      ).length,
+    );
+  }, [activeCompany?.id]);
+
+  useEffect(() => {
+    void refreshAlertCount();
+
+    const timer = window.setInterval(() => {
+      void refreshAlertCount();
+    }, 5 * 60 * 1000);
+
+    return () => window.clearInterval(timer);
+  }, [refreshAlertCount]);
+
+  useEffect(() => {
+    void refreshAlertCount();
+  }, [page, refreshAlertCount]);
 
   const navigation =
     activeRole === "owner" || activeRole === "admin"
@@ -175,6 +234,9 @@ function Workspace() {
               onClick={() => setPage(target)}
             >
               <span>{icon}</span> {label}
+              {target === "alerts" && unreadAlerts > 0 && (
+                <b className="nav-alert-badge">{unreadAlerts > 99 ? "99+" : unreadAlerts}</b>
+              )}
             </button>
           ))}
 
@@ -210,7 +272,11 @@ function Workspace() {
           </div>
         )}
         <RecurringSyncGate>
-          <CurrentPage page={page} />
+          <CurrentPage
+            page={page}
+            onNavigate={setPage}
+            onAlertsChanged={() => void refreshAlertCount()}
+          />
         </RecurringSyncGate>
       </main>
     </div>
