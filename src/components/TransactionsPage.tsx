@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabase";
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; type: "income" | "expense" | "both" };
 type CostCenter = { id: string; name: string };
-type Partner = { id: string; name: string; kind: "customer" | "supplier" | "both" };
+type Partner = { id: string; name: string; kind: "customer" | "supplier" | "both"; active: boolean };
 type Transaction = {
   id: string;
   description: string;
@@ -83,9 +83,8 @@ export function TransactionsPage() {
         .order("name"),
       supabase
         .from("business_partners")
-        .select("id, name, kind")
+        .select("id, name, kind, active")
         .eq("company_id", activeCompany.id)
-        .eq("active", true)
         .order("name"),
     ]);
 
@@ -122,9 +121,10 @@ export function TransactionsPage() {
     () =>
       partners.filter(
         (item) =>
-          item.kind === "both" ||
+          item.active &&
+          (item.kind === "both" ||
           (form.type === "income" && item.kind === "customer") ||
-          (form.type === "expense" && item.kind === "supplier"),
+          (form.type === "expense" && item.kind === "supplier")),
       ),
     [partners, form.type],
   );
