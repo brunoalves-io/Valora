@@ -14,6 +14,7 @@ type Transaction = {
   amount: number | string;
   status: "pending" | "paid" | "cancelled";
   due_date: string;
+  account_id: string | null;
 };
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -31,6 +32,7 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [filter, setFilter] = useState<StatusFilter>("pending");
+  const [settlementAccounts, setSettlementAccounts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -59,7 +61,7 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
     const [txResult, accountResult, categoryResult, costCenterResult] = await Promise.all([
       supabase
         .from("transactions")
-        .select("id, description, amount, status, due_date")
+        .select("id, description, amount, status, due_date, account_id")
         .eq("company_id", activeCompany.id)
         .eq("type", type)
         .neq("status", "cancelled")
@@ -182,9 +184,20 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
 
   async function markAsPaid(item: Transaction) {
     if (!supabase) return;
+
+    const settlementAccountId = item.account_id || settlementAccounts[item.id];
+    if (!settlementAccountId) {
+      setError("Selecione uma conta ou caixa para concluir a baixa.");
+      return;
+    }
+
     const { error: updateError } = await supabase
       .from("transactions")
-      .update({ status: "paid", paid_at: new Date().toISOString() })
+      .update({
+        status: "paid",
+        paid_at: new Date().toISOString(),
+        account_id: settlementAccountId,
+      })
       .eq("id", item.id);
 
     if (updateError) {
@@ -315,7 +328,35 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
                       <td>{new Date(item.due_date + "T12:00:00").toLocaleDateString("pt-BR")}</td>
                       <td><span className={overdue ? "pill overdue" : "pill " + item.status}>{overdue ? "Em atraso" : item.status === "paid" ? paidLabel : "Pendente"}</span></td>
                       <td className={"right amount " + type}>{money.format(Number(item.amount))}</td>
-                      <td className="right">{item.status === "pending" && <button className="table-action" onClick={() => void markAsPaid(item)}>{actionLabel}</button>}</td>
+                      <td className="right">
+                        {item.status === "pending" && (
+                          <div className="settlement-actions">
+                            {!item.account_id && (
+                              <select
+                                value={settlementAccounts[item.id] || ""}
+                                onChange={(event) =>
+                                  setSettlementAccounts((current) => ({
+                                    ...current,
+                                    [item.id]: event.target.value,
+                                  }))
+                                }
+                              >
+                                <option value="">Conta...</option>
+                                {accounts.map((account) => (
+                                  <option key={account.id} value={account.id}>{account.name}</option>
+                                ))}
+                              </select>
+                            )}
+                            <button
+                              className="table-action"
+                              disabled={!item.account_id && !settlementAccounts[item.id]}
+                              onClick={() => void markAsPaid(item)}
+                            >
+                              {actionLabel}
+                            </button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
