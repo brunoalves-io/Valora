@@ -292,7 +292,14 @@ export function TransactionsPage() {
                 min="1"
                 max="120"
                 value={form.installments}
-                onChange={(event) => setForm({ ...form, installments: event.target.value })}
+                onChange={(event) => {
+                  const installments = event.target.value;
+                  setForm({
+                    ...form,
+                    installments,
+                    status: Number(installments) > 1 ? "pending" : form.status,
+                  });
+                }}
                 required
               />
             </label>
