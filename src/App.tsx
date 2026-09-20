@@ -16,6 +16,7 @@ import { RecurringSyncGate } from "./components/RecurringSyncGate";
 import { TeamPage } from "./components/TeamPage";
 import { AuditPage } from "./components/AuditPage";
 import { AlertsPage } from "./components/AlertsPage";
+import { ValoraAIPage } from "./components/ValoraAIPage";
 import { TransactionsPage } from "./components/TransactionsPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
@@ -37,7 +38,8 @@ type Page =
   | "recurrences"
   | "team"
   | "audit"
-  | "alerts";
+  | "alerts"
+  | "ai";
 
 const activeNav: Array<[string, string, Page]> = [
   ["⌂", "Início", "dashboard"],
@@ -54,15 +56,12 @@ const activeNav: Array<[string, string, Page]> = [
   ["▣", "Cartões", "cards"],
   ["⟳", "Recorrências", "recurrences"],
   ["●", "Alertas", "alerts"],
+  ["✦", "Valora IA", "ai"],
 ];
 
 const adminNav: Array<[string, string, Page]> = [
   ["♟", "Equipe", "team"],
   ["◌", "Auditoria", "audit"],
-];
-
-const futureNav = [
-  ["✦", "Valora IA"],
 ];
 
 function MissingConfiguration() {
@@ -134,8 +133,10 @@ function CurrentPage({
           onChanged={onAlertsChanged}
         />
       );
+    case "ai":
+      return <ValoraAIPage />;
     default:
-      return <Dashboard />;
+      return <Dashboard onOpenAI={() => onNavigate("ai")} />;
   }
 }
 
@@ -240,13 +241,6 @@ function Workspace() {
             </button>
           ))}
 
-          <div className="nav-divider" />
-
-          {futureNav.map(([icon, label]) => (
-            <button className="nav-item disabled" key={label} disabled title="Em breve">
-              <span>{icon}</span> {label}
-            </button>
-          ))}
         </nav>
 
         <div className="sidebar-footer">
