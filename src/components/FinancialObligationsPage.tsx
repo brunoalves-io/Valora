@@ -8,6 +8,7 @@ type StatusFilter = "all" | "pending" | "paid" | "overdue";
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; type: "income" | "expense" | "both" };
 type CostCenter = { id: string; name: string };
+type Partner = { id: string; name: string; kind: "customer" | "supplier" | "both" };
 type Transaction = {
   id: string;
   description: string;
@@ -15,6 +16,7 @@ type Transaction = {
   status: "pending" | "paid" | "cancelled";
   due_date: string;
   account_id: string | null;
+  partner_id: string | null;
 };
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -31,6 +33,7 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [filter, setFilter] = useState<StatusFilter>("pending");
   const [settlementAccounts, setSettlementAccounts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -45,6 +48,7 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
     account_id: "",
     category_id: "",
     cost_center_id: "",
+    partner_id: "",
   });
 
   const isExpense = type === "expense";
@@ -58,10 +62,10 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
     setLoading(true);
     setError("");
 
-    const [txResult, accountResult, categoryResult, costCenterResult] = await Promise.all([
+    const [txResult, accountResult, categoryResult, costCenterResult, partnerResult] = await Promise.all([
       supabase
         .from("transactions")
-        .select("id, description, amount, status, due_date, account_id")
+        .select("id, description, amount, status, due_date, account_id, partner_id")
         .eq("company_id", activeCompany.id)
         .eq("type", type)
         .neq("status", "cancelled")
@@ -84,10 +88,20 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
         .eq("company_id", activeCompany.id)
         .eq("active", true)
         .order("name"),
+      supabase
+        .from("business_partners")
+        .select("id, name, kind")
+        .eq("company_id", activeCompany.id)
+        .eq("active", true)
+        .order("name"),
     ]);
 
     const firstError =
-      txResult.error || accountResult.error || categoryResult.error || costCenterResult.error;
+      txResult.error ||
+      accountResult.error ||
+      categoryResult.error ||
+      costCenterResult.error ||
+      partnerResult.error;
 
     if (firstError) {
       setError(firstError.message);
@@ -101,6 +115,7 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
       }));
       setCategories((categoryResult.data ?? []) as Category[]);
       setCostCenters((costCenterResult.data ?? []) as CostCenter[]);
+      setPartners((partnerResult.data ?? []) as Partner[]);
     }
     setLoading(false);
   }
@@ -136,6 +151,18 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
     (category) => category.type === type || category.type === "both",
   );
 
+  const visiblePartners = partners.filter(
+    (partner) =>
+      partner.kind === "both" ||
+      (type === "income" && partner.kind === "customer") ||
+      (type === "expense" && partner.kind === "supplier"),
+  );
+
+  const partnerNames = useMemo(
+    () => new Map(partners.map((partner) => [partner.id, partner.name])),
+    [partners],
+  );
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!supabase || !activeCompany) return;
@@ -160,6 +187,7 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
       account_id: form.account_id || null,
       category_id: form.category_id || null,
       cost_center_id: form.cost_center_id || null,
+      partner_id: form.partner_id || null,
     });
 
     if (insertError) {
@@ -176,6 +204,7 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
       account_id: accounts[0]?.id ?? "",
       category_id: "",
       cost_center_id: "",
+      partner_id: "",
     });
     setShowForm(false);
     setSaving(false);
@@ -287,6 +316,13 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
                 {costCenters.map((center) => <option key={center.id} value={center.id}>{center.name}</option>)}
               </select>
             </label>
+            <label>
+              {isExpense ? "Fornecedor" : "Cliente"}
+              <select value={form.partner_id} onChange={(event) => setForm({ ...form, partner_id: event.target.value })}>
+                <option value="">Sem vínculo</option>
+                {visiblePartners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}
+              </select>
+            </label>
           </div>
           {error && <div className="form-alert error">{error}</div>}
           <div className="form-actions">
@@ -317,7 +353,7 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
           <div className="table-scroll">
             <table>
               <thead>
-                <tr><th>Descrição</th><th>Vencimento</th><th>Status</th><th className="right">Valor</th><th></th></tr>
+                <tr><th>Descrição</th><th>{isExpense ? "Fornecedor" : "Cliente"}</th><th>Vencimento</th><th>Status</th><th className="right">Valor</th><th></th></tr>
               </thead>
               <tbody>
                 {filteredItems.map((item) => {
@@ -325,6 +361,7 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
                   return (
                     <tr key={item.id}>
                       <td><strong>{item.description}</strong></td>
+                      <td>{item.partner_id ? partnerNames.get(item.partner_id) ?? "—" : "—"}</td>
                       <td>{new Date(item.due_date + "T12:00:00").toLocaleDateString("pt-BR")}</td>
                       <td><span className={overdue ? "pill overdue" : "pill " + item.status}>{overdue ? "Em atraso" : item.status === "paid" ? paidLabel : "Pendente"}</span></td>
                       <td className={"right amount " + type}>{money.format(Number(item.amount))}</td>
