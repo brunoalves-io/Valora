@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; type: "income" | "expense" | "both" };
 type CostCenter = { id: string; name: string };
+type Partner = { id: string; name: string; kind: "customer" | "supplier" | "both"; active: boolean };
 type Transaction = {
   id: string;
   description: string;
@@ -14,6 +15,7 @@ type Transaction = {
   due_date: string;
   account_id: string | null;
   category_id: string | null;
+  partner_id: string | null;
 };
 
 const money = new Intl.NumberFormat("pt-BR", {
@@ -33,6 +35,7 @@ export function TransactionsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -46,16 +49,17 @@ export function TransactionsPage() {
     account_id: "",
     category_id: "",
     cost_center_id: "",
+    partner_id: "",
   });
 
   async function load() {
     if (!supabase || !activeCompany) return;
     setLoading(true);
 
-    const [txResult, accountResult, categoryResult, costCenterResult] = await Promise.all([
+    const [txResult, accountResult, categoryResult, costCenterResult, partnerResult] = await Promise.all([
       supabase
         .from("transactions")
-        .select("id, description, amount, type, status, due_date, account_id, category_id")
+        .select("id, description, amount, type, status, due_date, account_id, category_id, partner_id")
         .eq("company_id", activeCompany.id)
         .order("due_date", { ascending: false })
         .limit(100),
@@ -77,14 +81,20 @@ export function TransactionsPage() {
         .eq("company_id", activeCompany.id)
         .eq("active", true)
         .order("name"),
+      supabase
+        .from("business_partners")
+        .select("id, name, kind, active")
+        .eq("company_id", activeCompany.id)
+        .order("name"),
     ]);
 
-    if (txResult.error || accountResult.error || categoryResult.error || costCenterResult.error) {
+    if (txResult.error || accountResult.error || categoryResult.error || costCenterResult.error || partnerResult.error) {
       setError(
         txResult.error?.message ||
           accountResult.error?.message ||
           categoryResult.error?.message ||
           costCenterResult.error?.message ||
+          partnerResult.error?.message ||
           "Erro ao carregar dados.",
       );
     } else {
@@ -92,6 +102,7 @@ export function TransactionsPage() {
       setAccounts((accountResult.data ?? []) as Account[]);
       setCategories((categoryResult.data ?? []) as Category[]);
       setCostCenters((costCenterResult.data ?? []) as CostCenter[]);
+      setPartners((partnerResult.data ?? []) as Partner[]);
     }
 
     setLoading(false);
@@ -104,6 +115,23 @@ export function TransactionsPage() {
   const visibleCategories = useMemo(
     () => categories.filter((item) => item.type === form.type || item.type === "both"),
     [categories, form.type],
+  );
+
+  const visiblePartners = useMemo(
+    () =>
+      partners.filter(
+        (item) =>
+          item.active &&
+          (item.kind === "both" ||
+          (form.type === "income" && item.kind === "customer") ||
+          (form.type === "expense" && item.kind === "supplier")),
+      ),
+    [partners, form.type],
+  );
+
+  const partnerNames = useMemo(
+    () => new Map(partners.map((partner) => [partner.id, partner.name])),
+    [partners],
   );
 
   async function submit(event: FormEvent) {
@@ -130,6 +158,7 @@ export function TransactionsPage() {
       account_id: form.account_id || null,
       category_id: form.category_id || null,
       cost_center_id: form.cost_center_id || null,
+      partner_id: form.partner_id || null,
     });
 
     if (insertError) {
@@ -147,6 +176,7 @@ export function TransactionsPage() {
       account_id: accounts[0]?.id ?? "",
       category_id: "",
       cost_center_id: "",
+      partner_id: "",
     });
     setShowForm(false);
     setSaving(false);
@@ -177,14 +207,14 @@ export function TransactionsPage() {
               <button
                 type="button"
                 className={form.type === "expense" ? "selected expense" : ""}
-                onClick={() => setForm({ ...form, type: "expense", category_id: "" })}
+                onClick={() => setForm({ ...form, type: "expense", category_id: "", partner_id: "" })}
               >
                 Despesa
               </button>
               <button
                 type="button"
                 className={form.type === "income" ? "selected income" : ""}
-                onClick={() => setForm({ ...form, type: "income", category_id: "" })}
+                onClick={() => setForm({ ...form, type: "income", category_id: "", partner_id: "" })}
               >
                 Receita
               </button>
@@ -268,6 +298,18 @@ export function TransactionsPage() {
                 ))}
               </select>
             </label>
+            <label>
+              {form.type === "income" ? "Cliente" : "Fornecedor"}
+              <select
+                value={form.partner_id}
+                onChange={(event) => setForm({ ...form, partner_id: event.target.value })}
+              >
+                <option value="">Sem vínculo</option>
+                {visiblePartners.map((partner) => (
+                  <option key={partner.id} value={partner.id}>{partner.name}</option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {error && <div className="form-alert error">{error}</div>}
@@ -300,6 +342,7 @@ export function TransactionsPage() {
                   <th>Descrição</th>
                   <th>Vencimento</th>
                   <th>Tipo</th>
+                  <th>Cliente / Fornecedor</th>
                   <th>Status</th>
                   <th className="right">Valor</th>
                 </tr>
@@ -314,6 +357,7 @@ export function TransactionsPage() {
                         {item.type === "income" ? "Receita" : "Despesa"}
                       </span>
                     </td>
+                    <td>{item.partner_id ? partnerNames.get(item.partner_id) ?? "—" : "—"}</td>
                     <td>{item.status === "paid" ? "Pago" : "Pendente"}</td>
                     <td className={`right amount ${item.type}`}>
                       {item.type === "income" ? "+" : "−"} {money.format(Number(item.amount))}
