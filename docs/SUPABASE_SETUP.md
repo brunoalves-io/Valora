@@ -34,12 +34,12 @@ In Supabase Authentication:
 
 ## 4. Get the public project credentials
 
-From the Supabase project settings, copy:
+From the Supabase project **Connect** panel, copy:
 
 - Project URL
-- Publishable/anon key
+- Publishable key
 
-Never put the service-role key in the desktop frontend.
+Never put a Secret key or service-role key in the desktop frontend.
 
 ## 5. Create the local environment file
 
@@ -47,7 +47,7 @@ Copy `.env.example` to `.env.local`:
 
 ```env
 VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-VITE_SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxxx
 ```
 
 The `.env.local` file is ignored by Git.
