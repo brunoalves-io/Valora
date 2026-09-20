@@ -562,7 +562,7 @@ returns date
 language plpgsql
 immutable
 set search_path = public
-as $
+as $$
 declare
   v_target_month date;
   v_last_day date;
@@ -611,7 +611,7 @@ begin
 
   raise exception 'Invalid recurring frequency';
 end;
-$;
+$$;
 
 create or replace function public.materialize_recurring_transactions(
   p_company_id uuid,
