@@ -8,7 +8,7 @@ create table if not exists public.team_invitations (
   role text not null check (role in ('admin', 'member', 'viewer')),
   status text not null default 'pending'
     check (status in ('pending', 'accepted', 'cancelled')),
-  invited_by uuid not null default auth.uid() references auth.users(id) on delete set null,
+  invited_by uuid default auth.uid() references auth.users(id) on delete set null,
   accepted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
