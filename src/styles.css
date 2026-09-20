@@ -1348,3 +1348,261 @@ tr:last-child td { border-bottom: 0; }
     gap: 2px;
   }
 }
+
+
+/* Valora v0.6.0 cards, installments and recurrences */
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.card-form,
+.recurring-form {
+  margin-bottom: 16px;
+}
+
+.card-form label,
+.recurring-form label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #49566c;
+}
+
+.card-form input,
+.card-form select,
+.recurring-form input,
+.recurring-form select {
+  width: 100%;
+  border: 1px solid #d9e0e9;
+  border-radius: 10px;
+  padding: 12px 13px;
+  color: #172033;
+  background: white;
+  outline: none;
+}
+
+.card-form input:focus,
+.card-form select:focus,
+.recurring-form input:focus,
+.recurring-form select:focus {
+  border-color: #46bf91;
+  box-shadow: 0 0 0 3px rgba(70, 191, 145, .12);
+}
+
+.card-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.purchase-grid {
+  grid-template-columns: 1fr 2fr repeat(3, minmax(140px, 1fr));
+}
+
+.card-form-grid .wide {
+  grid-column: span 2;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.credit-card-card {
+  min-height: 230px;
+  padding: 20px;
+  border-radius: 18px;
+  color: white;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(86, 219, 167, .24), transparent 26%),
+    linear-gradient(145deg, #15263f, #0e1a2b);
+  box-shadow: 0 12px 32px rgba(15, 26, 43, .15);
+  display: grid;
+  align-content: space-between;
+  gap: 16px;
+}
+
+.credit-card-card.inactive {
+  opacity: .58;
+}
+
+.credit-card-top,
+.credit-card-values,
+.credit-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.credit-card-top small,
+.credit-card-values span,
+.credit-card-footer {
+  color: #aab8cc;
+}
+
+.credit-card-top h2 {
+  margin: 4px 0 0;
+  font-size: 19px;
+}
+
+.credit-card-number {
+  font-size: 20px;
+  letter-spacing: .16em;
+  font-weight: 800;
+}
+
+.credit-card-values {
+  align-items: flex-end;
+}
+
+.credit-card-values > div {
+  display: grid;
+  gap: 4px;
+}
+
+.credit-card-values strong {
+  font-size: 18px;
+}
+
+.card-limit-track {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .12);
+  overflow: hidden;
+}
+
+.card-limit-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #53d5a3;
+}
+
+.credit-card-footer {
+  font-size: 11px;
+  border-top: 1px solid rgba(255, 255, 255, .09);
+  padding-top: 12px;
+}
+
+.credit-card-footer .table-action {
+  color: #74ddb7;
+}
+
+.card-statements {
+  margin-top: 4px;
+}
+
+.card-statements-table {
+  min-width: 960px;
+}
+
+.statement-account {
+  min-width: 145px;
+  border: 1px solid #d9e0e9;
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: white;
+  color: #4f5c71;
+  font-size: 11px;
+}
+
+.compact-primary {
+  padding: 8px 11px;
+  font-size: 11px;
+}
+
+.card-bill-hint {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #496ea8;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.recurring-form-grid {
+  display: grid;
+  grid-template-columns: 2fr repeat(4, minmax(145px, 1fr));
+  gap: 14px;
+}
+
+.recurring-form-grid .wide {
+  grid-column: span 2;
+}
+
+.interval-input {
+  display: grid;
+  grid-template-columns: 82px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.interval-input span {
+  color: #788499;
+  font-size: 12px;
+}
+
+.recurring-table {
+  min-width: 1100px;
+}
+
+@media (max-width: 1280px) {
+  .card-form-grid,
+  .purchase-grid,
+  .recurring-form-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .card-form-grid,
+  .purchase-grid,
+  .recurring-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-form-grid .wide,
+  .recurring-form-grid .wide {
+    grid-column: 1 / -1;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .header-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .header-actions button {
+    flex: 1;
+  }
+
+  .card-form-grid,
+  .purchase-grid,
+  .recurring-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-form-grid .wide,
+  .recurring-form-grid .wide {
+    grid-column: auto;
+  }
+}
