@@ -17,6 +17,7 @@ type Transaction = {
   due_date: string;
   account_id: string | null;
   partner_id: string | null;
+  credit_card_id: string | null;
 };
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -65,7 +66,7 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
     const [txResult, accountResult, categoryResult, costCenterResult, partnerResult] = await Promise.all([
       supabase
         .from("transactions")
-        .select("id, description, amount, status, due_date, account_id, partner_id")
+        .select("id, description, amount, status, due_date, account_id, partner_id, credit_card_id")
         .eq("company_id", activeCompany.id)
         .eq("type", type)
         .neq("status", "cancelled")
@@ -366,7 +367,10 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
                       <td><span className={overdue ? "pill overdue" : "pill " + item.status}>{overdue ? "Em atraso" : item.status === "paid" ? paidLabel : "Pendente"}</span></td>
                       <td className={"right amount " + type}>{money.format(Number(item.amount))}</td>
                       <td className="right">
-                        {item.status === "pending" && (
+                        {item.status === "pending" && item.credit_card_id && (
+                          <span className="card-bill-hint">Pagar pela fatura</span>
+                        )}
+                        {item.status === "pending" && !item.credit_card_id && (
                           <div className="settlement-actions">
                             {!item.account_id && (
                               <select
