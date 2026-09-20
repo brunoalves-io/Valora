@@ -45,6 +45,7 @@ export function TransactionsPage() {
     description: "",
     amount: "",
     due_date: new Date().toISOString().slice(0, 10),
+    installments: "1",
     status: "pending" as "pending" | "paid",
     account_id: "",
     category_id: "",
@@ -139,32 +140,65 @@ export function TransactionsPage() {
     if (!supabase || !activeCompany) return;
 
     const amount = parseMoney(form.amount);
+    const installments = Number(form.installments);
+
     if (!Number.isFinite(amount) || amount <= 0) {
       setError("Informe um valor válido.");
+      return;
+    }
+
+    if (!Number.isInteger(installments) || installments < 1 || installments > 120) {
+      setError("A quantidade de parcelas deve estar entre 1 e 120.");
+      return;
+    }
+
+    if (installments > 1 && form.status === "paid") {
+      setError("Parcelamentos são criados como pendentes para que cada parcela seja baixada no vencimento.");
       return;
     }
 
     setSaving(true);
     setError("");
 
-    const { error: insertError } = await supabase.from("transactions").insert({
-      company_id: activeCompany.id,
-      type: form.type,
-      description: form.description.trim(),
-      amount,
-      due_date: form.due_date,
-      status: form.status,
-      paid_at: form.status === "paid" ? new Date().toISOString() : null,
-      account_id: form.account_id || null,
-      category_id: form.category_id || null,
-      cost_center_id: form.cost_center_id || null,
-      partner_id: form.partner_id || null,
-    });
+    if (installments > 1) {
+      const { error: installmentError } = await supabase.rpc("create_installment_series", {
+        p_company_id: activeCompany.id,
+        p_type: form.type,
+        p_description: form.description.trim(),
+        p_total_amount: amount,
+        p_first_due_date: form.due_date,
+        p_installments: installments,
+        p_account_id: form.account_id || null,
+        p_category_id: form.category_id || null,
+        p_cost_center_id: form.cost_center_id || null,
+        p_partner_id: form.partner_id || null,
+      });
 
-    if (insertError) {
-      setError(insertError.message);
-      setSaving(false);
-      return;
+      if (installmentError) {
+        setError(installmentError.message);
+        setSaving(false);
+        return;
+      }
+    } else {
+      const { error: insertError } = await supabase.from("transactions").insert({
+        company_id: activeCompany.id,
+        type: form.type,
+        description: form.description.trim(),
+        amount,
+        due_date: form.due_date,
+        status: form.status,
+        paid_at: form.status === "paid" ? new Date().toISOString() : null,
+        account_id: form.account_id || null,
+        category_id: form.category_id || null,
+        cost_center_id: form.cost_center_id || null,
+        partner_id: form.partner_id || null,
+      });
+
+      if (insertError) {
+        setError(insertError.message);
+        setSaving(false);
+        return;
+      }
     }
 
     setForm({
@@ -172,6 +206,7 @@ export function TransactionsPage() {
       description: "",
       amount: "",
       due_date: new Date().toISOString().slice(0, 10),
+      installments: "1",
       status: "pending",
       account_id: accounts[0]?.id ?? "",
       category_id: "",
@@ -201,7 +236,7 @@ export function TransactionsPage() {
           <div className="form-heading">
             <div>
               <h2>Novo lançamento</h2>
-              <p>Cadastre uma receita ou despesa.</p>
+              <p>Cadastre uma receita ou despesa, à vista ou parcelada.</p>
             </div>
             <div className="type-toggle">
               <button
@@ -251,9 +286,28 @@ export function TransactionsPage() {
               />
             </label>
             <label>
+              Parcelas
+              <input
+                type="number"
+                min="1"
+                max="120"
+                value={form.installments}
+                onChange={(event) => {
+                  const installments = event.target.value;
+                  setForm({
+                    ...form,
+                    installments,
+                    status: Number(installments) > 1 ? "pending" : form.status,
+                  });
+                }}
+                required
+              />
+            </label>
+            <label>
               Status
               <select
                 value={form.status}
+                disabled={Number(form.installments) > 1}
                 onChange={(event) =>
                   setForm({ ...form, status: event.target.value as "pending" | "paid" })
                 }

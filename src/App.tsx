@@ -10,6 +10,9 @@ import { Dashboard } from "./components/Dashboard";
 import { FinancialObligationsPage } from "./components/FinancialObligationsPage";
 import { ProposalsPage } from "./components/ProposalsPage";
 import { ReportsPage } from "./components/ReportsPage";
+import { CardsPage } from "./components/CardsPage";
+import { RecurrencesPage } from "./components/RecurrencesPage";
+import { RecurringSyncGate } from "./components/RecurringSyncGate";
 import { TransactionsPage } from "./components/TransactionsPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
@@ -26,7 +29,9 @@ type Page =
   | "customers"
   | "suppliers"
   | "proposals"
-  | "reports";
+  | "reports"
+  | "cards"
+  | "recurrences";
 
 const activeNav: Array<[string, string, Page]> = [
   ["⌂", "Início", "dashboard"],
@@ -40,10 +45,11 @@ const activeNav: Array<[string, string, Page]> = [
   ["♟", "Fornecedores", "suppliers"],
   ["◇", "Propostas", "proposals"],
   ["▥", "Relatórios", "reports"],
+  ["▣", "Cartões", "cards"],
+  ["⟳", "Recorrências", "recurrences"],
 ];
 
 const futureNav = [
-  ["▣", "Cartões"],
   ["✦", "Valora IA"],
 ];
 
@@ -93,6 +99,10 @@ function CurrentPage({ page }: { page: Page }) {
       return <ProposalsPage />;
     case "reports":
       return <ReportsPage />;
+    case "cards":
+      return <CardsPage />;
+    case "recurrences":
+      return <RecurrencesPage />;
     default:
       return <Dashboard />;
   }
@@ -165,7 +175,9 @@ function Workspace() {
       </aside>
 
       <main className="workspace">
-        <CurrentPage page={page} />
+        <RecurringSyncGate>
+          <CurrentPage page={page} />
+        </RecurringSyncGate>
       </main>
     </div>
   );
