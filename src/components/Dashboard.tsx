@@ -35,7 +35,7 @@ function Metric({
   );
 }
 
-export function Dashboard() {
+export function Dashboard({ onOpenAI }: { onOpenAI: () => void }) {
   const { activeCompany } = useCompany();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
@@ -240,11 +240,15 @@ export function Dashboard() {
               <div className="ai-icon">✦</div>
               <div>
                 <h2>Valora IA</h2>
-                <p>A infraestrutura visual está pronta para a futura camada de inteligência.</p>
+                <p>Converse com os números da empresa e transforme dados em próximos passos.</p>
               </div>
               <div className="ask">
-                <input disabled placeholder='Ex.: "Quanto tenho para pagar nos próximos 7 dias?"' />
-                <button disabled>Em breve</button>
+                <div className="ai-dashboard-example">
+                  Ex.: “Como está meu caixa nos próximos 30 dias?”
+                </div>
+                <button className="primary" onClick={onOpenAI}>
+                  Abrir Valora IA
+                </button>
               </div>
             </article>
           </section>
