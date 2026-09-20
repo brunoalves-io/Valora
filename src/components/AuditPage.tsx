@@ -43,6 +43,7 @@ const entityLabels: Record<string, string> = {
   proposals: "Proposta",
   credit_cards: "Cartão",
   recurring_rules: "Recorrência",
+  automation_rules: "Regra de automação",
   team_member: "Membro da equipe",
   team_invitation: "Convite",
 };
