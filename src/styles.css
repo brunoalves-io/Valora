@@ -812,3 +812,27 @@ tr:last-child td { border-bottom: 0; }
     grid-template-columns: 1fr;
   }
 }
+
+
+.settlement-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.settlement-actions select {
+  max-width: 130px;
+  border: 1px solid #d9e0e9;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: white;
+  color: #4f5c71;
+  font-size: 11px;
+}
+
+.table-action:disabled {
+  opacity: .45;
+  text-decoration: none;
+  cursor: not-allowed;
+}
