@@ -8,6 +8,7 @@ import { CompanyGate } from "./components/CompanyGate";
 import { CostCentersPage } from "./components/CostCentersPage";
 import { Dashboard } from "./components/Dashboard";
 import { FinancialObligationsPage } from "./components/FinancialObligationsPage";
+import { ProposalsPage } from "./components/ProposalsPage";
 import { TransactionsPage } from "./components/TransactionsPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
@@ -22,7 +23,8 @@ type Page =
   | "categories"
   | "cost-centers"
   | "customers"
-  | "suppliers";
+  | "suppliers"
+  | "proposals";
 
 const activeNav: Array<[string, string, Page]> = [
   ["⌂", "Início", "dashboard"],
@@ -34,11 +36,11 @@ const activeNav: Array<[string, string, Page]> = [
   ["◎", "Centros de custo", "cost-centers"],
   ["♙", "Clientes", "customers"],
   ["♟", "Fornecedores", "suppliers"],
+  ["◇", "Propostas", "proposals"],
 ];
 
 const futureNav = [
   ["▣", "Cartões"],
-  ["◇", "Propostas"],
   ["▥", "Relatórios"],
   ["✦", "Valora IA"],
 ];
@@ -85,6 +87,8 @@ function CurrentPage({ page }: { page: Page }) {
       return <BusinessPartnersPage view="customer" />;
     case "suppliers":
       return <BusinessPartnersPage view="supplier" />;
+    case "proposals":
+      return <ProposalsPage />;
     default:
       return <Dashboard />;
   }
