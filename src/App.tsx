@@ -173,7 +173,17 @@ function Workspace() {
 
   useEffect(() => {
     void refreshAlertCount();
+
+    const timer = window.setInterval(() => {
+      void refreshAlertCount();
+    }, 5 * 60 * 1000);
+
+    return () => window.clearInterval(timer);
   }, [refreshAlertCount]);
+
+  useEffect(() => {
+    void refreshAlertCount();
+  }, [page, refreshAlertCount]);
 
   const navigation =
     activeRole === "owner" || activeRole === "admin"
