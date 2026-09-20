@@ -274,3 +274,16 @@ drop policy if exists "managers can delete transactions" on public.transactions;
 create policy "managers can delete transactions"
   on public.transactions for delete
   using (public.can_manage_company(company_id));
+
+
+-- Explicit Data API privileges.
+-- This lets us keep "Automatically expose new tables" disabled in Supabase
+-- and grant access only to the objects Valora actually uses.
+grant usage on schema public to authenticated;
+
+grant select, update on table public.profiles to authenticated;
+grant select, update on table public.companies to authenticated;
+grant select on table public.company_members to authenticated;
+grant select, insert, update, delete on table public.financial_accounts to authenticated;
+grant select, insert, update, delete on table public.categories to authenticated;
+grant select, insert, update, delete on table public.transactions to authenticated;
