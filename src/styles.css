@@ -940,3 +940,191 @@ tr:last-child td { border-bottom: 0; }
     width: 100%;
   }
 }
+
+
+/* Valora v0.4.0 proposals */
+.proposal-form { margin-bottom: 16px; }
+.proposal-form label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #49566c;
+}
+.proposal-form input,
+.proposal-form select {
+  width: 100%;
+  border: 1px solid #d9e0e9;
+  border-radius: 10px;
+  padding: 12px 13px;
+  color: #172033;
+  background: white;
+  outline: none;
+}
+.proposal-form input:focus,
+.proposal-form select:focus {
+  border-color: #46bf91;
+  box-shadow: 0 0 0 3px rgba(70, 191, 145, .12);
+}
+.proposal-main-grid,
+.proposal-bottom-grid {
+  display: grid;
+  grid-template-columns: 2fr repeat(3, minmax(150px, 1fr));
+  gap: 14px;
+}
+.proposal-main-grid .wide,
+.proposal-bottom-grid .wide {
+  grid-column: span 2;
+}
+.proposal-items {
+  margin: 20px 0;
+  border: 1px solid #e5e9f0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.proposal-items-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #fafbfc;
+  border-bottom: 1px solid #edf0f4;
+}
+.proposal-items-heading strong,
+.proposal-items-heading span {
+  display: block;
+}
+.proposal-items-heading span {
+  color: #8b96a7;
+  font-size: 11px;
+  margin-top: 3px;
+}
+.compact-button { padding: 7px 10px; font-size: 12px; }
+.proposal-item-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) 120px 150px 140px 34px;
+  gap: 12px;
+  align-items: end;
+  padding: 14px 16px;
+  border-bottom: 1px solid #edf0f4;
+}
+.proposal-item-row:last-child { border-bottom: 0; }
+.proposal-line-total {
+  display: grid;
+  gap: 5px;
+  padding-bottom: 11px;
+}
+.proposal-line-total span {
+  color: #8b96a7;
+  font-size: 11px;
+}
+.proposal-line-total strong {
+  font-size: 14px;
+}
+.remove-item {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #ad3e47;
+  font-size: 18px;
+}
+.proposal-total-box {
+  align-self: end;
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f7faf9;
+  border: 1px solid #dfece7;
+}
+.proposal-total-box span {
+  color: #748195;
+  font-size: 12px;
+}
+.proposal-total-box strong {
+  font-size: 18px;
+  color: #1f7f5c;
+}
+.proposal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.proposals-table { min-width: 1180px; }
+.proposal-status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.proposal-status.draft { background: #eef1f6; color: #667388; }
+.proposal-status.sent { background: #eef4ff; color: #496ea8; }
+.proposal-status.approved { background: #eaf9f2; color: #237d5b; }
+.proposal-status.rejected { background: #fff0f1; color: #a83b44; }
+.proposal-status.expired { background: #fff7e8; color: #9a681a; }
+.proposal-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.muted-action { color: #7d8899; }
+.proposal-convert {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.proposal-convert input {
+  max-width: 132px;
+  border: 1px solid #d9e0e9;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+.converted-badge {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eaf9f2;
+  color: #237d5b;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+@media (max-width: 1180px) {
+  .proposal-main-grid,
+  .proposal-bottom-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .proposal-item-row {
+    grid-template-columns: minmax(220px, 2fr) 110px 140px 130px 34px;
+  }
+}
+@media (max-width: 760px) {
+  .proposal-main-grid,
+  .proposal-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+  .proposal-main-grid .wide,
+  .proposal-bottom-grid .wide {
+    grid-column: auto;
+  }
+  .proposal-item-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .proposal-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .proposal-line-total {
+    padding-bottom: 0;
+  }
+}
