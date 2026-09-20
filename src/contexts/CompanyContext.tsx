@@ -51,6 +51,11 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     }
 
     setLoading(true);
+
+    // Accept pending invitations that match the authenticated user's e-mail.
+    // This keeps invitation onboarding inside Valora without requiring a separate e-mail service.
+    await supabase.rpc("accept_my_company_invitations");
+
     const { data, error } = await supabase
       .from("company_members")
       .select("role, created_at, company:companies(id, name, slug, created_at)")
