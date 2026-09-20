@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AccountsPage } from "./components/AccountsPage";
 import { AuthScreen } from "./components/AuthScreen";
 import { CategoriesPage } from "./components/CategoriesPage";
+import { BusinessPartnersPage } from "./components/BusinessPartnersPage";
 import { CompanyGate } from "./components/CompanyGate";
 import { CostCentersPage } from "./components/CostCentersPage";
 import { Dashboard } from "./components/Dashboard";
@@ -19,7 +20,9 @@ type Page =
   | "receivables"
   | "accounts"
   | "categories"
-  | "cost-centers";
+  | "cost-centers"
+  | "customers"
+  | "suppliers";
 
 const activeNav: Array<[string, string, Page]> = [
   ["⌂", "Início", "dashboard"],
@@ -29,12 +32,12 @@ const activeNav: Array<[string, string, Page]> = [
   ["◉", "Contas e caixas", "accounts"],
   ["◆", "Categorias", "categories"],
   ["◎", "Centros de custo", "cost-centers"],
+  ["♙", "Clientes", "customers"],
+  ["♟", "Fornecedores", "suppliers"],
 ];
 
 const futureNav = [
   ["▣", "Cartões"],
-  ["♙", "Clientes"],
-  ["♟", "Fornecedores"],
   ["◇", "Propostas"],
   ["▥", "Relatórios"],
   ["✦", "Valora IA"],
@@ -78,6 +81,10 @@ function CurrentPage({ page }: { page: Page }) {
       return <CategoriesPage />;
     case "cost-centers":
       return <CostCentersPage />;
+    case "customers":
+      return <BusinessPartnersPage view="customer" />;
+    case "suppliers":
+      return <BusinessPartnersPage view="supplier" />;
     default:
       return <Dashboard />;
   }
