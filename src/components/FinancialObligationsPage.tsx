@@ -8,7 +8,7 @@ type StatusFilter = "all" | "pending" | "paid" | "overdue";
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; type: "income" | "expense" | "both" };
 type CostCenter = { id: string; name: string };
-type Partner = { id: string; name: string; kind: "customer" | "supplier" | "both" };
+type Partner = { id: string; name: string; kind: "customer" | "supplier" | "both"; active: boolean };
 type Transaction = {
   id: string;
   description: string;
@@ -90,9 +90,8 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
         .order("name"),
       supabase
         .from("business_partners")
-        .select("id, name, kind")
+        .select("id, name, kind, active")
         .eq("company_id", activeCompany.id)
-        .eq("active", true)
         .order("name"),
     ]);
 
@@ -153,9 +152,10 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
 
   const visiblePartners = partners.filter(
     (partner) =>
-      partner.kind === "both" ||
+      partner.active &&
+      (partner.kind === "both" ||
       (type === "income" && partner.kind === "customer") ||
-      (type === "expense" && partner.kind === "supplier"),
+      (type === "expense" && partner.kind === "supplier")),
   );
 
   const partnerNames = useMemo(
