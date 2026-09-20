@@ -13,6 +13,8 @@ import { ReportsPage } from "./components/ReportsPage";
 import { CardsPage } from "./components/CardsPage";
 import { RecurrencesPage } from "./components/RecurrencesPage";
 import { RecurringSyncGate } from "./components/RecurringSyncGate";
+import { TeamPage } from "./components/TeamPage";
+import { AuditPage } from "./components/AuditPage";
 import { TransactionsPage } from "./components/TransactionsPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
@@ -31,7 +33,9 @@ type Page =
   | "proposals"
   | "reports"
   | "cards"
-  | "recurrences";
+  | "recurrences"
+  | "team"
+  | "audit";
 
 const activeNav: Array<[string, string, Page]> = [
   ["⌂", "Início", "dashboard"],
@@ -47,6 +51,11 @@ const activeNav: Array<[string, string, Page]> = [
   ["▥", "Relatórios", "reports"],
   ["▣", "Cartões", "cards"],
   ["⟳", "Recorrências", "recurrences"],
+];
+
+const adminNav: Array<[string, string, Page]> = [
+  ["♟", "Equipe", "team"],
+  ["◌", "Auditoria", "audit"],
 ];
 
 const futureNav = [
@@ -103,6 +112,10 @@ function CurrentPage({ page }: { page: Page }) {
       return <CardsPage />;
     case "recurrences":
       return <RecurrencesPage />;
+    case "team":
+      return <TeamPage />;
+    case "audit":
+      return <AuditPage />;
     default:
       return <Dashboard />;
   }
@@ -110,11 +123,16 @@ function CurrentPage({ page }: { page: Page }) {
 
 function Workspace() {
   const [page, setPage] = useState<Page>("dashboard");
-  const { companies, activeCompany, selectCompany } = useCompany();
+  const { companies, activeCompany, activeRole, selectCompany } = useCompany();
   const { user, signOut } = useAuth();
 
+  const navigation =
+    activeRole === "owner" || activeRole === "admin"
+      ? [...activeNav, ...adminNav]
+      : activeNav;
+
   return (
-    <div className="shell">
+    <div className={activeRole === "viewer" ? "shell role-viewer" : "shell"}>
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">V</div>
@@ -136,10 +154,21 @@ function Workspace() {
               </option>
             ))}
           </select>
+          {activeRole && (
+            <small className={"company-role-badge " + activeRole}>
+              {activeRole === "owner"
+                ? "Owner"
+                : activeRole === "admin"
+                  ? "Admin"
+                  : activeRole === "member"
+                    ? "Membro"
+                    : "Somente leitura"}
+            </small>
+          )}
         </div>
 
         <nav>
-          {activeNav.map(([icon, label, target]) => (
+          {navigation.map(([icon, label, target]) => (
             <button
               className={page === target ? "nav-item active" : "nav-item"}
               key={target}
@@ -175,6 +204,11 @@ function Workspace() {
       </aside>
 
       <main className="workspace">
+        {activeRole === "viewer" && (
+          <div className="viewer-banner">
+            Modo somente leitura. Você pode consultar os dados, mas não alterar registros.
+          </div>
+        )}
         <RecurringSyncGate>
           <CurrentPage page={page} />
         </RecurringSyncGate>
