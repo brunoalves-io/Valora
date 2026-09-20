@@ -149,7 +149,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 begin
   insert into public.automation_rules (
     company_id,
@@ -170,7 +170,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists seed_company_automation_rules_trigger on public.companies;
 create trigger seed_company_automation_rules_trigger
