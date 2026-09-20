@@ -552,6 +552,67 @@ begin
 end;
 $$;
 
+create or replace function public.advance_recurring_due_date(
+  p_current_due date,
+  p_anchor_date date,
+  p_frequency text,
+  p_interval_count integer
+)
+returns date
+language plpgsql
+immutable
+set search_path = public
+as $
+declare
+  v_target_month date;
+  v_last_day date;
+  v_target_year integer;
+  v_anchor_month integer;
+  v_anchor_day integer;
+begin
+  if p_frequency = 'weekly' then
+    return (p_current_due + make_interval(days => 7 * p_interval_count))::date;
+  end if;
+
+  v_anchor_month := extract(month from p_anchor_date)::integer;
+  v_anchor_day := extract(day from p_anchor_date)::integer;
+
+  if p_frequency = 'monthly' then
+    v_target_month :=
+      (date_trunc('month', p_current_due)::date
+        + make_interval(months => p_interval_count))::date;
+
+    v_last_day :=
+      (date_trunc('month', v_target_month)
+        + interval '1 month'
+        - interval '1 day')::date;
+
+    return make_date(
+      extract(year from v_target_month)::integer,
+      extract(month from v_target_month)::integer,
+      least(v_anchor_day, extract(day from v_last_day)::integer)
+    );
+  end if;
+
+  if p_frequency = 'yearly' then
+    v_target_year := extract(year from p_current_due)::integer + p_interval_count;
+    v_target_month := make_date(v_target_year, v_anchor_month, 1);
+    v_last_day :=
+      (date_trunc('month', v_target_month)
+        + interval '1 month'
+        - interval '1 day')::date;
+
+    return make_date(
+      v_target_year,
+      v_anchor_month,
+      least(v_anchor_day, extract(day from v_last_day)::integer)
+    );
+  end if;
+
+  raise exception 'Invalid recurring frequency';
+end;
+$;
+
 create or replace function public.materialize_recurring_transactions(
   p_company_id uuid,
   p_through_date date
@@ -620,12 +681,12 @@ begin
         v_generated := v_generated + 1;
       end if;
 
-      v_due :=
-        case v_rule.frequency
-          when 'weekly' then (v_due + make_interval(days => 7 * v_rule.interval_count))::date
-          when 'monthly' then (v_due + make_interval(months => v_rule.interval_count))::date
-          when 'yearly' then (v_due + make_interval(years => v_rule.interval_count))::date
-        end;
+      v_due := public.advance_recurring_due_date(
+        v_due,
+        v_rule.start_date,
+        v_rule.frequency,
+        v_rule.interval_count
+      );
     end loop;
 
     update public.recurring_rules
@@ -649,6 +710,7 @@ revoke all on function public.card_first_due_date(date, integer, integer) from p
 revoke all on function public.create_installment_series(uuid, text, text, numeric, date, integer, uuid, uuid, uuid, uuid) from public;
 revoke all on function public.create_card_purchase(uuid, uuid, text, numeric, date, integer, uuid, uuid, uuid) from public;
 revoke all on function public.pay_card_statement(uuid, date, uuid) from public;
+revoke all on function public.advance_recurring_due_date(date, date, text, integer) from public;
 revoke all on function public.materialize_recurring_transactions(uuid, date) from public;
 
 grant execute on function public.create_installment_series(uuid, text, text, numeric, date, integer, uuid, uuid, uuid, uuid) to authenticated;
