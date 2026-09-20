@@ -91,7 +91,12 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
       setError(firstError.message);
     } else {
       setItems((txResult.data ?? []) as Transaction[]);
-      setAccounts((accountResult.data ?? []) as Account[]);
+      const loadedAccounts = (accountResult.data ?? []) as Account[];
+      setAccounts(loadedAccounts);
+      setForm((current) => ({
+        ...current,
+        account_id: current.account_id || loadedAccounts[0]?.id || "",
+      }));
       setCategories((categoryResult.data ?? []) as Category[]);
       setCostCenters((costCenterResult.data ?? []) as CostCenter[]);
     }
@@ -250,8 +255,8 @@ export function FinancialObligationsPage({ type }: { type: ObligationType }) {
             </label>
             <label>
               Conta / caixa
-              <select value={form.account_id} onChange={(event) => setForm({ ...form, account_id: event.target.value })}>
-                <option value="">Sem conta</option>
+              <select value={form.account_id} onChange={(event) => setForm({ ...form, account_id: event.target.value })} required>
+                <option value="" disabled>Selecione uma conta</option>
                 {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
               </select>
             </label>
