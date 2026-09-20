@@ -144,6 +144,39 @@ cross join (
 ) as defaults(kind, days_before, horizon_days, threshold)
 on conflict (company_id, kind) do nothing;
 
+create or replace function public.seed_company_automation_rules()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  insert into public.automation_rules (
+    company_id,
+    kind,
+    enabled,
+    days_before,
+    horizon_days,
+    threshold
+  )
+  values
+    (new.id, 'expense_due', true, 3, 30, 0),
+    (new.id, 'income_due', true, 3, 30, 0),
+    (new.id, 'expense_overdue', true, 0, 30, 0),
+    (new.id, 'income_overdue', true, 0, 30, 0),
+    (new.id, 'card_statement_due', true, 3, 30, 0),
+    (new.id, 'cash_projection', true, 0, 30, 0)
+  on conflict (company_id, kind) do nothing;
+
+  return new;
+end;
+$;
+
+drop trigger if exists seed_company_automation_rules_trigger on public.companies;
+create trigger seed_company_automation_rules_trigger
+  after insert on public.companies
+  for each row execute procedure public.seed_company_automation_rules();
+
 create or replace function public.ensure_default_automation_rules(p_company_id uuid)
 returns void
 language plpgsql
@@ -623,6 +656,7 @@ create trigger audit_automation_rules
   after insert or update or delete on public.automation_rules
   for each row execute procedure public.capture_audit_log();
 
+revoke all on function public.seed_company_automation_rules() from public;
 revoke all on function public.ensure_default_automation_rules(uuid) from public;
 revoke all on function public.refresh_company_alerts(uuid) from public;
 revoke all on function public.list_company_alerts(uuid, boolean) from public;
