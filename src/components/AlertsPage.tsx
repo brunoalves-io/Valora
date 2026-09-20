@@ -443,7 +443,7 @@ export function AlertsPage({
             />
             Mostrar dispensados
           </label>
-          <button className="table-action" onClick={() => void markAllRead()}>
+          <button className="alert-text-action alert-mark-all" onClick={() => void markAllRead()}>
             Marcar todos como lidos
           </button>
         </div>
@@ -468,10 +468,6 @@ export function AlertsPage({
               }
               key={item.id}
             >
-              <div className={"alert-severity-icon " + item.severity}>
-                {item.severity === "critical" ? "!" : item.severity === "warning" ? "△" : "i"}
-              </div>
-
               <div className="alert-card-content">
                 <div className="alert-card-heading">
                   <div>
@@ -511,7 +507,7 @@ export function AlertsPage({
                     </button>
                   )}
                   <button
-                    className="table-action muted-action"
+                    className="alert-text-action alert-dismiss-action"
                     onClick={() =>
                       void setState(item, item.is_dismissed ? "restore" : "dismiss")
                     }
