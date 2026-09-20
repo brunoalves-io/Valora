@@ -559,3 +559,280 @@ tr:last-child td { border-bottom: 0; }
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .wide { grid-column: auto; min-width: 0; }
 }
+
+
+/* Valora v0.2.0 financial core */
+.nav-divider {
+  height: 1px;
+  background: #1e2d45;
+  margin: 8px 10px;
+}
+
+.compact-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.danger-text { color: #bc4650 !important; }
+
+.table-toolbar {
+  padding: 14px 16px;
+  border-bottom: 1px solid #edf0f4;
+  background: #fafbfc;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  border: 1px solid #dde3eb;
+  background: white;
+  color: #657187;
+  border-radius: 9px;
+  padding: 8px 11px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.filter-tab.active {
+  border-color: #7bd4b2;
+  background: #eefaf5;
+  color: #20805d;
+}
+
+.table-action {
+  border: 0;
+  background: transparent;
+  color: #238b67;
+  font-weight: 800;
+  padding: 5px 7px;
+}
+
+.table-action:hover { text-decoration: underline; }
+
+.pill.pending { background: #fff7e8; color: #9a681a; }
+.pill.paid { background: #eaf9f2; color: #237d5b; }
+.pill.overdue { background: #fff0f1; color: #a83b44; }
+.pill.both { background: #eef1f6; color: #5f6c81; }
+
+.simple-form {
+  margin-bottom: 16px;
+}
+
+.simple-form label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #49566c;
+}
+
+.simple-form input,
+.simple-form select {
+  width: 100%;
+  border: 1px solid #d9e0e9;
+  border-radius: 10px;
+  padding: 12px 13px;
+  color: #172033;
+  background: white;
+  outline: none;
+}
+
+.simple-form input:focus,
+.simple-form select:focus {
+  border-color: #46bf91;
+  box-shadow: 0 0 0 3px rgba(70, 191, 145, .12);
+}
+
+.simple-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cost-center-form-grid {
+  grid-template-columns: 1fr 2fr;
+}
+
+.obligations-form-grid {
+  grid-template-columns: 2fr repeat(3, minmax(145px, 1fr));
+}
+
+.account-total-card {
+  background: linear-gradient(135deg, #13233a, #0f1b2e);
+  color: white;
+  border-radius: 18px;
+  padding: 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 28px rgba(16, 27, 45, .12);
+}
+
+.account-total-card span,
+.account-total-card small {
+  display: block;
+  color: #aab8cc;
+}
+
+.account-total-card strong {
+  display: block;
+  font-size: 32px;
+  margin: 8px 0 6px;
+}
+
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.account-card,
+.management-card {
+  background: white;
+  border: 1px solid #e5e9f0;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 5px 20px rgba(21, 34, 56, .035);
+}
+
+.account-card.inactive,
+.management-card.inactive {
+  opacity: .6;
+}
+
+.account-card-top,
+.account-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.account-symbol {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: #eaf9f2;
+  color: #248560;
+  font-weight: 900;
+}
+
+.status-badge {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #eef1f5;
+  color: #788397;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.status-badge.active {
+  background: #eaf9f2;
+  color: #237d5b;
+}
+
+.account-card > small {
+  display: block;
+  color: #8490a3;
+  margin-top: 18px;
+}
+
+.account-card h2,
+.management-card h2 {
+  margin: 5px 0 8px;
+  font-size: 18px;
+}
+
+.account-card > strong {
+  display: block;
+  font-size: 25px;
+  margin-bottom: 18px;
+}
+
+.account-card-footer {
+  border-top: 1px solid #edf0f4;
+  padding-top: 13px;
+  color: #8490a3;
+  font-size: 11px;
+}
+
+.management-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.management-card {
+  min-height: 175px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.management-card p {
+  color: #788499;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.management-card .table-action {
+  align-self: flex-start;
+  padding-left: 0;
+}
+
+.cell-subtitle {
+  display: block;
+  color: #8b96a7;
+  margin-top: 3px;
+  font-size: 11px;
+}
+
+@media (max-width: 1180px) {
+  .account-grid,
+  .management-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .obligations-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .compact-metrics,
+  .account-grid,
+  .management-grid,
+  .simple-form-grid,
+  .cost-center-form-grid,
+  .obligations-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+.settlement-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.settlement-actions select {
+  max-width: 130px;
+  border: 1px solid #d9e0e9;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: white;
+  color: #4f5c71;
+  font-size: 11px;
+}
+
+.table-action:disabled {
+  opacity: .45;
+  text-decoration: none;
+  cursor: not-allowed;
+}

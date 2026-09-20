@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; type: "income" | "expense" | "both" };
+type CostCenter = { id: string; name: string };
 type Transaction = {
   id: string;
   description: string;
@@ -31,6 +32,7 @@ export function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -43,13 +45,14 @@ export function TransactionsPage() {
     status: "pending" as "pending" | "paid",
     account_id: "",
     category_id: "",
+    cost_center_id: "",
   });
 
   async function load() {
     if (!supabase || !activeCompany) return;
     setLoading(true);
 
-    const [txResult, accountResult, categoryResult] = await Promise.all([
+    const [txResult, accountResult, categoryResult, costCenterResult] = await Promise.all([
       supabase
         .from("transactions")
         .select("id, description, amount, type, status, due_date, account_id, category_id")
@@ -68,19 +71,27 @@ export function TransactionsPage() {
         .eq("company_id", activeCompany.id)
         .eq("active", true)
         .order("name"),
+      supabase
+        .from("cost_centers")
+        .select("id, name")
+        .eq("company_id", activeCompany.id)
+        .eq("active", true)
+        .order("name"),
     ]);
 
-    if (txResult.error || accountResult.error || categoryResult.error) {
+    if (txResult.error || accountResult.error || categoryResult.error || costCenterResult.error) {
       setError(
         txResult.error?.message ||
           accountResult.error?.message ||
           categoryResult.error?.message ||
+          costCenterResult.error?.message ||
           "Erro ao carregar dados.",
       );
     } else {
       setTransactions((txResult.data ?? []) as Transaction[]);
       setAccounts((accountResult.data ?? []) as Account[]);
       setCategories((categoryResult.data ?? []) as Category[]);
+      setCostCenters((costCenterResult.data ?? []) as CostCenter[]);
     }
 
     setLoading(false);
@@ -118,6 +129,7 @@ export function TransactionsPage() {
       paid_at: form.status === "paid" ? new Date().toISOString() : null,
       account_id: form.account_id || null,
       category_id: form.category_id || null,
+      cost_center_id: form.cost_center_id || null,
     });
 
     if (insertError) {
@@ -134,6 +146,7 @@ export function TransactionsPage() {
       status: "pending",
       account_id: accounts[0]?.id ?? "",
       category_id: "",
+      cost_center_id: "",
     });
     setShowForm(false);
     setSaving(false);
@@ -240,6 +253,18 @@ export function TransactionsPage() {
                 <option value="">Sem categoria</option>
                 {visibleCategories.map((category) => (
                   <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Centro de custo
+              <select
+                value={form.cost_center_id}
+                onChange={(event) => setForm({ ...form, cost_center_id: event.target.value })}
+              >
+                <option value="">Sem centro de custo</option>
+                {costCenters.map((center) => (
+                  <option key={center.id} value={center.id}>{center.name}</option>
                 ))}
               </select>
             </label>

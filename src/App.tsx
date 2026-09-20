@@ -1,18 +1,37 @@
+
 import { useState } from "react";
+import { AccountsPage } from "./components/AccountsPage";
 import { AuthScreen } from "./components/AuthScreen";
+import { CategoriesPage } from "./components/CategoriesPage";
 import { CompanyGate } from "./components/CompanyGate";
+import { CostCentersPage } from "./components/CostCentersPage";
 import { Dashboard } from "./components/Dashboard";
+import { FinancialObligationsPage } from "./components/FinancialObligationsPage";
 import { TransactionsPage } from "./components/TransactionsPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
 import { isSupabaseConfigured } from "./lib/supabase";
 
-type Page = "dashboard" | "transactions";
+type Page =
+  | "dashboard"
+  | "transactions"
+  | "payables"
+  | "receivables"
+  | "accounts"
+  | "categories"
+  | "cost-centers";
+
+const activeNav: Array<[string, string, Page]> = [
+  ["⌂", "Início", "dashboard"],
+  ["↔", "Lançamentos", "transactions"],
+  ["↓", "Contas a pagar", "payables"],
+  ["↑", "Contas a receber", "receivables"],
+  ["◉", "Contas e caixas", "accounts"],
+  ["◆", "Categorias", "categories"],
+  ["◎", "Centros de custo", "cost-centers"],
+];
 
 const futureNav = [
-  ["↓", "Contas a pagar"],
-  ["↑", "Contas a receber"],
-  ["◉", "Contas e caixas"],
   ["▣", "Cartões"],
   ["♙", "Clientes"],
   ["♟", "Fornecedores"],
@@ -35,14 +54,33 @@ function MissingConfiguration() {
         <p className="eyebrow">SUPABASE</p>
         <h1>Falta conectar o banco de dados</h1>
         <p>
-          Crie o arquivo <code>.env.local</code> com as variáveis abaixo e aplique a
-          migration disponível na pasta <code>supabase/migrations</code>.
+          Crie o arquivo <code>.env.local</code> com as variáveis abaixo e aplique as
+          migrations disponíveis na pasta <code>supabase/migrations</code>.
         </p>
         <pre>{`VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...`}</pre>
+VITE_SUPABASE_PUBLISHABLE_KEY=...`}</pre>
       </div>
     </div>
   );
+}
+
+function CurrentPage({ page }: { page: Page }) {
+  switch (page) {
+    case "transactions":
+      return <TransactionsPage />;
+    case "payables":
+      return <FinancialObligationsPage type="expense" />;
+    case "receivables":
+      return <FinancialObligationsPage type="income" />;
+    case "accounts":
+      return <AccountsPage />;
+    case "categories":
+      return <CategoriesPage />;
+    case "cost-centers":
+      return <CostCentersPage />;
+    default:
+      return <Dashboard />;
+  }
 }
 
 function Workspace() {
@@ -76,18 +114,18 @@ function Workspace() {
         </div>
 
         <nav>
-          <button
-            className={page === "dashboard" ? "nav-item active" : "nav-item"}
-            onClick={() => setPage("dashboard")}
-          >
-            <span>⌂</span> Início
-          </button>
-          <button
-            className={page === "transactions" ? "nav-item active" : "nav-item"}
-            onClick={() => setPage("transactions")}
-          >
-            <span>↔</span> Lançamentos
-          </button>
+          {activeNav.map(([icon, label, target]) => (
+            <button
+              className={page === target ? "nav-item active" : "nav-item"}
+              key={target}
+              onClick={() => setPage(target)}
+            >
+              <span>{icon}</span> {label}
+            </button>
+          ))}
+
+          <div className="nav-divider" />
+
           {futureNav.map(([icon, label]) => (
             <button className="nav-item disabled" key={label} disabled title="Em breve">
               <span>{icon}</span> {label}
@@ -112,7 +150,7 @@ function Workspace() {
       </aside>
 
       <main className="workspace">
-        {page === "dashboard" ? <Dashboard /> : <TransactionsPage />}
+        <CurrentPage page={page} />
       </main>
     </div>
   );
