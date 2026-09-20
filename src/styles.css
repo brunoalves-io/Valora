@@ -1128,3 +1128,223 @@ tr:last-child td { border-bottom: 0; }
     padding-bottom: 0;
   }
 }
+
+
+/* Valora v0.5.0 reports */
+.report-filters {
+  display: grid;
+  grid-template-columns: 1.25fr repeat(6, minmax(130px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.report-filters label,
+.report-basis {
+  display: grid;
+  gap: 7px;
+  color: #4d5a6f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.report-filters input,
+.report-filters select {
+  width: 100%;
+  border: 1px solid #d9e0e9;
+  border-radius: 9px;
+  padding: 10px 11px;
+  color: #172033;
+  background: white;
+  outline: none;
+}
+
+.report-filters input:focus,
+.report-filters select:focus {
+  border-color: #46bf91;
+  box-shadow: 0 0 0 3px rgba(70, 191, 145, .12);
+}
+
+.report-presets {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.report-metrics .positive-value,
+.positive-value {
+  color: #238660 !important;
+}
+
+.report-metrics .negative-value,
+.negative-value {
+  color: #bc4650 !important;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.report-grid.secondary {
+  grid-template-columns: 1fr 1fr;
+}
+
+.report-flow-panel {
+  min-width: 0;
+}
+
+.report-months {
+  display: grid;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.report-month {
+  display: grid;
+  gap: 7px;
+}
+
+.report-month-label,
+.report-month-values {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report-month-label {
+  align-items: center;
+}
+
+.report-month-label strong {
+  text-transform: capitalize;
+  font-size: 13px;
+}
+
+.report-month-label span,
+.report-month-values {
+  font-size: 11px;
+  color: #7e8a9e;
+}
+
+.report-bars {
+  display: grid;
+  gap: 4px;
+}
+
+.report-bar {
+  height: 8px;
+  border-radius: 999px;
+  min-width: 2%;
+}
+
+.report-bar.income {
+  background: #2ab67f;
+}
+
+.report-bar.expense {
+  background: #dc6a72;
+}
+
+.dre-table {
+  display: grid;
+  margin-top: 17px;
+}
+
+.dre-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf0f4;
+  font-size: 13px;
+}
+
+.dre-row.sub {
+  padding-left: 12px;
+  color: #69758a;
+}
+
+.dre-row.strong {
+  font-weight: 800;
+}
+
+.dre-row.total {
+  margin-top: 5px;
+  padding-top: 15px;
+  border-top: 2px solid #dfe5ec;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.report-note {
+  margin-top: 15px !important;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #f7f9fc;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.report-table-panel {
+  min-width: 0;
+}
+
+.report-panel-title {
+  padding: 18px 20px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.report-empty-cell {
+  text-align: center;
+  color: #8a95a6;
+  padding: 28px !important;
+}
+
+.report-detail {
+  margin-bottom: 12px;
+}
+
+.report-count {
+  color: #8590a3;
+  font-size: 12px;
+}
+
+.report-detail-table {
+  min-width: 1040px;
+}
+
+@media (max-width: 1380px) {
+  .report-filters {
+    grid-template-columns: repeat(4, minmax(140px, 1fr));
+  }
+}
+
+@media (max-width: 1050px) {
+  .report-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-grid,
+  .report-grid.secondary {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .report-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .report-presets {
+    grid-column: auto;
+  }
+
+  .report-month-values {
+    flex-direction: column;
+    gap: 2px;
+  }
+}
