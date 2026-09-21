@@ -5,6 +5,7 @@ import {
   type CSSProperties,
   type FormEvent,
 } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 
@@ -105,6 +106,7 @@ export function CompanySettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
+  const [logoRemovalOpen, setLogoRemovalOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -253,9 +255,6 @@ export function CompanySettingsPage() {
   async function removeLogo() {
     if (!supabase || !activeCompany || !canEdit || logoBusy || !form.logo_url) return;
 
-    const confirmed = window.confirm("Remover a logo atual da empresa?");
-    if (!confirmed) return;
-
     setLogoBusy(true);
     setError("");
     setMessage("");
@@ -281,6 +280,7 @@ export function CompanySettingsPage() {
     await refreshCompanies();
     setMessage("Logo removida.");
     setLogoBusy(false);
+    setLogoRemovalOpen(false);
   }
 
   async function save(event: FormEvent) {
@@ -667,7 +667,7 @@ export function CompanySettingsPage() {
                   <button
                     type="button"
                     className="table-action danger company-logo-remove"
-                    onClick={() => void removeLogo()}
+                    onClick={() => setLogoRemovalOpen(true)}
                     disabled={logoBusy}
                   >
                     Remover logo
@@ -737,6 +737,16 @@ export function CompanySettingsPage() {
           </div>
         )}
       </form>
+      <ConfirmDialog
+        open={logoRemovalOpen}
+        title="Remover logo?"
+        description="A logo atual será removida da identidade desta empresa."
+        warning="Você poderá enviar uma nova logo a qualquer momento."
+        confirmLabel="Remover logo"
+        busy={logoBusy}
+        onCancel={() => { if (!logoBusy) setLogoRemovalOpen(false); }}
+        onConfirm={() => void removeLogo()}
+      />
     </>
   );
 }
