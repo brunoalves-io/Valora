@@ -253,21 +253,77 @@ nav {
   overflow-y: auto;
   padding-right: 2px;
 }
-.nav-item, .settings {
+
+.nav-item,
+.settings {
+  position: relative;
+  width: 100%;
+  min-height: 40px;
   border: 0;
   background: transparent;
   color: #9eacc6;
-  padding: 10px 12px;
+  padding: 9px 11px;
   border-radius: 9px;
   text-align: left;
   display: flex;
-  gap: 11px;
+  gap: 10px;
   align-items: center;
+  transition:
+    background .15s ease,
+    color .15s ease,
+    transform .15s ease;
 }
-.nav-item span { width: 20px; text-align: center; }
-.nav-item:hover:not(:disabled), .nav-item.active { background: #1c2a42; color: white; }
-.nav-item.active { box-shadow: inset 3px 0 #4bd19b; }
-.nav-item.disabled { opacity: .38; }
+
+.nav-icon {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  color: #7f94b4;
+  transition: color .15s ease;
+}
+
+.nav-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.nav-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-item:hover:not(:disabled),
+.settings:hover {
+  background: #17263d;
+  color: #eef4fb;
+}
+
+.nav-item:hover:not(:disabled) .nav-icon,
+.settings:hover .nav-icon {
+  color: #b9c9df;
+}
+
+.nav-item.active,
+.settings.active {
+  background: #1c2a42;
+  color: #fff;
+  box-shadow: inset 3px 0 #4bd19b;
+}
+
+.nav-item.active .nav-icon,
+.settings.active .nav-icon {
+  color: #65d9ad;
+}
+
+.nav-item.disabled {
+  opacity: .38;
+}
 
 .sidebar-footer {
   margin-top: auto;
@@ -2959,12 +3015,6 @@ tr:last-child td { border-bottom: 0; }
 
 
 /* Valora v1.0.0 company settings */
-.settings.active {
-  background: #1c2a42;
-  color: #fff;
-  box-shadow: inset 3px 0 #4bd19b;
-}
-
 .settings.sign-out {
   margin-top: 2px;
 }
