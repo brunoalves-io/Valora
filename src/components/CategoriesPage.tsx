@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
@@ -26,6 +27,7 @@ export function CategoriesPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -137,14 +139,14 @@ export function CategoriesPage() {
     await load();
   }
 
-  async function deleteCategory(category: Category) {
-    if (!supabase || !activeCompany || deletingId) return;
+  function requestDeleteCategory(category: Category) {
+    if (deletingId) return;
+    setPendingDelete(category);
+  }
 
-    const confirmed = window.confirm(
-      `Excluir a categoria "${category.name}"?\n\nLançamentos existentes serão mantidos sem esta categoria. Subcategorias também serão preservadas e passarão a ficar sem categoria principal.`,
-    );
-    if (!confirmed) return;
-
+  async function confirmDeleteCategory() {
+    if (!supabase || !activeCompany || !pendingDelete || deletingId) return;
+    const category = pendingDelete;
     setDeletingId(category.id);
     setError("");
 
@@ -157,10 +159,12 @@ export function CategoriesPage() {
     if (deleteError) {
       setError(getDeleteErrorMessage(deleteError, "esta categoria"));
       setDeletingId(null);
+      setPendingDelete(null);
       return;
     }
 
     setDeletingId(null);
+    setPendingDelete(null);
     await load();
   }
 
@@ -275,7 +279,7 @@ export function CategoriesPage() {
                         </button>
                         <button
                           className="table-action danger"
-                          onClick={() => void deleteCategory(category)}
+                          onClick={() => requestDeleteCategory(category)}
                           disabled={deletingId === category.id}
                         >
                           {deletingId === category.id ? "Excluindo..." : "Excluir"}
@@ -289,6 +293,16 @@ export function CategoriesPage() {
           </div>
         )}
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Excluir categoria?"
+        description={pendingDelete ? `Você está prestes a excluir “${pendingDelete.name}”.` : ""}
+        warning="Lançamentos serão preservados sem a categoria. Subcategorias também ficarão sem categoria principal."
+        confirmLabel="Excluir categoria"
+        busy={Boolean(deletingId)}
+        onCancel={() => { if (!deletingId) setPendingDelete(null); }}
+        onConfirm={() => void confirmDeleteCategory()}
+      />
     </>
   );
 }
