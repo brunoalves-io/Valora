@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from "react";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 
@@ -276,7 +282,7 @@ export function CompanySettingsPage() {
         </div>
 
         <div className="company-completeness">
-          <div className="company-completeness-ring" style={{ "--progress": completeness } as React.CSSProperties}>
+          <div className="company-completeness-ring" style={{ "--progress": completeness } as CSSProperties}>
             <strong>{completeness}%</strong>
           </div>
           <div>
@@ -528,8 +534,12 @@ export function CompanySettingsPage() {
             <div className="company-logo-preview">
               {form.logo_url ? (
                 <img
+                  key={form.logo_url}
                   src={form.logo_url}
                   alt="Logo da empresa"
+                  onLoad={(event) => {
+                    event.currentTarget.style.display = "block";
+                  }}
                   onError={(event) => {
                     event.currentTarget.style.display = "none";
                   }}
