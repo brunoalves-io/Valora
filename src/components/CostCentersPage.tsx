@@ -16,6 +16,7 @@ export function CostCentersPage() {
   const [items, setItems] = useState<CostCenter[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -43,6 +44,31 @@ export function CostCentersPage() {
     void load();
   }, [activeCompany?.id]);
 
+  function resetForm() {
+    setForm({ name: "", description: "" });
+    setEditingId(null);
+    setShowForm(false);
+    setError("");
+  }
+
+  function openNewCostCenter() {
+    setEditingId(null);
+    setForm({ name: "", description: "" });
+    setError("");
+    setShowForm(true);
+  }
+
+  function editCostCenter(item: CostCenter) {
+    setEditingId(item.id);
+    setForm({
+      name: item.name,
+      description: item.description ?? "",
+    });
+    setError("");
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!supabase || !activeCompany) return;
@@ -50,21 +76,36 @@ export function CostCentersPage() {
     setSaving(true);
     setError("");
 
-    const { error: insertError } = await supabase.from("cost_centers").insert({
-      company_id: activeCompany.id,
-      name: form.name.trim(),
-      description: form.description.trim() || null,
-    });
+    const mutation = editingId
+      ? supabase
+          .from("cost_centers")
+          .update({
+            name: form.name.trim(),
+            description: form.description.trim() || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingId)
+          .eq("company_id", activeCompany.id)
+      : supabase.from("cost_centers").insert({
+          company_id: activeCompany.id,
+          name: form.name.trim(),
+          description: form.description.trim() || null,
+        });
 
-    if (insertError) {
-      setError(insertError.message);
+    const { error: mutationError } = await mutation;
+
+    if (mutationError) {
+      setError(
+        editingId
+          ? "Não foi possível atualizar este centro de custo."
+          : mutationError.message,
+      );
       setSaving(false);
       return;
     }
 
-    setForm({ name: "", description: "" });
-    setShowForm(false);
     setSaving(false);
+    resetForm();
     await load();
   }
 
@@ -119,7 +160,13 @@ export function CostCentersPage() {
           <h1>Centros de custo</h1>
           <p>Separe gastos e resultados por área, obra, empreendimento ou projeto.</p>
         </div>
-        <button className="primary" onClick={() => setShowForm((value) => !value)}>
+        <button
+          className="primary"
+          onClick={() => {
+            if (showForm) resetForm();
+            else openNewCostCenter();
+          }}
+        >
           {showForm ? "Fechar" : "+ Novo centro"}
         </button>
       </header>
@@ -128,8 +175,12 @@ export function CostCentersPage() {
         <form className="panel simple-form" onSubmit={submit}>
           <div className="form-heading">
             <div>
-              <h2>Novo centro de custo</h2>
-              <p>Ex.: Administrativo, Marketing ou Loteamento A.</p>
+              <h2>{editingId ? "Editar centro de custo" : "Novo centro de custo"}</h2>
+              <p>
+                {editingId
+                  ? "Atualize o nome ou a descrição deste centro de custo."
+                  : "Ex.: Administrativo, Marketing ou Loteamento A."}
+              </p>
             </div>
           </div>
           <div className="simple-form-grid cost-center-form-grid">
@@ -144,8 +195,10 @@ export function CostCentersPage() {
           </div>
           {error && <div className="form-alert error">{error}</div>}
           <div className="form-actions">
-            <button type="button" className="ghost" onClick={() => setShowForm(false)}>Cancelar</button>
-            <button className="primary" disabled={saving}>{saving ? "Salvando..." : "Salvar centro"}</button>
+            <button type="button" className="ghost" onClick={resetForm}>Cancelar</button>
+            <button className="primary" disabled={saving}>
+              {saving ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar centro"}
+            </button>
           </div>
         </form>
       )}
@@ -166,6 +219,9 @@ export function CostCentersPage() {
                 <p>{item.description || "Sem descrição."}</p>
               </div>
               <div className="record-actions">
+                <button className="table-action edit" onClick={() => editCostCenter(item)}>
+                  Editar
+                </button>
                 <button className="table-action" onClick={() => void toggleActive(item)}>
                   {item.active ? "Desativar" : "Reativar"}
                 </button>
