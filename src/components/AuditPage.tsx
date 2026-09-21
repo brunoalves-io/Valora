@@ -178,7 +178,7 @@ export function AuditPage() {
     return (
       <section className="panel empty-state">
         <strong>Área restrita.</strong>
-        <span>Somente Owner e Admin podem consultar a auditoria.</span>
+        <span>Somente Líder e Administrador podem consultar a auditoria.</span>
       </section>
     );
   }
