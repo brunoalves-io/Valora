@@ -73,6 +73,7 @@ export function CompanyGate({ children }: { children: ReactNode }) {
 
   const [step, setStep] = useState(1);
   const [onboardingActive, setOnboardingActive] = useState(false);
+  const [createdCompanyId, setCreatedCompanyId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -140,7 +141,13 @@ export function CompanyGate({ children }: { children: ReactNode }) {
     setError("");
 
     try {
-      const companyId = await createCompany(companyForm.name);
+      let companyId = createdCompanyId;
+
+      if (!companyId) {
+        companyId = await createCompany(companyForm.name);
+        setCreatedCompanyId(companyId);
+      }
+
       const openingBalance = parseMoney(accountForm.opening_balance);
 
       const { error: companyError } = await supabase
@@ -156,16 +163,26 @@ export function CompanyGate({ children }: { children: ReactNode }) {
 
       if (companyError) throw companyError;
 
-      const { error: accountError } = await supabase
+      const { data: existingAccounts, error: existingAccountError } = await supabase
         .from("financial_accounts")
-        .insert({
-          company_id: companyId,
-          name: accountForm.name.trim(),
-          kind: accountForm.kind,
-          opening_balance: openingBalance,
-        });
+        .select("id")
+        .eq("company_id", companyId)
+        .limit(1);
 
-      if (accountError) throw accountError;
+      if (existingAccountError) throw existingAccountError;
+
+      if ((existingAccounts ?? []).length === 0) {
+        const { error: accountError } = await supabase
+          .from("financial_accounts")
+          .insert({
+            company_id: companyId,
+            name: accountForm.name.trim(),
+            kind: accountForm.kind,
+            opening_balance: openingBalance,
+          });
+
+        if (accountError) throw accountError;
+      }
 
       await refreshCompanies();
       setOnboardingActive(false);
