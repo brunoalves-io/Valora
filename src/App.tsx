@@ -17,6 +17,7 @@ import { TeamPage } from "./components/TeamPage";
 import { AuditPage } from "./components/AuditPage";
 import { AlertsPage } from "./components/AlertsPage";
 import { ValoraAIPage } from "./components/ValoraAIPage";
+import { CompanySettingsPage } from "./components/CompanySettingsPage";
 import { TransactionsPage } from "./components/TransactionsPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
@@ -39,7 +40,8 @@ type Page =
   | "team"
   | "audit"
   | "alerts"
-  | "ai";
+  | "ai"
+  | "settings";
 
 const activeNav: Array<[string, string, Page]> = [
   ["⌂", "Início", "dashboard"],
@@ -135,6 +137,8 @@ function CurrentPage({
       );
     case "ai":
       return <ValoraAIPage />;
+    case "settings":
+      return <CompanySettingsPage />;
     default:
       return <Dashboard onOpenAI={() => onNavigate("ai")} />;
   }
@@ -253,7 +257,13 @@ function Workspace() {
               <small>{user?.email}</small>
             </div>
           </div>
-          <button className="settings" onClick={() => void signOut()}>
+          <button
+            className={page === "settings" ? "settings active" : "settings"}
+            onClick={() => setPage("settings")}
+          >
+            ⚙ Configurações
+          </button>
+          <button className="settings sign-out" onClick={() => void signOut()}>
             ⇥ Sair
           </button>
         </div>
