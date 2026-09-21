@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
@@ -44,6 +45,7 @@ export function AccountsPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -174,14 +176,14 @@ export function AccountsPage() {
     await load();
   }
 
-  async function deleteAccount(account: Account) {
-    if (!supabase || !activeCompany || deletingId) return;
+  function requestDeleteAccount(account: Account) {
+    if (deletingId) return;
+    setPendingDelete(account);
+  }
 
-    const confirmed = window.confirm(
-      `Excluir "${account.name}" permanentemente?\n\nOs lançamentos vinculados serão preservados, mas ficarão sem conta associada.`,
-    );
-    if (!confirmed) return;
-
+  async function confirmDeleteAccount() {
+    if (!supabase || !activeCompany || !pendingDelete || deletingId) return;
+    const account = pendingDelete;
     setDeletingId(account.id);
     setError("");
 
@@ -194,10 +196,12 @@ export function AccountsPage() {
     if (deleteError) {
       setError(getDeleteErrorMessage(deleteError, "esta conta ou caixa"));
       setDeletingId(null);
+      setPendingDelete(null);
       return;
     }
 
     setDeletingId(null);
+    setPendingDelete(null);
     await load();
   }
 
@@ -304,7 +308,7 @@ export function AccountsPage() {
                   </button>
                   <button
                     className="table-action danger"
-                    onClick={() => void deleteAccount(account)}
+                    onClick={() => requestDeleteAccount(account)}
                     disabled={deletingId === account.id}
                   >
                     {deletingId === account.id ? "Excluindo..." : "Excluir"}
@@ -315,6 +319,16 @@ export function AccountsPage() {
           ))}
         </section>
       )}
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Excluir conta ou caixa?"
+        description={pendingDelete ? `Você está prestes a excluir “${pendingDelete.name}”.` : ""}
+        warning="Os lançamentos vinculados serão preservados, mas ficarão sem conta associada."
+        confirmLabel="Excluir conta"
+        busy={Boolean(deletingId)}
+        onCancel={() => { if (!deletingId) setPendingDelete(null); }}
+        onConfirm={() => void confirmDeleteAccount()}
+      />
     </>
   );
 }
