@@ -604,28 +604,42 @@ export function CompanySettingsPage() {
           </div>
 
           <div className="company-brand-settings">
-            <div className="company-logo-preview">
-              {form.logo_url ? (
-                <img
-                  key={form.logo_url}
-                  src={form.logo_url}
-                  alt="Logo da empresa"
-                  onLoad={(event) => {
-                    event.currentTarget.style.display = "block";
-                  }}
-                  onError={(event) => {
-                    event.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : (
-                <span>{form.name.trim().slice(0, 1).toUpperCase() || "V"}</span>
-              )}
+            <div className="company-logo-preview-wrap">
+              <div className="company-logo-preview">
+                {form.logo_url ? (
+                  <img
+                    key={form.logo_url}
+                    src={form.logo_url}
+                    alt="Logo da empresa"
+                    onLoad={(event) => {
+                      event.currentTarget.style.display = "block";
+                    }}
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <span>{form.name.trim().slice(0, 1).toUpperCase() || "V"}</span>
+                )}
+              </div>
+              <span
+                className={
+                  form.logo_url
+                    ? "company-logo-status active"
+                    : "company-logo-status"
+                }
+              >
+                {form.logo_url ? "Logo ativa" : "Sem logo"}
+              </span>
             </div>
 
             <div className="company-logo-controls">
-              <div>
+              <div className="company-logo-copy">
                 <strong>Logo da empresa</strong>
                 <span>PNG, JPG ou WebP, até 5 MB.</span>
+                <small>
+                  Ela aparece no seletor da empresa e fica disponível para propostas e documentos.
+                </small>
               </div>
 
               <div className="company-logo-actions">
@@ -656,24 +670,33 @@ export function CompanySettingsPage() {
                     onClick={() => void removeLogo()}
                     disabled={logoBusy}
                   >
-                    Remover
+                    Remover logo
                   </button>
                 )}
               </div>
 
-              <label className="company-logo-url">
-                Ou use uma URL pública
-                <input
-                  type="url"
-                  value={form.logo_url}
-                  onChange={(event) => update("logo_url", event.target.value)}
-                  disabled={!canEdit || logoBusy}
-                  placeholder="https://..."
-                />
-                <small>
-                  O upload direto salva a imagem automaticamente. A URL continua disponível como alternativa.
-                </small>
-              </label>
+              <details className="company-logo-url-disclosure">
+                <summary>
+                  <span className="company-logo-url-summary-copy">
+                    <strong>Usar URL pública</strong>
+                    <small>Alternativa ao envio de arquivo</small>
+                  </span>
+                </summary>
+
+                <label className="company-logo-url">
+                  URL pública da logo
+                  <input
+                    type="url"
+                    value={form.logo_url}
+                    onChange={(event) => update("logo_url", event.target.value)}
+                    disabled={!canEdit || logoBusy}
+                    placeholder="https://..."
+                  />
+                  <small>
+                    Cole um endereço HTTPS da imagem e depois salve as configurações.
+                  </small>
+                </label>
+              </details>
             </div>
           </div>
         </section>
