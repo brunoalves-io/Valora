@@ -331,6 +331,11 @@ code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
   position: relative;
 }
 
+.company-switcher-control {
+  position: relative;
+  width: 100%;
+}
+
 .company-switcher-trigger {
   width: 100%;
   min-height: 48px;
@@ -400,15 +405,31 @@ code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
 
 .company-menu {
   position: absolute;
-  top: calc(100% + 8px);
-  left: 8px;
-  right: 8px;
-  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 60;
   overflow: hidden;
   border: 1px solid #273a55;
-  border-radius: 13px;
+  border-radius: 12px;
   background: #132037;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, .28);
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, .28),
+    0 2px 8px rgba(0, 0, 0, .14);
+  transform-origin: top center;
+  animation: companyMenuIn .14s ease-out;
+}
+
+@keyframes companyMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .company-menu-heading {
@@ -4172,4 +4193,10 @@ tr:last-child td { border-bottom: 0; }
     width: 100%;
     min-width: 0 !important;
   }
+}
+
+
+.company-switcher:has(.company-switcher-trigger.open) > .company-role-badge {
+  opacity: .28;
+  transition: opacity .15s ease;
 }
