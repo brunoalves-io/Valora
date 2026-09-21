@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 
@@ -46,6 +47,8 @@ export function ValoraAIPage() {
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
+  const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
+  const [pendingConversationDelete, setPendingConversationDelete] = useState<Conversation | null>(null);
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -132,13 +135,15 @@ export function ValoraAIPage() {
     setError("");
   }
 
-  async function removeConversation(conversation: Conversation) {
-    if (!supabase) return;
+  function requestRemoveConversation(conversation: Conversation) {
+    if (deletingConversationId) return;
+    setPendingConversationDelete(conversation);
+  }
 
-    const confirmed = window.confirm(
-      `Excluir a conversa "${conversation.title}"?`,
-    );
-    if (!confirmed) return;
+  async function confirmRemoveConversation() {
+    if (!supabase || !pendingConversationDelete || deletingConversationId) return;
+    const conversation = pendingConversationDelete;
+    setDeletingConversationId(conversation.id);
 
     const { error: deleteError } = await supabase
       .from("ai_conversations")
@@ -147,6 +152,8 @@ export function ValoraAIPage() {
 
     if (deleteError) {
       setError(deleteError.message);
+      setDeletingConversationId(null);
+      setPendingConversationDelete(null);
       return;
     }
 
@@ -154,6 +161,8 @@ export function ValoraAIPage() {
       startNewConversation();
     }
 
+    setDeletingConversationId(null);
+    setPendingConversationDelete(null);
     await loadConversations(false);
   }
 
@@ -366,7 +375,7 @@ export function ValoraAIPage() {
                   </button>
                   <button
                     className="ai-conversation-delete"
-                    onClick={() => void removeConversation(conversation)}
+                    onClick={() => requestRemoveConversation(conversation)}
                     title="Excluir conversa"
                   >
                     ×
@@ -475,6 +484,16 @@ export function ValoraAIPage() {
           </p>
         </section>
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingConversationDelete)}
+        title="Excluir conversa?"
+        description={pendingConversationDelete ? `Você está prestes a excluir “${pendingConversationDelete.title}”.` : ""}
+        warning="Essa ação é permanente e removerá o histórico desta conversa."
+        confirmLabel="Excluir conversa"
+        busy={Boolean(deletingConversationId)}
+        onCancel={() => { if (!deletingConversationId) setPendingConversationDelete(null); }}
+        onConfirm={() => void confirmRemoveConversation()}
+      />
     </>
   );
 }
