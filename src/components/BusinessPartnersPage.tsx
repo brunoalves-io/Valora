@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type PartnerKind = "customer" | "supplier" | "both";
 type ViewKind = "customer" | "supplier";
@@ -42,6 +43,7 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -185,6 +187,39 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
     });
     setShowForm(false);
     setSaving(false);
+    await load();
+  }
+
+  async function deletePartner(partner: Partner) {
+    if (!supabase || !activeCompany || deletingId) return;
+
+    const confirmed = window.confirm(
+      `Excluir "${partner.name}"?\n\nLançamentos vinculados serão mantidos sem este cadastro. Se houver proposta vinculada, a exclusão será bloqueada para proteger o histórico.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(partner.id);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("business_partners")
+      .delete()
+      .eq("id", partner.id)
+      .eq("company_id", activeCompany.id);
+
+    if (deleteError) {
+      setError(
+        getDeleteErrorMessage(
+          deleteError,
+          `este ${isCustomer ? "cliente" : "fornecedor"}`,
+          `Não é possível excluir este ${isCustomer ? "cliente" : "fornecedor"} porque há propostas vinculadas. Você pode desativá-lo para manter o histórico.`,
+        ),
+      );
+      setDeletingId(null);
+      return;
+    }
+
+    setDeletingId(null);
     await load();
   }
 
@@ -397,9 +432,18 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
                         </span>
                       </td>
                       <td className="right">
-                        <button className="table-action" onClick={() => void toggleActive(partner)}>
-                          {partner.active ? "Desativar" : "Reativar"}
-                        </button>
+                        <div className="record-actions right">
+                          <button className="table-action" onClick={() => void toggleActive(partner)}>
+                            {partner.active ? "Desativar" : "Reativar"}
+                          </button>
+                          <button
+                            className="table-action danger"
+                            onClick={() => void deletePartner(partner)}
+                            disabled={deletingId === partner.id}
+                          >
+                            {deletingId === partner.id ? "Excluindo..." : "Excluir"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
