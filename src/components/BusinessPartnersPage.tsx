@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
@@ -45,6 +46,7 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Partner | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -244,14 +246,14 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
     await load();
   }
 
-  async function deletePartner(partner: Partner) {
-    if (!supabase || !activeCompany || deletingId) return;
+  function requestDeletePartner(partner: Partner) {
+    if (deletingId) return;
+    setPendingDelete(partner);
+  }
 
-    const confirmed = window.confirm(
-      `Excluir "${partner.name}"?\n\nLançamentos vinculados serão mantidos sem este cadastro. Se houver proposta vinculada, a exclusão será bloqueada para proteger o histórico.`,
-    );
-    if (!confirmed) return;
-
+  async function confirmDeletePartner() {
+    if (!supabase || !activeCompany || !pendingDelete || deletingId) return;
+    const partner = pendingDelete;
     setDeletingId(partner.id);
     setError("");
 
@@ -270,10 +272,12 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
         ),
       );
       setDeletingId(null);
+      setPendingDelete(null);
       return;
     }
 
     setDeletingId(null);
+    setPendingDelete(null);
     await load();
   }
 
@@ -509,7 +513,7 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
                           </button>
                           <button
                             className="table-action danger"
-                            onClick={() => void deletePartner(partner)}
+                            onClick={() => requestDeletePartner(partner)}
                             disabled={deletingId === partner.id}
                           >
                             {deletingId === partner.id ? "Excluindo..." : "Excluir"}
@@ -524,6 +528,16 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
           </div>
         )}
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title={isCustomer ? "Excluir cliente?" : "Excluir fornecedor?"}
+        description={pendingDelete ? `Você está prestes a excluir “${pendingDelete.name}”.` : ""}
+        warning="Lançamentos vinculados serão mantidos sem este cadastro. Se houver proposta vinculada, a exclusão será bloqueada."
+        confirmLabel={isCustomer ? "Excluir cliente" : "Excluir fornecedor"}
+        busy={Boolean(deletingId)}
+        onCancel={() => { if (!deletingId) setPendingDelete(null); }}
+        onConfirm={() => void confirmDeletePartner()}
+      />
     </>
   );
 }
