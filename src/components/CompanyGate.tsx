@@ -1,6 +1,13 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useCompany } from "../contexts/CompanyContext";
 
+const roleLabels = {
+  owner: "Líder",
+  admin: "Administrador",
+  member: "Membro",
+  viewer: "Visualizador",
+} as const;
+
 export function CompanyGate({ children }: { children: ReactNode }) {
   const { activeCompany, companies, createCompany, loading, selectCompany } = useCompany();
   const [name, setName] = useState("");
@@ -48,7 +55,7 @@ export function CompanyGate({ children }: { children: ReactNode }) {
                   <span className="company-avatar">{company.name.slice(0, 1).toUpperCase()}</span>
                   <span>
                     <strong>{company.name}</strong>
-                    <small>{role}</small>
+                    <small>{roleLabels[role]}</small>
                   </span>
                 </button>
               ))}
