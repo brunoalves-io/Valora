@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type Card = {
   id: string;
@@ -58,6 +59,7 @@ export function CardsPage() {
   const [showPurchaseForm, setShowPurchaseForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [statementAccounts, setStatementAccounts] = useState<Record<string, string>>({});
   const [cardForm, setCardForm] = useState({
@@ -367,6 +369,33 @@ export function CardsPage() {
       return;
     }
 
+    await load();
+  }
+
+  async function deleteCard(card: Card) {
+    if (!supabase || !activeCompany || deletingId) return;
+
+    const confirmed = window.confirm(
+      `Excluir o cartão "${card.name}"?\n\nAs compras e parcelas já registradas serão preservadas no histórico, mas deixarão de ficar vinculadas ao cartão.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(card.id);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("credit_cards")
+      .delete()
+      .eq("id", card.id)
+      .eq("company_id", activeCompany.id);
+
+    if (deleteError) {
+      setError(getDeleteErrorMessage(deleteError, "este cartão"));
+      setDeletingId(null);
+      return;
+    }
+
+    setDeletingId(null);
     await load();
   }
 
@@ -680,9 +709,18 @@ export function CardsPage() {
                   </div>
                   <div className="credit-card-footer">
                     <span>Fecha dia {card.closing_day} · vence dia {card.due_day}</span>
-                    <button className="table-action" onClick={() => void toggleCard(card)}>
-                      {card.active ? "Desativar" : "Reativar"}
-                    </button>
+                    <div className="record-actions">
+                      <button className="table-action" onClick={() => void toggleCard(card)}>
+                        {card.active ? "Desativar" : "Reativar"}
+                      </button>
+                      <button
+                        className="table-action danger"
+                        onClick={() => void deleteCard(card)}
+                        disabled={deletingId === card.id}
+                      >
+                        {deletingId === card.id ? "Excluindo..." : "Excluir"}
+                      </button>
+                    </div>
                   </div>
                 </article>
               );
