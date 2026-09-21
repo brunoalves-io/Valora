@@ -29,6 +29,7 @@ type Proposal = {
 };
 
 type ProposalItemForm = {
+  id?: string;
   description: string;
   quantity: string;
   unit_price: string;
@@ -82,6 +83,8 @@ export function ProposalsPage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingOriginalItemIds, setEditingOriginalItemIds] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [receivableDates, setReceivableDates] = useState<Record<string, string>>({});
@@ -236,6 +239,86 @@ export function ProposalsPage() {
     });
   }
 
+  function resetProposalForm() {
+    setForm({
+      customer_id: activeCustomers[0]?.id ?? "",
+      title: "",
+      issue_date: todayIso(),
+      valid_until: addDaysIso(15),
+      discount: "0,00",
+      notes: "",
+    });
+    setItems([{ description: "", quantity: "1", unit_price: "" }]);
+    setEditingId(null);
+    setEditingOriginalItemIds([]);
+    setShowForm(false);
+    setError("");
+  }
+
+  function openNewProposal() {
+    setEditingId(null);
+    setEditingOriginalItemIds([]);
+    setForm({
+      customer_id: activeCustomers[0]?.id ?? "",
+      title: "",
+      issue_date: todayIso(),
+      valid_until: addDaysIso(15),
+      discount: "0,00",
+      notes: "",
+    });
+    setItems([{ description: "", quantity: "1", unit_price: "" }]);
+    setError("");
+    setShowForm(true);
+  }
+
+  async function editProposal(proposal: Proposal) {
+    if (!supabase || proposal.converted_transaction_id) return;
+
+    setError("");
+
+    const { data, error: itemsError } = await supabase
+      .from("proposal_items")
+      .select("id, description, quantity, unit_price, sort_order")
+      .eq("proposal_id", proposal.id)
+      .eq("company_id", activeCompany?.id ?? "")
+      .order("sort_order");
+
+    if (itemsError) {
+      setError("Não foi possível carregar os itens desta proposta.");
+      return;
+    }
+
+    const loadedItems = (data ?? []) as Array<{
+      id: string;
+      description: string;
+      quantity: number | string;
+      unit_price: number | string;
+    }>;
+
+    setEditingId(proposal.id);
+    setEditingOriginalItemIds(loadedItems.map((item) => item.id));
+    setForm({
+      customer_id: proposal.customer_id,
+      title: proposal.title,
+      issue_date: proposal.issue_date,
+      valid_until: proposal.valid_until ?? "",
+      discount: String(proposal.discount).replace(".", ","),
+      notes: proposal.notes ?? "",
+    });
+    setItems(
+      loadedItems.length > 0
+        ? loadedItems.map((item) => ({
+            id: item.id,
+            description: item.description,
+            quantity: String(item.quantity).replace(".", ","),
+            unit_price: String(item.unit_price).replace(".", ","),
+          }))
+        : [{ description: "", quantity: "1", unit_price: "" }],
+    );
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!supabase || !activeCompany) return;
@@ -246,6 +329,7 @@ export function ProposalsPage() {
     }
 
     const normalizedItems = items.map((item) => ({
+      id: item.id,
       description: item.description.trim(),
       quantity: parseQuantity(item.quantity),
       unit_price: parseMoney(item.unit_price),
@@ -274,77 +358,154 @@ export function ProposalsPage() {
     setSaving(true);
     setError("");
 
-    const { data: proposalData, error: proposalError } = await supabase
-      .from("proposals")
-      .insert({
-        company_id: activeCompany.id,
-        customer_id: form.customer_id,
-        proposal_number: null,
-        title: form.title.trim(),
-        issue_date: form.issue_date,
-        valid_until: form.valid_until || null,
-        notes: form.notes.trim() || null,
-        discount: 0,
-        subtotal: 0,
-        total: 0,
-      })
-      .select("id")
-      .single();
+    if (editingId) {
+      const existingItems = normalizedItems.filter((item) => item.id);
+      const newItems = normalizedItems.filter((item) => !item.id);
 
-    if (proposalError || !proposalData) {
-      setError(proposalError?.message || "Não foi possível criar a proposta.");
-      setSaving(false);
-      return;
-    }
+      for (const [index, item] of existingItems.entries()) {
+        const { error: itemUpdateError } = await supabase
+          .from("proposal_items")
+          .update({
+            description: item.description,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            sort_order: index,
+          })
+          .eq("id", item.id as string)
+          .eq("proposal_id", editingId)
+          .eq("company_id", activeCompany.id);
 
-    const proposalId = proposalData.id as string;
+        if (itemUpdateError) {
+          setError("Não foi possível atualizar um dos itens da proposta.");
+          setSaving(false);
+          return;
+        }
+      }
 
-    const { error: itemsError } = await supabase.from("proposal_items").insert(
-      normalizedItems.map((item, index) => ({
-        company_id: activeCompany.id,
-        proposal_id: proposalId,
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        sort_order: index,
-      })),
-    );
+      if (newItems.length > 0) {
+        const { error: newItemsError } = await supabase.from("proposal_items").insert(
+          newItems.map((item, index) => ({
+            company_id: activeCompany.id,
+            proposal_id: editingId,
+            description: item.description,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            sort_order: existingItems.length + index,
+          })),
+        );
 
-    if (itemsError) {
-      await supabase.from("proposals").delete().eq("id", proposalId);
-      setError(itemsError.message);
-      setSaving(false);
-      return;
-    }
+        if (newItemsError) {
+          setError("Não foi possível adicionar os novos itens à proposta.");
+          setSaving(false);
+          return;
+        }
+      }
 
-    if (discount > 0) {
-      const { error: discountError } = await supabase
+      const retainedIds = new Set(
+        normalizedItems.flatMap((item) => (item.id ? [item.id] : [])),
+      );
+      const removedIds = editingOriginalItemIds.filter((id) => !retainedIds.has(id));
+
+      if (removedIds.length > 0) {
+        const { error: removedItemsError } = await supabase
+          .from("proposal_items")
+          .delete()
+          .in("id", removedIds)
+          .eq("proposal_id", editingId)
+          .eq("company_id", activeCompany.id);
+
+        if (removedItemsError) {
+          setError("Não foi possível remover um dos itens antigos da proposta.");
+          setSaving(false);
+          return;
+        }
+      }
+
+      const { error: proposalUpdateError } = await supabase
         .from("proposals")
         .update({
+          customer_id: form.customer_id,
+          title: form.title.trim(),
+          issue_date: form.issue_date,
+          valid_until: form.valid_until || null,
+          notes: form.notes.trim() || null,
           discount,
+          subtotal: calculatedSubtotal,
           total: calculatedSubtotal - discount,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", proposalId);
+        .eq("id", editingId)
+        .eq("company_id", activeCompany.id);
 
-      if (discountError) {
-        setError(discountError.message);
+      if (proposalUpdateError) {
+        setError("Não foi possível atualizar esta proposta.");
         setSaving(false);
         return;
       }
+    } else {
+      const { data: proposalData, error: proposalError } = await supabase
+        .from("proposals")
+        .insert({
+          company_id: activeCompany.id,
+          customer_id: form.customer_id,
+          proposal_number: null,
+          title: form.title.trim(),
+          issue_date: form.issue_date,
+          valid_until: form.valid_until || null,
+          notes: form.notes.trim() || null,
+          discount: 0,
+          subtotal: 0,
+          total: 0,
+        })
+        .select("id")
+        .single();
+
+      if (proposalError || !proposalData) {
+        setError(proposalError?.message || "Não foi possível criar a proposta.");
+        setSaving(false);
+        return;
+      }
+
+      const proposalId = proposalData.id as string;
+
+      const { error: itemsError } = await supabase.from("proposal_items").insert(
+        normalizedItems.map((item, index) => ({
+          company_id: activeCompany.id,
+          proposal_id: proposalId,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          sort_order: index,
+        })),
+      );
+
+      if (itemsError) {
+        await supabase.from("proposals").delete().eq("id", proposalId);
+        setError(itemsError.message);
+        setSaving(false);
+        return;
+      }
+
+      if (discount > 0) {
+        const { error: discountError } = await supabase
+          .from("proposals")
+          .update({
+            discount,
+            total: calculatedSubtotal - discount,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", proposalId);
+
+        if (discountError) {
+          setError(discountError.message);
+          setSaving(false);
+          return;
+        }
+      }
     }
 
-    setForm({
-      customer_id: activeCustomers[0]?.id ?? "",
-      title: "",
-      issue_date: todayIso(),
-      valid_until: addDaysIso(15),
-      discount: "0,00",
-      notes: "",
-    });
-    setItems([{ description: "", quantity: "1", unit_price: "" }]);
-    setShowForm(false);
     setSaving(false);
+    resetProposalForm();
     await load();
   }
 
@@ -421,7 +582,13 @@ export function ProposalsPage() {
           <h1>Propostas</h1>
           <p>Monte orçamentos, acompanhe aprovações e transforme vendas em contas a receber.</p>
         </div>
-        <button className="primary" onClick={() => setShowForm((value) => !value)}>
+        <button
+          className="primary"
+          onClick={() => {
+            if (showForm) resetProposalForm();
+            else openNewProposal();
+          }}
+        >
           {showForm ? "Fechar" : "+ Nova proposta"}
         </button>
       </header>
@@ -455,8 +622,12 @@ export function ProposalsPage() {
         <form className="panel proposal-form" onSubmit={submit}>
           <div className="form-heading">
             <div>
-              <h2>Nova proposta</h2>
-              <p>Monte os itens e o Valora calcula o total automaticamente.</p>
+              <h2>{editingId ? "Editar proposta" : "Nova proposta"}</h2>
+              <p>
+                {editingId
+                  ? "Atualize dados e itens. O número e o histórico da proposta são preservados."
+                  : "Monte os itens e o Valora calcula o total automaticamente."}
+              </p>
             </div>
           </div>
 
@@ -689,6 +860,15 @@ export function ProposalsPage() {
                       <td className="right"><strong>{money.format(Number(proposal.total))}</strong></td>
                       <td>
                         <div className="proposal-actions">
+                          {!proposal.converted_transaction_id && (
+                            <button
+                              className="table-action edit"
+                              onClick={() => void editProposal(proposal)}
+                            >
+                              Editar
+                            </button>
+                          )}
+
                           {proposal.status === "draft" && actualStatus !== "expired" && (
                             <button className="table-action" onClick={() => void setStatus(proposal, "sent")}>
                               Marcar enviada
