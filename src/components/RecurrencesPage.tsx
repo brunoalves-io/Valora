@@ -71,6 +71,7 @@ export function RecurrencesPage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
@@ -203,6 +204,64 @@ export function RecurrencesPage() {
     };
   }, [rules]);
 
+  function resetForm() {
+    setForm({
+      type: "expense",
+      description: "",
+      amount: "",
+      frequency: "monthly",
+      interval_count: "1",
+      start_date: todayIso(),
+      end_date: "",
+      account_id: "",
+      category_id: "",
+      cost_center_id: "",
+      partner_id: "",
+    });
+    setEditingId(null);
+    setShowForm(false);
+    setError("");
+  }
+
+  function openNewRule() {
+    setEditingId(null);
+    setForm({
+      type: "expense",
+      description: "",
+      amount: "",
+      frequency: "monthly",
+      interval_count: "1",
+      start_date: todayIso(),
+      end_date: "",
+      account_id: "",
+      category_id: "",
+      cost_center_id: "",
+      partner_id: "",
+    });
+    setError("");
+    setShowForm(true);
+  }
+
+  function editRule(rule: RecurringRule) {
+    setEditingId(rule.id);
+    setForm({
+      type: rule.type,
+      description: rule.description,
+      amount: String(rule.amount).replace(".", ","),
+      frequency: rule.frequency,
+      interval_count: String(rule.interval_count),
+      start_date: rule.start_date,
+      end_date: rule.end_date ?? "",
+      account_id: rule.account_id ?? "",
+      category_id: rule.category_id ?? "",
+      cost_center_id: rule.cost_center_id ?? "",
+      partner_id: rule.partner_id ?? "",
+    });
+    setError("");
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function syncForecast() {
     if (!supabase || !activeCompany) return;
     setSyncing(true);
@@ -241,8 +300,7 @@ export function RecurrencesPage() {
     setSaving(true);
     setError("");
 
-    const { error: insertError } = await supabase.from("recurring_rules").insert({
-      company_id: activeCompany.id,
+    const payload = {
       type: form.type,
       description: form.description.trim(),
       amount,
@@ -250,34 +308,49 @@ export function RecurrencesPage() {
       interval_count: intervalCount,
       start_date: form.start_date,
       end_date: form.end_date || null,
-      next_due_date: form.start_date,
       account_id: form.account_id || null,
       category_id: form.category_id || null,
       cost_center_id: form.cost_center_id || null,
       partner_id: form.partner_id || null,
-    });
+    };
 
-    if (insertError) {
-      setError(insertError.message);
+    const currentRule = editingId
+      ? rules.find((rule) => rule.id === editingId)
+      : null;
+
+    const mutation = editingId
+      ? supabase
+          .from("recurring_rules")
+          .update({
+            ...payload,
+            next_due_date:
+              currentRule && currentRule.next_due_date > form.start_date
+                ? currentRule.next_due_date
+                : form.start_date,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingId)
+          .eq("company_id", activeCompany.id)
+      : supabase.from("recurring_rules").insert({
+          company_id: activeCompany.id,
+          ...payload,
+          next_due_date: form.start_date,
+        });
+
+    const { error: mutationError } = await mutation;
+
+    if (mutationError) {
+      setError(
+        editingId
+          ? "Não foi possível atualizar esta recorrência."
+          : mutationError.message,
+      );
       setSaving(false);
       return;
     }
 
-    setForm({
-      type: "expense",
-      description: "",
-      amount: "",
-      frequency: "monthly",
-      interval_count: "1",
-      start_date: todayIso(),
-      end_date: "",
-      account_id: "",
-      category_id: "",
-      cost_center_id: "",
-      partner_id: "",
-    });
-    setShowForm(false);
     setSaving(false);
+    resetForm();
     await syncForecast();
   }
 
@@ -339,7 +412,13 @@ export function RecurrencesPage() {
           <button className="ghost" onClick={() => void syncForecast()} disabled={syncing}>
             {syncing ? "Atualizando..." : "Atualizar 90 dias"}
           </button>
-          <button className="primary" onClick={() => setShowForm((value) => !value)}>
+          <button
+            className="primary"
+            onClick={() => {
+              if (showForm) resetForm();
+              else openNewRule();
+            }}
+          >
             {showForm ? "Fechar" : "+ Nova recorrência"}
           </button>
         </div>
@@ -367,8 +446,12 @@ export function RecurrencesPage() {
         <form className="panel recurring-form" onSubmit={submit}>
           <div className="form-heading">
             <div>
-              <h2>Nova recorrência</h2>
-              <p>Os próximos 90 dias serão gerados automaticamente no financeiro.</p>
+              <h2>{editingId ? "Editar recorrência" : "Nova recorrência"}</h2>
+              <p>
+                {editingId
+                  ? "As alterações valem para as próximas previsões; lançamentos já gerados são preservados."
+                  : "Os próximos 90 dias serão gerados automaticamente no financeiro."}
+              </p>
             </div>
             <div className="type-toggle">
               <button
@@ -527,11 +610,15 @@ export function RecurrencesPage() {
           {error && <div className="form-alert error">{error}</div>}
 
           <div className="form-actions">
-            <button type="button" className="ghost" onClick={() => setShowForm(false)}>
+            <button type="button" className="ghost" onClick={resetForm}>
               Cancelar
             </button>
             <button className="primary" disabled={saving}>
-              {saving ? "Salvando..." : "Salvar recorrência"}
+              {saving
+                ? "Salvando..."
+                : editingId
+                  ? "Salvar alterações"
+                  : "Salvar recorrência"}
             </button>
           </div>
         </form>
@@ -612,6 +699,9 @@ export function RecurrencesPage() {
                     </td>
                     <td className="right">
                       <div className="record-actions right">
+                        <button className="table-action edit" onClick={() => editRule(rule)}>
+                          Editar
+                        </button>
                         <button className="table-action" onClick={() => void toggleRule(rule)}>
                           {rule.active ? "Pausar" : "Reativar"}
                         </button>
