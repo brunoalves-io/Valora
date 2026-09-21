@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type RuleType = "income" | "expense";
 type Frequency = "weekly" | "monthly" | "yearly";
@@ -70,6 +71,7 @@ export function RecurrencesPage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -277,6 +279,33 @@ export function RecurrencesPage() {
     setShowForm(false);
     setSaving(false);
     await syncForecast();
+  }
+
+  async function deleteRule(rule: RecurringRule) {
+    if (!supabase || !activeCompany || deletingId) return;
+
+    const confirmed = window.confirm(
+      `Excluir a recorrência "${rule.description}"?\n\nOs lançamentos já gerados serão preservados. Apenas as próximas gerações automáticas deixarão de existir.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(rule.id);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("recurring_rules")
+      .delete()
+      .eq("id", rule.id)
+      .eq("company_id", activeCompany.id);
+
+    if (deleteError) {
+      setError(getDeleteErrorMessage(deleteError, "esta recorrência"));
+      setDeletingId(null);
+      return;
+    }
+
+    setDeletingId(null);
+    await load();
   }
 
   async function toggleRule(rule: RecurringRule) {
@@ -582,9 +611,18 @@ export function RecurrencesPage() {
                       </span>
                     </td>
                     <td className="right">
-                      <button className="table-action" onClick={() => void toggleRule(rule)}>
-                        {rule.active ? "Pausar" : "Reativar"}
-                      </button>
+                      <div className="record-actions right">
+                        <button className="table-action" onClick={() => void toggleRule(rule)}>
+                          {rule.active ? "Pausar" : "Reativar"}
+                        </button>
+                        <button
+                          className="table-action danger"
+                          onClick={() => void deleteRule(rule)}
+                          disabled={deletingId === rule.id}
+                        >
+                          {deletingId === rule.id ? "Excluindo..." : "Excluir"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
