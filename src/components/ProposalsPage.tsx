@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type ProposalStatus = "draft" | "sent" | "approved" | "rejected" | "expired";
 
@@ -81,6 +82,7 @@ export function ProposalsPage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [receivableDates, setReceivableDates] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
@@ -363,6 +365,33 @@ export function ProposalsPage() {
       return;
     }
 
+    await load();
+  }
+
+  async function deleteProposal(proposal: Proposal) {
+    if (!supabase || !activeCompany || deletingId) return;
+
+    const confirmed = window.confirm(
+      `Excluir a proposta "${proposal.title}"?\n\nOs itens da proposta serão removidos junto. Uma conta a receber já gerada, se existir, será preservada.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(proposal.id);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("proposals")
+      .delete()
+      .eq("id", proposal.id)
+      .eq("company_id", activeCompany.id);
+
+    if (deleteError) {
+      setError(getDeleteErrorMessage(deleteError, "esta proposta"));
+      setDeletingId(null);
+      return;
+    }
+
+    setDeletingId(null);
     await load();
   }
 
@@ -704,6 +733,14 @@ export function ProposalsPage() {
                               Arquivar expirada
                             </button>
                           )}
+
+                          <button
+                            className="table-action danger"
+                            onClick={() => void deleteProposal(proposal)}
+                            disabled={deletingId === proposal.id}
+                          >
+                            {deletingId === proposal.id ? "Excluindo..." : "Excluir"}
+                          </button>
                         </div>
                       </td>
                     </tr>
