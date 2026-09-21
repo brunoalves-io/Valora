@@ -23,8 +23,8 @@ type Invitation = {
 };
 
 const roleLabels: Record<TeamRole, string> = {
-  owner: "Owner",
-  admin: "Admin",
+  owner: "Líder",
+  admin: "Administrador",
   member: "Membro",
   viewer: "Visualizador",
 };
@@ -195,7 +195,7 @@ export function TeamPage() {
     return (
       <section className="panel empty-state">
         <strong>Área restrita.</strong>
-        <span>Somente Owner e Admin podem gerenciar a equipe.</span>
+        <span>Somente Líder e Administrador podem gerenciar a equipe.</span>
       </section>
     );
   }
@@ -219,7 +219,7 @@ export function TeamPage() {
         <article className="metric-card">
           <span>Gestores</span>
           <strong>{totals.admins}</strong>
-          <small>Owner + Admin</small>
+          <small>Líder + Administrador</small>
         </article>
         <article className="metric-card">
           <span>Visualizadores</span>
@@ -258,7 +258,7 @@ export function TeamPage() {
                 setRole(event.target.value as Exclude<TeamRole, "owner">)
               }
             >
-              {canManageAdmins && <option value="admin">Admin</option>}
+              {canManageAdmins && <option value="admin">Administrador</option>}
               <option value="member">Membro</option>
               <option value="viewer">Visualizador</option>
             </select>
@@ -344,7 +344,7 @@ export function TeamPage() {
                               )
                             }
                           >
-                            {canManageAdmins && <option value="admin">Admin</option>}
+                            {canManageAdmins && <option value="admin">Administrador</option>}
                             <option value="member">Membro</option>
                             <option value="viewer">Visualizador</option>
                           </select>
