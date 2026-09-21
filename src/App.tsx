@@ -438,17 +438,18 @@ function Workspace() {
         >
           <span>EMPRESA</span>
 
-          <button
-            type="button"
-            className={companyMenuOpen ? "company-switcher-trigger open" : "company-switcher-trigger"}
+          <div className="company-switcher-control">
+            <button
+              type="button"
+              className={companyMenuOpen ? "company-switcher-trigger open" : "company-switcher-trigger"}
             onClick={() => {
               setCompanyMenuOpen((value) => !value);
               setCompanyMenuError("");
             }}
-            aria-expanded={companyMenuOpen}
-            aria-haspopup="menu"
-          >
-            <span className="company-switcher-avatar">
+              aria-expanded={companyMenuOpen}
+              aria-haspopup="menu"
+            >
+              <span className="company-switcher-avatar">
               {(activeCompany?.name?.slice(0, 1) ?? "E").toUpperCase()}
             </span>
             <span className="company-switcher-name">{activeCompany?.name ?? "Empresa"}</span>
@@ -466,15 +467,9 @@ function Workspace() {
             >
               <path d="m7 10 5 5 5-5" />
             </svg>
-          </button>
+            </button>
 
-          {activeRole && (
-            <small className={"company-role-badge " + activeRole}>
-              {roleLabel(activeRole)}
-            </small>
-          )}
-
-          {companyMenuOpen && (
+            {companyMenuOpen && (
             <div className="company-menu" role="menu">
               <div className="company-menu-heading">
                 <strong>Suas empresas</strong>
@@ -593,7 +588,14 @@ function Workspace() {
                   </div>
                 </div>
               )}
-            </div>
+              </div>
+            )}
+          </div>
+
+          {activeRole && (
+            <small className={"company-role-badge " + activeRole}>
+              {roleLabel(activeRole)}
+            </small>
           )}
         </div>
 
