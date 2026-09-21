@@ -14,8 +14,10 @@ type Transaction = {
   type: "income" | "expense";
   status: "pending" | "paid";
   due_date: string;
+  paid_at: string | null;
   account_id: string | null;
   category_id: string | null;
+  cost_center_id: string | null;
   partner_id: string | null;
 };
 
@@ -39,6 +41,7 @@ export function TransactionsPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -62,7 +65,7 @@ export function TransactionsPage() {
     const [txResult, accountResult, categoryResult, costCenterResult, partnerResult] = await Promise.all([
       supabase
         .from("transactions")
-        .select("id, description, amount, type, status, due_date, account_id, category_id, partner_id")
+        .select("id, description, amount, type, status, due_date, paid_at, account_id, category_id, cost_center_id, partner_id")
         .eq("company_id", activeCompany.id)
         .order("due_date", { ascending: false })
         .limit(100),
@@ -137,6 +140,61 @@ export function TransactionsPage() {
     [partners],
   );
 
+  function resetForm() {
+    setForm({
+      type: "expense",
+      description: "",
+      amount: "",
+      due_date: new Date().toISOString().slice(0, 10),
+      installments: "1",
+      status: "pending",
+      account_id: accounts[0]?.id ?? "",
+      category_id: "",
+      cost_center_id: "",
+      partner_id: "",
+    });
+    setEditingId(null);
+    setShowForm(false);
+    setError("");
+  }
+
+  function openNewTransaction() {
+    setEditingId(null);
+    setForm({
+      type: "expense",
+      description: "",
+      amount: "",
+      due_date: new Date().toISOString().slice(0, 10),
+      installments: "1",
+      status: "pending",
+      account_id: accounts[0]?.id ?? "",
+      category_id: "",
+      cost_center_id: "",
+      partner_id: "",
+    });
+    setError("");
+    setShowForm(true);
+  }
+
+  function editTransaction(item: Transaction) {
+    setEditingId(item.id);
+    setForm({
+      type: item.type,
+      description: item.description,
+      amount: String(item.amount).replace(".", ","),
+      due_date: item.due_date,
+      installments: "1",
+      status: item.status,
+      account_id: item.account_id ?? "",
+      category_id: item.category_id ?? "",
+      cost_center_id: item.cost_center_id ?? "",
+      partner_id: item.partner_id ?? "",
+    });
+    setError("");
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function deleteTransaction(item: Transaction) {
     if (!supabase || !activeCompany || deletingId) return;
 
@@ -190,7 +248,36 @@ export function TransactionsPage() {
     setSaving(true);
     setError("");
 
-    if (installments > 1) {
+    if (editingId) {
+      const current = transactions.find((item) => item.id === editingId);
+
+      const { error: updateError } = await supabase
+        .from("transactions")
+        .update({
+          type: form.type,
+          description: form.description.trim(),
+          amount,
+          due_date: form.due_date,
+          status: form.status,
+          paid_at:
+            form.status === "paid"
+              ? current?.paid_at ?? new Date().toISOString()
+              : null,
+          account_id: form.account_id || null,
+          category_id: form.category_id || null,
+          cost_center_id: form.cost_center_id || null,
+          partner_id: form.partner_id || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editingId)
+        .eq("company_id", activeCompany.id);
+
+      if (updateError) {
+        setError("Não foi possível atualizar o lançamento. Tente novamente.");
+        setSaving(false);
+        return;
+      }
+    } else if (installments > 1) {
       const { error: installmentError } = await supabase.rpc("create_installment_series", {
         p_company_id: activeCompany.id,
         p_type: form.type,
@@ -231,20 +318,8 @@ export function TransactionsPage() {
       }
     }
 
-    setForm({
-      type: "expense",
-      description: "",
-      amount: "",
-      due_date: new Date().toISOString().slice(0, 10),
-      installments: "1",
-      status: "pending",
-      account_id: accounts[0]?.id ?? "",
-      category_id: "",
-      cost_center_id: "",
-      partner_id: "",
-    });
-    setShowForm(false);
     setSaving(false);
+    resetForm();
     await load();
   }
 
@@ -256,7 +331,13 @@ export function TransactionsPage() {
           <h1>Lançamentos</h1>
           <p>Receitas e despesas da empresa em um único histórico.</p>
         </div>
-        <button className="primary" onClick={() => setShowForm((value) => !value)}>
+        <button
+          className="primary"
+          onClick={() => {
+            if (showForm) resetForm();
+            else openNewTransaction();
+          }}
+        >
           {showForm ? "Fechar" : "+ Novo lançamento"}
         </button>
       </header>
@@ -265,8 +346,12 @@ export function TransactionsPage() {
         <form className="panel transaction-form" onSubmit={submit}>
           <div className="form-heading">
             <div>
-              <h2>Novo lançamento</h2>
-              <p>Cadastre uma receita ou despesa, à vista ou parcelada.</p>
+              <h2>{editingId ? "Editar lançamento" : "Novo lançamento"}</h2>
+              <p>
+                {editingId
+                  ? "Atualize os dados deste lançamento sem criar um novo registro."
+                  : "Cadastre uma receita ou despesa, à vista ou parcelada."}
+              </p>
             </div>
             <div className="type-toggle">
               <button
@@ -322,6 +407,7 @@ export function TransactionsPage() {
                 min="1"
                 max="120"
                 value={form.installments}
+                disabled={Boolean(editingId)}
                 onChange={(event) => {
                   const installments = event.target.value;
                   setForm({
@@ -398,11 +484,15 @@ export function TransactionsPage() {
 
           {error && <div className="form-alert error">{error}</div>}
           <div className="form-actions">
-            <button type="button" className="ghost" onClick={() => setShowForm(false)}>
+            <button type="button" className="ghost" onClick={resetForm}>
               Cancelar
             </button>
             <button className="primary" disabled={saving}>
-              {saving ? "Salvando..." : "Salvar lançamento"}
+              {saving
+                ? "Salvando..."
+                : editingId
+                  ? "Salvar alterações"
+                  : "Salvar lançamento"}
             </button>
           </div>
         </form>
@@ -448,13 +538,22 @@ export function TransactionsPage() {
                       {item.type === "income" ? "+" : "−"} {money.format(Number(item.amount))}
                     </td>
                     <td className="right">
-                      <button
-                        className="table-action danger"
-                        onClick={() => void deleteTransaction(item)}
-                        disabled={deletingId === item.id}
-                      >
-                        {deletingId === item.id ? "Excluindo..." : "Excluir"}
-                      </button>
+                      <div className="record-actions right">
+                        <button
+                          className="table-action edit"
+                          onClick={() => editTransaction(item)}
+                          disabled={deletingId === item.id}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="table-action danger"
+                          onClick={() => void deleteTransaction(item)}
+                          disabled={deletingId === item.id}
+                        >
+                          {deletingId === item.id ? "Excluindo..." : "Excluir"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
