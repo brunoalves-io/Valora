@@ -1,5 +1,6 @@
 
 import { useEffect, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
@@ -18,6 +19,7 @@ export function CostCentersPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<CostCenter | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", description: "" });
@@ -109,14 +111,14 @@ export function CostCentersPage() {
     await load();
   }
 
-  async function deleteCostCenter(item: CostCenter) {
-    if (!supabase || !activeCompany || deletingId) return;
+  function requestDeleteCostCenter(item: CostCenter) {
+    if (deletingId) return;
+    setPendingDelete(item);
+  }
 
-    const confirmed = window.confirm(
-      `Excluir o centro de custo "${item.name}"?\n\nOs lançamentos existentes serão preservados, mas ficarão sem este centro de custo.`,
-    );
-    if (!confirmed) return;
-
+  async function confirmDeleteCostCenter() {
+    if (!supabase || !activeCompany || !pendingDelete || deletingId) return;
+    const item = pendingDelete;
     setDeletingId(item.id);
     setError("");
 
@@ -129,10 +131,12 @@ export function CostCentersPage() {
     if (deleteError) {
       setError(getDeleteErrorMessage(deleteError, "este centro de custo"));
       setDeletingId(null);
+      setPendingDelete(null);
       return;
     }
 
     setDeletingId(null);
+    setPendingDelete(null);
     await load();
   }
 
@@ -227,7 +231,7 @@ export function CostCentersPage() {
                 </button>
                 <button
                   className="table-action danger"
-                  onClick={() => void deleteCostCenter(item)}
+                  onClick={() => requestDeleteCostCenter(item)}
                   disabled={deletingId === item.id}
                 >
                   {deletingId === item.id ? "Excluindo..." : "Excluir"}
@@ -237,6 +241,16 @@ export function CostCentersPage() {
           ))
         )}
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Excluir centro de custo?"
+        description={pendingDelete ? `Você está prestes a excluir “${pendingDelete.name}”.` : ""}
+        warning="Os lançamentos existentes serão preservados, mas ficarão sem este centro de custo."
+        confirmLabel="Excluir centro de custo"
+        busy={Boolean(deletingId)}
+        onCancel={() => { if (!deletingId) setPendingDelete(null); }}
+        onConfirm={() => void confirmDeleteCostCenter()}
+      />
     </>
   );
 }
