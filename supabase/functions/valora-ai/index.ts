@@ -53,7 +53,7 @@ Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const geminiApiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
-  const geminiModel = Deno.env.get("GEMINI_MODEL")?.trim() || "gemini-2.5-flash-lite";
+  const geminiModel = Deno.env.get("GEMINI_MODEL")?.trim() || "gemini-3.5-flash-lite";
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return jsonResponse({ error: "Supabase function environment is incomplete" }, 500);
