@@ -2,6 +2,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type CostCenter = {
   id: string;
@@ -15,6 +16,7 @@ export function CostCentersPage() {
   const [items, setItems] = useState<CostCenter[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", description: "" });
@@ -63,6 +65,33 @@ export function CostCentersPage() {
     setForm({ name: "", description: "" });
     setShowForm(false);
     setSaving(false);
+    await load();
+  }
+
+  async function deleteCostCenter(item: CostCenter) {
+    if (!supabase || !activeCompany || deletingId) return;
+
+    const confirmed = window.confirm(
+      `Excluir o centro de custo "${item.name}"?\n\nOs lançamentos existentes serão preservados, mas ficarão sem este centro de custo.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(item.id);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("cost_centers")
+      .delete()
+      .eq("id", item.id)
+      .eq("company_id", activeCompany.id);
+
+    if (deleteError) {
+      setError(getDeleteErrorMessage(deleteError, "este centro de custo"));
+      setDeletingId(null);
+      return;
+    }
+
+    setDeletingId(null);
     await load();
   }
 
@@ -136,7 +165,18 @@ export function CostCentersPage() {
                 <h2>{item.name}</h2>
                 <p>{item.description || "Sem descrição."}</p>
               </div>
-              <button className="table-action" onClick={() => void toggleActive(item)}>{item.active ? "Desativar" : "Reativar"}</button>
+              <div className="record-actions">
+                <button className="table-action" onClick={() => void toggleActive(item)}>
+                  {item.active ? "Desativar" : "Reativar"}
+                </button>
+                <button
+                  className="table-action danger"
+                  onClick={() => void deleteCostCenter(item)}
+                  disabled={deletingId === item.id}
+                >
+                  {deletingId === item.id ? "Excluindo..." : "Excluir"}
+                </button>
+              </div>
             </article>
           ))
         )}
