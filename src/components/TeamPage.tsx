@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useAuth } from "../contexts/AuthContext";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
@@ -45,6 +46,8 @@ export function TeamPage() {
   const [role, setRole] = useState<Exclude<TeamRole, "owner">>("member");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [pendingMemberRemoval, setPendingMemberRemoval] = useState<TeamMember | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -149,12 +152,15 @@ export function TeamPage() {
     if (member.user_id === user?.id) await refreshCompanies();
   }
 
-  async function removeMember(member: TeamMember) {
-    if (!supabase || !activeCompany) return;
-    if (!window.confirm(`Remover ${member.full_name || member.email || "este usuário"} da empresa?`)) {
-      return;
-    }
+  function requestRemoveMember(member: TeamMember) {
+    if (removingMemberId) return;
+    setPendingMemberRemoval(member);
+  }
 
+  async function confirmRemoveMember() {
+    if (!supabase || !activeCompany || !pendingMemberRemoval || removingMemberId) return;
+    const member = pendingMemberRemoval;
+    setRemovingMemberId(member.user_id);
     setError("");
     setSuccess("");
 
@@ -165,9 +171,13 @@ export function TeamPage() {
 
     if (rpcError) {
       setError(rpcError.message);
+      setRemovingMemberId(null);
+      setPendingMemberRemoval(null);
       return;
     }
 
+    setRemovingMemberId(null);
+    setPendingMemberRemoval(null);
     setSuccess("Acesso removido.");
     await load();
   }
@@ -357,7 +367,7 @@ export function TeamPage() {
                         {canEditMember && !isSelf && (
                           <button
                             className="table-action danger-action"
-                            onClick={() => void removeMember(member)}
+                            onClick={() => requestRemoveMember(member)}
                           >
                             Remover
                           </button>
@@ -430,6 +440,16 @@ export function TeamPage() {
           </div>
         )}
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingMemberRemoval)}
+        title="Remover acesso?"
+        description={pendingMemberRemoval ? `Você está prestes a remover ${pendingMemberRemoval.full_name || pendingMemberRemoval.email || "este usuário"} da empresa.` : ""}
+        warning="Essa pessoa perderá o acesso a esta empresa no Valora."
+        confirmLabel="Remover acesso"
+        busy={Boolean(removingMemberId)}
+        onCancel={() => { if (!removingMemberId) setPendingMemberRemoval(null); }}
+        onConfirm={() => void confirmRemoveMember()}
+      />
     </>
   );
 }
