@@ -237,17 +237,36 @@ export function Dashboard({ onOpenAI }: { onOpenAI: () => void }) {
             </article>
 
             <article className="panel ai-panel">
-              <div className="ai-icon">✦</div>
-              <div>
-                <h2>Valora IA</h2>
-                <p>Converse com os números da empresa e transforme dados em próximos passos.</p>
+              <div className="ai-panel-topline">
+                <span className="ai-panel-badge">INTELIGÊNCIA FINANCEIRA</span>
+                <span className="ai-panel-status"><i /> Disponível</span>
               </div>
-              <div className="ask">
-                <div className="ai-dashboard-example">
-                  Ex.: “Como está meu caixa nos próximos 30 dias?”
+
+              <div className="ai-panel-main">
+                <div className="ai-icon">✦</div>
+                <div className="ai-panel-copy">
+                  <h2>Valora IA</h2>
+                  <p>
+                    Converse com os números da empresa e transforme dados financeiros
+                    em respostas claras e próximos passos.
+                  </p>
                 </div>
-                <button className="primary" onClick={onOpenAI}>
-                  Abrir Valora IA
+              </div>
+
+              <div className="ai-panel-footer">
+                <button
+                  className="ai-dashboard-example"
+                  type="button"
+                  onClick={onOpenAI}
+                  title="Abrir esta pergunta na Valora IA"
+                >
+                  <span>Experimente perguntar</span>
+                  <strong>“Como está meu caixa nos próximos 30 dias?”</strong>
+                </button>
+
+                <button className="ai-dashboard-cta" onClick={onOpenAI}>
+                  <span>Abrir Valora IA</span>
+                  <b>→</b>
                 </button>
               </div>
             </article>
