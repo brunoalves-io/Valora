@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
@@ -73,6 +74,7 @@ export function RecurrencesPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<RecurringRule | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -354,14 +356,14 @@ export function RecurrencesPage() {
     await syncForecast();
   }
 
-  async function deleteRule(rule: RecurringRule) {
-    if (!supabase || !activeCompany || deletingId) return;
+  function requestDeleteRule(rule: RecurringRule) {
+    if (deletingId) return;
+    setPendingDelete(rule);
+  }
 
-    const confirmed = window.confirm(
-      `Excluir a recorrência "${rule.description}"?\n\nOs lançamentos já gerados serão preservados. Apenas as próximas gerações automáticas deixarão de existir.`,
-    );
-    if (!confirmed) return;
-
+  async function confirmDeleteRule() {
+    if (!supabase || !activeCompany || !pendingDelete || deletingId) return;
+    const rule = pendingDelete;
     setDeletingId(rule.id);
     setError("");
 
@@ -374,10 +376,12 @@ export function RecurrencesPage() {
     if (deleteError) {
       setError(getDeleteErrorMessage(deleteError, "esta recorrência"));
       setDeletingId(null);
+      setPendingDelete(null);
       return;
     }
 
     setDeletingId(null);
+    setPendingDelete(null);
     await load();
   }
 
@@ -707,7 +711,7 @@ export function RecurrencesPage() {
                         </button>
                         <button
                           className="table-action danger"
-                          onClick={() => void deleteRule(rule)}
+                          onClick={() => requestDeleteRule(rule)}
                           disabled={deletingId === rule.id}
                         >
                           {deletingId === rule.id ? "Excluindo..." : "Excluir"}
@@ -721,6 +725,16 @@ export function RecurrencesPage() {
           </div>
         )}
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Excluir recorrência?"
+        description={pendingDelete ? `Você está prestes a excluir “${pendingDelete.description}”.` : ""}
+        warning="Os lançamentos já gerados serão preservados. Apenas as próximas gerações automáticas deixarão de existir."
+        confirmLabel="Excluir recorrência"
+        busy={Boolean(deletingId)}
+        onCancel={() => { if (!deletingId) setPendingDelete(null); }}
+        onConfirm={() => void confirmDeleteRule()}
+      />
     </>
   );
 }
