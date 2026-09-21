@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type AccountKind = "cash" | "checking" | "savings" | "wallet" | "other";
 type Account = {
@@ -41,6 +42,7 @@ export function AccountsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -129,6 +131,33 @@ export function AccountsPage() {
     await load();
   }
 
+  async function deleteAccount(account: Account) {
+    if (!supabase || !activeCompany || deletingId) return;
+
+    const confirmed = window.confirm(
+      `Excluir "${account.name}" permanentemente?\n\nOs lançamentos vinculados serão preservados, mas ficarão sem conta associada.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(account.id);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("financial_accounts")
+      .delete()
+      .eq("id", account.id)
+      .eq("company_id", activeCompany.id);
+
+    if (deleteError) {
+      setError(getDeleteErrorMessage(deleteError, "esta conta ou caixa"));
+      setDeletingId(null);
+      return;
+    }
+
+    setDeletingId(null);
+    await load();
+  }
+
   async function toggleActive(account: Account) {
     if (!supabase) return;
     const { error: updateError } = await supabase
@@ -211,7 +240,18 @@ export function AccountsPage() {
               <strong>{money.format(balances.get(account.id) ?? 0)}</strong>
               <div className="account-card-footer">
                 <span>Inicial: {money.format(Number(account.opening_balance))}</span>
-                <button className="table-action" onClick={() => void toggleActive(account)}>{account.active ? "Desativar" : "Reativar"}</button>
+                <div className="record-actions">
+                  <button className="table-action" onClick={() => void toggleActive(account)}>
+                    {account.active ? "Desativar" : "Reativar"}
+                  </button>
+                  <button
+                    className="table-action danger"
+                    onClick={() => void deleteAccount(account)}
+                    disabled={deletingId === account.id}
+                  >
+                    {deletingId === account.id ? "Excluindo..." : "Excluir"}
+                  </button>
+                </div>
               </div>
             </article>
           ))}
