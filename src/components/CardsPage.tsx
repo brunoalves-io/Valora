@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
@@ -61,6 +62,7 @@ export function CardsPage() {
   const [saving, setSaving] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Card | null>(null);
   const [error, setError] = useState("");
   const [statementAccounts, setStatementAccounts] = useState<Record<string, string>>({});
   const [cardForm, setCardForm] = useState({
@@ -425,14 +427,14 @@ export function CardsPage() {
     await load();
   }
 
-  async function deleteCard(card: Card) {
-    if (!supabase || !activeCompany || deletingId) return;
+  function requestDeleteCard(card: Card) {
+    if (deletingId) return;
+    setPendingDelete(card);
+  }
 
-    const confirmed = window.confirm(
-      `Excluir o cartão "${card.name}"?\n\nAs compras e parcelas já registradas serão preservadas no histórico, mas deixarão de ficar vinculadas ao cartão.`,
-    );
-    if (!confirmed) return;
-
+  async function confirmDeleteCard() {
+    if (!supabase || !activeCompany || !pendingDelete || deletingId) return;
+    const card = pendingDelete;
     setDeletingId(card.id);
     setError("");
 
@@ -445,10 +447,12 @@ export function CardsPage() {
     if (deleteError) {
       setError(getDeleteErrorMessage(deleteError, "este cartão"));
       setDeletingId(null);
+      setPendingDelete(null);
       return;
     }
 
     setDeletingId(null);
+    setPendingDelete(null);
     await load();
   }
 
@@ -785,7 +789,7 @@ export function CardsPage() {
                       </button>
                       <button
                         className="table-action danger"
-                        onClick={() => void deleteCard(card)}
+                        onClick={() => requestDeleteCard(card)}
                         disabled={deletingId === card.id}
                       >
                         {deletingId === card.id ? "Excluindo..." : "Excluir"}
@@ -890,6 +894,16 @@ export function CardsPage() {
           </section>
         </>
       )}
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Excluir cartão?"
+        description={pendingDelete ? `Você está prestes a excluir “${pendingDelete.name}”.` : ""}
+        warning="As compras e parcelas já registradas serão preservadas no histórico, mas deixarão de ficar vinculadas ao cartão."
+        confirmLabel="Excluir cartão"
+        busy={Boolean(deletingId)}
+        onCancel={() => { if (!deletingId) setPendingDelete(null); }}
+        onConfirm={() => void confirmDeleteCard()}
+      />
     </>
   );
 }
