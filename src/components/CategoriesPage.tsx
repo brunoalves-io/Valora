@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type CategoryType = "income" | "expense" | "both";
 type Category = {
@@ -23,6 +24,7 @@ export function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -91,6 +93,33 @@ export function CategoriesPage() {
     setForm({ name: "", type: "expense", parent_id: "" });
     setShowForm(false);
     setSaving(false);
+    await load();
+  }
+
+  async function deleteCategory(category: Category) {
+    if (!supabase || !activeCompany || deletingId) return;
+
+    const confirmed = window.confirm(
+      `Excluir a categoria "${category.name}"?\n\nLançamentos existentes serão mantidos sem esta categoria. Subcategorias também serão preservadas e passarão a ficar sem categoria principal.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(category.id);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("categories")
+      .delete()
+      .eq("id", category.id)
+      .eq("company_id", activeCompany.id);
+
+    if (deleteError) {
+      setError(getDeleteErrorMessage(deleteError, "esta categoria"));
+      setDeletingId(null);
+      return;
+    }
+
+    setDeletingId(null);
     await load();
   }
 
@@ -182,9 +211,18 @@ export function CategoriesPage() {
                     <td>{category.parent_id ? "Subcategoria" : "Principal"}</td>
                     <td>{category.active ? "Ativa" : "Inativa"}</td>
                     <td className="right">
-                      <button className="table-action" onClick={() => void toggleActive(category)}>
-                        {category.active ? "Desativar" : "Reativar"}
-                      </button>
+                      <div className="record-actions right">
+                        <button className="table-action" onClick={() => void toggleActive(category)}>
+                          {category.active ? "Desativar" : "Reativar"}
+                        </button>
+                        <button
+                          className="table-action danger"
+                          onClick={() => void deleteCategory(category)}
+                          disabled={deletingId === category.id}
+                        >
+                          {deletingId === category.id ? "Excluindo..." : "Excluir"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
