@@ -52,8 +52,8 @@ Deno.serve(async (request) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-  const geminiModel = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash-lite";
+  const geminiApiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
+  const geminiModel = Deno.env.get("GEMINI_MODEL")?.trim() || "gemini-2.5-flash-lite";
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return jsonResponse({ error: "Supabase function environment is incomplete" }, 500);
@@ -148,13 +148,11 @@ Deno.serve(async (request) => {
           "x-goog-api-key": geminiApiKey,
         },
         body: JSON.stringify({
-          systemInstruction: {
+          system_instruction: {
             parts: [{ text: systemInstruction }],
           },
           contents,
           generationConfig: {
-            temperature: 0.2,
-            topP: 0.85,
             maxOutputTokens: 1400,
           },
         }),
@@ -172,16 +170,47 @@ Deno.serve(async (request) => {
   if (!geminiResponse.ok) {
     const providerMessage =
       geminiData?.error?.message ||
+      geminiData?.message ||
       "O provedor de IA recusou a solicitação.";
 
+    const providerDetail = String(providerMessage).slice(0, 900);
+
+    console.error("Valora AI provider error", {
+      status: geminiResponse.status,
+      model: geminiModel,
+      message: providerDetail,
+    });
+
+    let publicMessage = "A IA não conseguiu responder.";
+    let code = "AI_PROVIDER_ERROR";
+    let responseStatus = 502;
+
+    if (geminiResponse.status === 400) {
+      publicMessage = "O Gemini recusou a solicitação: " + providerDetail;
+      code = "AI_BAD_REQUEST";
+    } else if (geminiResponse.status === 401 || geminiResponse.status === 403) {
+      publicMessage = "A chave do Gemini não foi aceita: " + providerDetail;
+      code = "AI_AUTH_ERROR";
+    } else if (geminiResponse.status === 404) {
+      publicMessage = "O modelo de IA configurado não foi encontrado: " + providerDetail;
+      code = "AI_MODEL_ERROR";
+    } else if (geminiResponse.status === 429) {
+      publicMessage =
+        "O limite temporário da IA foi atingido: " + providerDetail;
+      code = "AI_RATE_LIMIT";
+      responseStatus = 429;
+    } else {
+      publicMessage =
+        "O Gemini retornou erro " + geminiResponse.status + ": " + providerDetail;
+    }
+
     return jsonResponse({
-      error:
-        geminiResponse.status === 429
-          ? "O limite temporário da IA foi atingido. Tente novamente em alguns instantes."
-          : "A IA não conseguiu responder agora.",
-      code: geminiResponse.status === 429 ? "AI_RATE_LIMIT" : "AI_PROVIDER_ERROR",
-      detail: String(providerMessage).slice(0, 800),
-    }, geminiResponse.status === 429 ? 429 : 502);
+      error: publicMessage,
+      code,
+      detail: providerDetail,
+      providerStatus: geminiResponse.status,
+      model: geminiModel,
+    }, responseStatus);
   }
 
   const answer = Array.isArray(geminiData?.candidates)
