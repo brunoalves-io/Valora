@@ -66,6 +66,20 @@ jobs:
           path: src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
 
+      - name: Publish v1.0.0 preview
+        if: github.ref == 'refs/heads/feat/company-settings-v1.0'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v1.0.0-preview
+          INSTALLER_PATH: ${{ steps.installer.outputs.path }}
+        run: |
+          if (gh release view "$env:RELEASE_TAG" 2>$null) {
+            gh release upload "$env:RELEASE_TAG" "$env:INSTALLER_PATH" --clobber
+          } else {
+            gh release create "$env:RELEASE_TAG" "$env:INSTALLER_PATH" --title "Valora v1.0.0-preview" --notes "Latest Valora v1.0.0 preview Windows installer." --prerelease
+          }
+
       - name: Publish release branch build
         if: startsWith(github.ref, 'refs/heads/release/')
         shell: pwsh
