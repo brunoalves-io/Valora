@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
@@ -86,6 +87,7 @@ export function ProposalsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingOriginalItemIds, setEditingOriginalItemIds] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Proposal | null>(null);
   const [error, setError] = useState("");
   const [receivableDates, setReceivableDates] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
@@ -529,14 +531,14 @@ export function ProposalsPage() {
     await load();
   }
 
-  async function deleteProposal(proposal: Proposal) {
-    if (!supabase || !activeCompany || deletingId) return;
+  function requestDeleteProposal(proposal: Proposal) {
+    if (deletingId) return;
+    setPendingDelete(proposal);
+  }
 
-    const confirmed = window.confirm(
-      `Excluir a proposta "${proposal.title}"?\n\nOs itens da proposta serão removidos junto. Uma conta a receber já gerada, se existir, será preservada.`,
-    );
-    if (!confirmed) return;
-
+  async function confirmDeleteProposal() {
+    if (!supabase || !activeCompany || !pendingDelete || deletingId) return;
+    const proposal = pendingDelete;
     setDeletingId(proposal.id);
     setError("");
 
@@ -549,10 +551,12 @@ export function ProposalsPage() {
     if (deleteError) {
       setError(getDeleteErrorMessage(deleteError, "esta proposta"));
       setDeletingId(null);
+      setPendingDelete(null);
       return;
     }
 
     setDeletingId(null);
+    setPendingDelete(null);
     await load();
   }
 
@@ -916,7 +920,7 @@ export function ProposalsPage() {
 
                           <button
                             className="table-action danger"
-                            onClick={() => void deleteProposal(proposal)}
+                            onClick={() => requestDeleteProposal(proposal)}
                             disabled={deletingId === proposal.id}
                           >
                             {deletingId === proposal.id ? "Excluindo..." : "Excluir"}
@@ -931,6 +935,16 @@ export function ProposalsPage() {
           </div>
         )}
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Excluir proposta?"
+        description={pendingDelete ? `Você está prestes a excluir “${pendingDelete.title}”.` : ""}
+        warning="Os itens da proposta serão removidos junto. Uma conta a receber já gerada, se existir, será preservada."
+        confirmLabel="Excluir proposta"
+        busy={Boolean(deletingId)}
+        onCancel={() => { if (!deletingId) setPendingDelete(null); }}
+        onConfirm={() => void confirmDeleteProposal()}
+      />
     </>
   );
 }
