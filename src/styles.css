@@ -706,6 +706,15 @@ nav {
   justify-content: flex-end;
 }
 
+.table-action.edit {
+  color: #35658a;
+}
+
+.table-action.edit:hover:not(:disabled) {
+  color: #244f70;
+  background: #eff6fb;
+}
+
 .table-action.danger {
   color: #bb3e49;
 }
