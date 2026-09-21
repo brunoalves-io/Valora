@@ -112,38 +112,20 @@ export function CompanySettingsPage() {
   useEffect(() => {
     if (!supabase || !activeCompany) return;
 
+    const client = supabase;
+    const companyId = activeCompany.id;
+
     async function load() {
       setLoading(true);
       setError("");
       setMessage("");
 
-      const { data, error: queryError } = await supabase
+      const { data, error: queryError } = await client
         .from("companies")
         .select(
-          [
-            "name",
-            "legal_name",
-            "tax_id",
-            "state_registration",
-            "municipal_registration",
-            "email",
-            "phone",
-            "website",
-            "address_street",
-            "address_number",
-            "address_complement",
-            "address_district",
-            "address_city",
-            "address_state",
-            "postal_code",
-            "country_code",
-            "currency_code",
-            "locale",
-            "timezone",
-            "logo_url",
-          ].join(","),
+          "name, legal_name, tax_id, state_registration, municipal_registration, email, phone, website, address_street, address_number, address_complement, address_district, address_city, address_state, postal_code, country_code, currency_code, locale, timezone, logo_url",
         )
-        .eq("id", activeCompany.id)
+        .eq("id", companyId)
         .single();
 
       if (queryError || !data) {
@@ -152,27 +134,29 @@ export function CompanySettingsPage() {
         return;
       }
 
+      const row = data as unknown as Partial<CompanySettings> & { name: string };
+
       setForm({
-        name: data.name ?? "",
-        legal_name: data.legal_name ?? "",
-        tax_id: data.tax_id ?? "",
-        state_registration: data.state_registration ?? "",
-        municipal_registration: data.municipal_registration ?? "",
-        email: data.email ?? "",
-        phone: data.phone ?? "",
-        website: data.website ?? "",
-        address_street: data.address_street ?? "",
-        address_number: data.address_number ?? "",
-        address_complement: data.address_complement ?? "",
-        address_district: data.address_district ?? "",
-        address_city: data.address_city ?? "",
-        address_state: data.address_state ?? "",
-        postal_code: data.postal_code ?? "",
-        country_code: data.country_code ?? "BR",
-        currency_code: data.currency_code ?? "BRL",
-        locale: data.locale ?? "pt-BR",
-        timezone: data.timezone ?? "America/Sao_Paulo",
-        logo_url: data.logo_url ?? "",
+        name: row.name ?? "",
+        legal_name: row.legal_name ?? "",
+        tax_id: row.tax_id ?? "",
+        state_registration: row.state_registration ?? "",
+        municipal_registration: row.municipal_registration ?? "",
+        email: row.email ?? "",
+        phone: row.phone ?? "",
+        website: row.website ?? "",
+        address_street: row.address_street ?? "",
+        address_number: row.address_number ?? "",
+        address_complement: row.address_complement ?? "",
+        address_district: row.address_district ?? "",
+        address_city: row.address_city ?? "",
+        address_state: row.address_state ?? "",
+        postal_code: row.postal_code ?? "",
+        country_code: row.country_code ?? "BR",
+        currency_code: row.currency_code ?? "BRL",
+        locale: row.locale ?? "pt-BR",
+        timezone: row.timezone ?? "America/Sao_Paulo",
+        logo_url: row.logo_url ?? "",
       });
 
       setLoading(false);
