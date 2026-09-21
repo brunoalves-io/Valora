@@ -35,7 +35,7 @@ function Metric({
   );
 }
 
-export function Dashboard() {
+export function Dashboard({ onOpenAI }: { onOpenAI: () => void }) {
   const { activeCompany } = useCompany();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
@@ -237,14 +237,37 @@ export function Dashboard() {
             </article>
 
             <article className="panel ai-panel">
-              <div className="ai-icon">✦</div>
-              <div>
-                <h2>Valora IA</h2>
-                <p>A infraestrutura visual está pronta para a futura camada de inteligência.</p>
+              <div className="ai-panel-topline">
+                <span className="ai-panel-badge">INTELIGÊNCIA FINANCEIRA</span>
+                <span className="ai-panel-status"><i /> Disponível</span>
               </div>
-              <div className="ask">
-                <input disabled placeholder='Ex.: "Quanto tenho para pagar nos próximos 7 dias?"' />
-                <button disabled>Em breve</button>
+
+              <div className="ai-panel-main">
+                <div className="ai-icon">✦</div>
+                <div className="ai-panel-copy">
+                  <h2>Valora IA</h2>
+                  <p>
+                    Converse com os números da empresa e transforme dados financeiros
+                    em respostas claras e próximos passos.
+                  </p>
+                </div>
+              </div>
+
+              <div className="ai-panel-footer">
+                <button
+                  className="ai-dashboard-example"
+                  type="button"
+                  onClick={onOpenAI}
+                  title="Abrir esta pergunta na Valora IA"
+                >
+                  <span>Experimente perguntar</span>
+                  <strong>“Como está meu caixa nos próximos 30 dias?”</strong>
+                </button>
+
+                <button className="ai-dashboard-cta" onClick={onOpenAI}>
+                  <span>Abrir Valora IA</span>
+                  <b>→</b>
+                </button>
               </div>
             </article>
           </section>
