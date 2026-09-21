@@ -43,28 +43,204 @@ type Page =
   | "ai"
   | "settings";
 
-const activeNav: Array<[string, string, Page]> = [
-  ["⌂", "Início", "dashboard"],
-  ["↔", "Lançamentos", "transactions"],
-  ["↓", "Contas a pagar", "payables"],
-  ["↑", "Contas a receber", "receivables"],
-  ["◉", "Contas e caixas", "accounts"],
-  ["◆", "Categorias", "categories"],
-  ["◎", "Centros de custo", "cost-centers"],
-  ["♙", "Clientes", "customers"],
-  ["♟", "Fornecedores", "suppliers"],
-  ["◇", "Propostas", "proposals"],
-  ["▥", "Relatórios", "reports"],
-  ["▣", "Cartões", "cards"],
-  ["⟳", "Recorrências", "recurrences"],
-  ["●", "Alertas", "alerts"],
-  ["✦", "Valora IA", "ai"],
+const activeNav: Array<[string, Page]> = [
+  ["Início", "dashboard"],
+  ["Lançamentos", "transactions"],
+  ["Contas a pagar", "payables"],
+  ["Contas a receber", "receivables"],
+  ["Contas e caixas", "accounts"],
+  ["Categorias", "categories"],
+  ["Centros de custo", "cost-centers"],
+  ["Clientes", "customers"],
+  ["Fornecedores", "suppliers"],
+  ["Propostas", "proposals"],
+  ["Relatórios", "reports"],
+  ["Cartões", "cards"],
+  ["Recorrências", "recurrences"],
+  ["Alertas", "alerts"],
+  ["Valora IA", "ai"],
 ];
 
-const adminNav: Array<[string, string, Page]> = [
-  ["♟", "Equipe", "team"],
-  ["◌", "Auditoria", "audit"],
+const adminNav: Array<[string, Page]> = [
+  ["Equipe", "team"],
+  ["Auditoria", "audit"],
 ];
+
+function SidebarIcon({
+  name,
+}: {
+  name: Page | "logout";
+}) {
+  const common = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+
+  switch (name) {
+    case "dashboard":
+      return (
+        <svg {...common}>
+          <path d="M3 10.8 12 3l9 7.8" />
+          <path d="M5.5 9.6V21h13V9.6" />
+          <path d="M9.5 21v-6h5v6" />
+        </svg>
+      );
+    case "transactions":
+      return (
+        <svg {...common}>
+          <path d="M7 7h13" />
+          <path d="m17 4 3 3-3 3" />
+          <path d="M17 17H4" />
+          <path d="m7 14-3 3 3 3" />
+        </svg>
+      );
+    case "payables":
+      return (
+        <svg {...common}>
+          <path d="M12 3v12" />
+          <path d="m7.5 10.5 4.5 4.5 4.5-4.5" />
+          <path d="M5 21h14" />
+        </svg>
+      );
+    case "receivables":
+      return (
+        <svg {...common}>
+          <path d="M12 21V9" />
+          <path d="m7.5 13.5 4.5-4.5 4.5 4.5" />
+          <path d="M5 3h14" />
+        </svg>
+      );
+    case "accounts":
+      return (
+        <svg {...common}>
+          <path d="M4 7.5h15.5A1.5 1.5 0 0 1 21 9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12" />
+          <path d="M16 12h5v4h-5a2 2 0 0 1 0-4Z" />
+        </svg>
+      );
+    case "categories":
+      return (
+        <svg {...common}>
+          <path d="M3 7V3h4" />
+          <path d="M3 3l8.8 8.8a2 2 0 0 1 0 2.8l-2.2 2.2a2 2 0 0 1-2.8 0L3 13" />
+          <path d="M14 7.5 21 14.5 14.5 21" />
+        </svg>
+      );
+    case "cost-centers":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8.5" />
+          <circle cx="12" cy="12" r="4.5" />
+          <circle cx="12" cy="12" r="1" />
+        </svg>
+      );
+    case "customers":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="8" r="3.5" />
+          <path d="M5 20c.8-3.7 3.2-5.5 7-5.5s6.2 1.8 7 5.5" />
+        </svg>
+      );
+    case "suppliers":
+      return (
+        <svg {...common}>
+          <path d="M3 9h12v8H3z" />
+          <path d="M15 12h3l3 3v2h-6z" />
+          <circle cx="7" cy="19" r="1.5" />
+          <circle cx="18" cy="19" r="1.5" />
+          <path d="M5 6h8" />
+        </svg>
+      );
+    case "proposals":
+      return (
+        <svg {...common}>
+          <path d="M6 3h8l4 4v14H6z" />
+          <path d="M14 3v5h5" />
+          <path d="M9 12h6M9 16h5" />
+        </svg>
+      );
+    case "reports":
+      return (
+        <svg {...common}>
+          <path d="M4 20V10" />
+          <path d="M10 20V4" />
+          <path d="M16 20v-7" />
+          <path d="M22 20H2" />
+        </svg>
+      );
+    case "cards":
+      return (
+        <svg {...common}>
+          <rect x="3" y="5" width="18" height="14" rx="2.5" />
+          <path d="M3 10h18" />
+          <path d="M7 15h4" />
+        </svg>
+      );
+    case "recurrences":
+      return (
+        <svg {...common}>
+          <path d="M20 7v5h-5" />
+          <path d="M4 17v-5h5" />
+          <path d="M6.2 8.2A7 7 0 0 1 18.8 7L20 12" />
+          <path d="M17.8 15.8A7 7 0 0 1 5.2 17L4 12" />
+        </svg>
+      );
+    case "alerts":
+      return (
+        <svg {...common}>
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+          <path d="M10 21h4" />
+        </svg>
+      );
+    case "ai":
+      return (
+        <svg {...common}>
+          <path d="m12 3 1.2 3.3L16.5 7.5l-3.3 1.2L12 12l-1.2-3.3-3.3-1.2 3.3-1.2L12 3Z" />
+          <path d="m18.5 13 1 2.5L22 16.5l-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1 1-2.5Z" />
+          <path d="m5 14 .7 1.8 1.8.7-1.8.7L5 19l-.7-1.8-1.8-.7 1.8-.7L5 14Z" />
+        </svg>
+      );
+    case "team":
+      return (
+        <svg {...common}>
+          <circle cx="9" cy="8" r="3" />
+          <path d="M3.5 19c.6-3.2 2.4-4.8 5.5-4.8s4.9 1.6 5.5 4.8" />
+          <path d="M15 6.5a3 3 0 0 1 0 5.8" />
+          <path d="M16 14.6c2.5.5 4 2 4.5 4.4" />
+        </svg>
+      );
+    case "audit":
+      return (
+        <svg {...common}>
+          <path d="M12 3 5 6v5c0 4.6 2.7 8 7 10 4.3-2 7-5.4 7-10V6l-7-3Z" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+      );
+    case "settings":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1v4H21a1.7 1.7 0 0 0-1.6 1Z" />
+        </svg>
+      );
+    case "logout":
+      return (
+        <svg {...common}>
+          <path d="M10 5H5v14h5" />
+          <path d="M14 8l4 4-4 4" />
+          <path d="M18 12H9" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
 
 function MissingConfiguration() {
   return (
@@ -232,13 +408,16 @@ function Workspace() {
         </div>
 
         <nav>
-          {navigation.map(([icon, label, target]) => (
+          {navigation.map(([label, target]) => (
             <button
               className={page === target ? "nav-item active" : "nav-item"}
               key={target}
               onClick={() => setPage(target)}
             >
-              <span>{icon}</span> {label}
+              <span className="nav-icon">
+                <SidebarIcon name={target} />
+              </span>
+              <span className="nav-label">{label}</span>
               {target === "alerts" && unreadAlerts > 0 && (
                 <b className="nav-alert-badge">{unreadAlerts > 99 ? "99+" : unreadAlerts}</b>
               )}
@@ -261,10 +440,16 @@ function Workspace() {
             className={page === "settings" ? "settings active" : "settings"}
             onClick={() => setPage("settings")}
           >
-            ⚙ Configurações
+            <span className="nav-icon">
+              <SidebarIcon name="settings" />
+            </span>
+            <span className="nav-label">Configurações</span>
           </button>
           <button className="settings sign-out" onClick={() => void signOut()}>
-            ⇥ Sair
+            <span className="nav-icon">
+              <SidebarIcon name="logout" />
+            </span>
+            <span className="nav-label">Sair</span>
           </button>
         </div>
       </aside>
