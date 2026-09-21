@@ -282,7 +282,7 @@ export function CompanySettingsPage() {
 
       {!canEdit && (
         <div className="viewer-banner settings-readonly">
-          Você pode consultar estas configurações. Apenas Owner e Admin podem alterá-las.
+          Você pode consultar estas configurações. Apenas Líder e Administrador podem alterá-las.
         </div>
       )}
 
