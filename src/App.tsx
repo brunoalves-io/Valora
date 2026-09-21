@@ -323,7 +323,11 @@ function CurrentPage({
 function Workspace() {
   const [page, setPage] = useState<Page>("dashboard");
   const [unreadAlerts, setUnreadAlerts] = useState(0);
-  const { companies, activeCompany, activeRole, selectCompany } = useCompany();
+  const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
+  const [creatingCompany, setCreatingCompany] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState("");
+  const [companyMenuError, setCompanyMenuError] = useState("");
+  const { companies, activeCompany, activeRole, selectCompany, createCompany } = useCompany();
   const { user, signOut } = useAuth();
 
   const refreshAlertCount = useCallback(async () => {
@@ -371,6 +375,45 @@ function Workspace() {
       ? [...activeNav, ...adminNav]
       : activeNav;
 
+  function roleLabel(role: "owner" | "admin" | "member" | "viewer") {
+    if (role === "owner") return "Líder";
+    if (role === "admin") return "Administrador";
+    if (role === "member") return "Membro";
+    return "Somente leitura";
+  }
+
+  function chooseCompany(companyId: string) {
+    selectCompany(companyId);
+    setCompanyMenuOpen(false);
+    setCreatingCompany(false);
+    setCompanyMenuError("");
+    setPage("dashboard");
+  }
+
+  async function addCompany() {
+    const cleanName = newCompanyName.trim();
+    if (cleanName.length < 2) {
+      setCompanyMenuError("Informe um nome válido para a empresa.");
+      return;
+    }
+
+    setCompanyMenuError("");
+
+    try {
+      await createCompany(cleanName);
+      setNewCompanyName("");
+      setCreatingCompany(false);
+      setCompanyMenuOpen(false);
+      setPage("settings");
+    } catch (error) {
+      setCompanyMenuError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível criar a empresa.",
+      );
+    }
+  }
+
   return (
     <div className={activeRole === "viewer" ? "shell role-viewer" : "shell"}>
       <aside className="sidebar">
@@ -382,28 +425,175 @@ function Workspace() {
           </div>
         </div>
 
-        <div className="company-switcher">
+        <div
+          className="company-switcher"
+          onBlur={(event) => {
+            const next = event.relatedTarget as Node | null;
+            if (!next || !event.currentTarget.contains(next)) {
+              setCompanyMenuOpen(false);
+              setCreatingCompany(false);
+              setCompanyMenuError("");
+            }
+          }}
+        >
           <span>EMPRESA</span>
-          <select
-            value={activeCompany?.id ?? ""}
-            onChange={(event) => selectCompany(event.target.value)}
+
+          <button
+            type="button"
+            className={companyMenuOpen ? "company-switcher-trigger open" : "company-switcher-trigger"}
+            onClick={() => {
+              setCompanyMenuOpen((value) => !value);
+              setCompanyMenuError("");
+            }}
+            aria-expanded={companyMenuOpen}
+            aria-haspopup="menu"
           >
-            {companies.map(({ company }) => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
+            <span className="company-switcher-avatar">
+              {(activeCompany?.name?.slice(0, 1) ?? "E").toUpperCase()}
+            </span>
+            <span className="company-switcher-name">{activeCompany?.name ?? "Empresa"}</span>
+            <svg
+              className="company-switcher-chevron"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m7 10 5 5 5-5" />
+            </svg>
+          </button>
+
           {activeRole && (
             <small className={"company-role-badge " + activeRole}>
-              {activeRole === "owner"
-                ? "Líder"
-                : activeRole === "admin"
-                  ? "Administrador"
-                  : activeRole === "member"
-                    ? "Membro"
-                    : "Somente leitura"}
+              {roleLabel(activeRole)}
             </small>
+          )}
+
+          {companyMenuOpen && (
+            <div className="company-menu" role="menu">
+              <div className="company-menu-heading">
+                <strong>Suas empresas</strong>
+                <span>{companies.length} vinculada(s)</span>
+              </div>
+
+              <div className="company-menu-list">
+                {companies.map(({ company, role }) => (
+                  <button
+                    type="button"
+                    key={company.id}
+                    className={
+                      company.id === activeCompany?.id
+                        ? "company-menu-item active"
+                        : "company-menu-item"
+                    }
+                    onClick={() => chooseCompany(company.id)}
+                    role="menuitem"
+                  >
+                    <span className="company-menu-avatar">
+                      {company.name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="company-menu-copy">
+                      <strong>{company.name}</strong>
+                      <small>{roleLabel(role)}</small>
+                    </span>
+                    {company.id === activeCompany?.id && (
+                      <span className="company-menu-check">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="company-menu-divider" />
+
+              {!creatingCompany ? (
+                <>
+                  <button
+                    type="button"
+                    className="company-menu-action"
+                    onClick={() => {
+                      setPage("settings");
+                      setCompanyMenuOpen(false);
+                    }}
+                  >
+                    <SidebarIcon name="settings" />
+                    <span>
+                      <strong>Configurações da empresa</strong>
+                      <small>Dados cadastrais, contato e identidade</small>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="company-menu-action create"
+                    onClick={() => {
+                      setCreatingCompany(true);
+                      setCompanyMenuError("");
+                    }}
+                  >
+                    <span className="company-menu-plus">+</span>
+                    <span>
+                      <strong>Nova empresa</strong>
+                      <small>Crie outro ambiente financeiro separado</small>
+                    </span>
+                  </button>
+                </>
+              ) : (
+                <div className="company-create-inline">
+                  <label>
+                    Nome da nova empresa
+                    <input
+                      value={newCompanyName}
+                      onChange={(event) => {
+                        setNewCompanyName(event.target.value);
+                        setCompanyMenuError("");
+                      }}
+                      placeholder="Ex.: Nova empresa"
+                      autoFocus
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void addCompany();
+                        }
+                        if (event.key === "Escape") {
+                          setCreatingCompany(false);
+                          setCompanyMenuError("");
+                        }
+                      }}
+                    />
+                  </label>
+
+                  {companyMenuError && (
+                    <small className="company-menu-error">{companyMenuError}</small>
+                  )}
+
+                  <div className="company-create-actions">
+                    <button
+                      type="button"
+                      className="company-create-cancel"
+                      onClick={() => {
+                        setCreatingCompany(false);
+                        setNewCompanyName("");
+                        setCompanyMenuError("");
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="company-create-confirm"
+                      onClick={() => void addCompany()}
+                    >
+                      Criar empresa
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
