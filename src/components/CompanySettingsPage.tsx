@@ -292,8 +292,7 @@ export function CompanySettingsPage() {
       <form className="company-settings-form" onSubmit={save}>
         <section className="panel settings-section">
           <div className="settings-section-heading">
-            <div className="settings-section-icon">▣</div>
-            <div>
+            <div className="settings-section-heading-copy">
               <h2>Empresa</h2>
               <p>Dados principais usados para identificar sua operação.</p>
             </div>
@@ -371,8 +370,7 @@ export function CompanySettingsPage() {
 
         <section className="panel settings-section">
           <div className="settings-section-heading">
-            <div className="settings-section-icon">◎</div>
-            <div>
+            <div className="settings-section-heading-copy">
               <h2>Contato</h2>
               <p>Informações que poderão ser reutilizadas em propostas e documentos.</p>
             </div>
@@ -417,8 +415,7 @@ export function CompanySettingsPage() {
 
         <section className="panel settings-section">
           <div className="settings-section-heading">
-            <div className="settings-section-icon">⌖</div>
-            <div>
+            <div className="settings-section-heading-copy">
               <h2>Endereço</h2>
               <p>Endereço comercial ou fiscal da empresa.</p>
             </div>
@@ -507,8 +504,7 @@ export function CompanySettingsPage() {
 
         <section className="panel settings-section settings-brand-section">
           <div className="settings-section-heading">
-            <div className="settings-section-icon">V</div>
-            <div>
+            <div className="settings-section-heading-copy">
               <h2>Identidade</h2>
               <p>Prepare a marca para futuras propostas e documentos gerados pelo Valora.</p>
             </div>
@@ -551,8 +547,7 @@ export function CompanySettingsPage() {
 
         <section className="panel settings-section settings-preferences">
           <div className="settings-section-heading">
-            <div className="settings-section-icon">◷</div>
-            <div>
+            <div className="settings-section-heading-copy">
               <h2>Preferências</h2>
               <p>Base regional usada internamente pelo Valora.</p>
             </div>
