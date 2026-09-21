@@ -28,7 +28,7 @@ type CompanyContextValue = {
   activeRole: CompanyMembership["role"] | null;
   loading: boolean;
   refreshCompanies: () => Promise<void>;
-  createCompany: (name: string) => Promise<void>;
+  createCompany: (name: string) => Promise<string>;
   selectCompany: (companyId: string) => void;
 };
 
@@ -121,6 +121,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setActiveCompanyId(companyId);
         localStorage.setItem(STORAGE_KEY, companyId);
         await refreshCompanies();
+        return companyId;
       },
       selectCompany(companyId) {
         setActiveCompanyId(companyId);
