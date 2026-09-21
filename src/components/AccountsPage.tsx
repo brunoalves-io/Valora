@@ -42,6 +42,7 @@ export function AccountsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -99,6 +100,32 @@ export function AccountsPage() {
     .filter((account) => account.active)
     .reduce((sum, account) => sum + (balances.get(account.id) ?? 0), 0);
 
+  function resetForm() {
+    setForm({ name: "", kind: "checking", opening_balance: "0,00" });
+    setEditingId(null);
+    setShowForm(false);
+    setError("");
+  }
+
+  function openNewAccount() {
+    setEditingId(null);
+    setForm({ name: "", kind: "checking", opening_balance: "0,00" });
+    setError("");
+    setShowForm(true);
+  }
+
+  function editAccount(account: Account) {
+    setEditingId(account.id);
+    setForm({
+      name: account.name,
+      kind: account.kind,
+      opening_balance: String(account.opening_balance).replace(".", ","),
+    });
+    setError("");
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!supabase || !activeCompany) return;
@@ -112,22 +139,38 @@ export function AccountsPage() {
     setSaving(true);
     setError("");
 
-    const { error: insertError } = await supabase.from("financial_accounts").insert({
-      company_id: activeCompany.id,
-      name: form.name.trim(),
-      kind: form.kind,
-      opening_balance: openingBalance,
-    });
+    const mutation = editingId
+      ? supabase
+          .from("financial_accounts")
+          .update({
+            name: form.name.trim(),
+            kind: form.kind,
+            opening_balance: openingBalance,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingId)
+          .eq("company_id", activeCompany.id)
+      : supabase.from("financial_accounts").insert({
+          company_id: activeCompany.id,
+          name: form.name.trim(),
+          kind: form.kind,
+          opening_balance: openingBalance,
+        });
 
-    if (insertError) {
-      setError(insertError.message);
+    const { error: mutationError } = await mutation;
+
+    if (mutationError) {
+      setError(
+        editingId
+          ? "Não foi possível atualizar esta conta ou caixa."
+          : mutationError.message,
+      );
       setSaving(false);
       return;
     }
 
-    setForm({ name: "", kind: "checking", opening_balance: "0,00" });
-    setShowForm(false);
     setSaving(false);
+    resetForm();
     await load();
   }
 
@@ -180,7 +223,13 @@ export function AccountsPage() {
           <h1>Contas e caixas</h1>
           <p>Organize onde o dinheiro da empresa entra, sai e permanece.</p>
         </div>
-        <button className="primary" onClick={() => setShowForm((value) => !value)}>
+        <button
+          className="primary"
+          onClick={() => {
+            if (showForm) resetForm();
+            else openNewAccount();
+          }}
+        >
           {showForm ? "Fechar" : "+ Nova conta"}
         </button>
       </header>
@@ -195,8 +244,12 @@ export function AccountsPage() {
         <form className="panel simple-form" onSubmit={submit}>
           <div className="form-heading">
             <div>
-              <h2>Nova conta ou caixa</h2>
-              <p>Use contas manuais nesta fase, sem conexão bancária.</p>
+              <h2>{editingId ? "Editar conta ou caixa" : "Nova conta ou caixa"}</h2>
+              <p>
+                {editingId
+                  ? "Atualize os dados da conta sem alterar os lançamentos vinculados."
+                  : "Use contas manuais nesta fase, sem conexão bancária."}
+              </p>
             </div>
           </div>
           <div className="simple-form-grid">
@@ -217,8 +270,10 @@ export function AccountsPage() {
           </div>
           {error && <div className="form-alert error">{error}</div>}
           <div className="form-actions">
-            <button type="button" className="ghost" onClick={() => setShowForm(false)}>Cancelar</button>
-            <button className="primary" disabled={saving}>{saving ? "Salvando..." : "Salvar conta"}</button>
+            <button type="button" className="ghost" onClick={resetForm}>Cancelar</button>
+            <button className="primary" disabled={saving}>
+              {saving ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar conta"}
+            </button>
           </div>
         </form>
       )}
@@ -241,6 +296,9 @@ export function AccountsPage() {
               <div className="account-card-footer">
                 <span>Inicial: {money.format(Number(account.opening_balance))}</span>
                 <div className="record-actions">
+                  <button className="table-action edit" onClick={() => editAccount(account)}>
+                    Editar
+                  </button>
                   <button className="table-action" onClick={() => void toggleActive(account)}>
                     {account.active ? "Desativar" : "Reativar"}
                   </button>
