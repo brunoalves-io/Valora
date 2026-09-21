@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
@@ -43,6 +44,7 @@ export function TransactionsPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -195,15 +197,15 @@ export function TransactionsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function deleteTransaction(item: Transaction) {
-    if (!supabase || !activeCompany || deletingId) return;
+  function requestDeleteTransaction(item: Transaction) {
+    if (deletingId) return;
+    setPendingDelete(item);
+  }
 
-    const confirmed = window.confirm(
-      `Excluir o lançamento "${item.description}"?\n\nEssa ação é permanente e removerá este lançamento dos saldos e relatórios.`,
-    );
+  async function confirmDeleteTransaction() {
+    if (!supabase || !activeCompany || !pendingDelete || deletingId) return;
 
-    if (!confirmed) return;
-
+    const item = pendingDelete;
     setDeletingId(item.id);
     setError("");
 
@@ -216,10 +218,12 @@ export function TransactionsPage() {
     if (deleteError) {
       setError(getDeleteErrorMessage(deleteError, "este lançamento"));
       setDeletingId(null);
+      setPendingDelete(null);
       return;
     }
 
     setDeletingId(null);
+    setPendingDelete(null);
     await load();
   }
 
@@ -548,7 +552,7 @@ export function TransactionsPage() {
                         </button>
                         <button
                           className="table-action danger"
-                          onClick={() => void deleteTransaction(item)}
+                          onClick={() => requestDeleteTransaction(item)}
                           disabled={deletingId === item.id}
                         >
                           {deletingId === item.id ? "Excluindo..." : "Excluir"}
@@ -562,6 +566,23 @@ export function TransactionsPage() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Excluir lançamento?"
+        description={
+          pendingDelete
+            ? `Você está prestes a excluir “${pendingDelete.description}”.`
+            : ""
+        }
+        warning="Essa ação é permanente e removerá o lançamento dos saldos e relatórios."
+        confirmLabel="Excluir lançamento"
+        busy={Boolean(deletingId)}
+        onCancel={() => {
+          if (!deletingId) setPendingDelete(null);
+        }}
+        onConfirm={() => void confirmDeleteTransaction()}
+      />
     </>
   );
 }
