@@ -469,7 +469,14 @@ function Workspace() {
             }
           }}
         >
-          <span>EMPRESA</span>
+          <div className="company-switcher-heading">
+            <span className="company-switcher-label">EMPRESA</span>
+            {activeRole && (
+              <small className={"company-role-badge " + activeRole}>
+                {roleLabel(activeRole)}
+              </small>
+            )}
+          </div>
 
           <div className="company-switcher-control">
             <button
@@ -621,11 +628,6 @@ function Workspace() {
             )}
           </div>
 
-          {activeRole && (
-            <small className={"company-role-badge " + activeRole}>
-              {roleLabel(activeRole)}
-            </small>
-          )}
         </div>
 
         <nav>
