@@ -104,6 +104,7 @@ export function CompanySettingsPage() {
   const [form, setForm] = useState<CompanySettings>(emptySettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [logoBusy, setLogoBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -188,6 +189,98 @@ export function CompanySettingsPage() {
     setForm((current) => ({ ...current, [field]: value }));
     setMessage("");
     setError("");
+  }
+
+  async function uploadLogo(file: File) {
+    if (!supabase || !activeCompany || !canEdit || logoBusy) return;
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setError("Use uma imagem PNG, JPG ou WebP.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("A logo deve ter no máximo 5 MB.");
+      return;
+    }
+
+    setLogoBusy(true);
+    setError("");
+    setMessage("");
+
+    const objectPath = `${activeCompany.id}/logo`;
+    const { error: uploadError } = await supabase.storage
+      .from("company-branding")
+      .upload(objectPath, file, {
+        upsert: true,
+        contentType: file.type,
+        cacheControl: "3600",
+      });
+
+    if (uploadError) {
+      setError("Não foi possível enviar a logo. Tente novamente.");
+      setLogoBusy(false);
+      return;
+    }
+
+    const { data: publicData } = supabase.storage
+      .from("company-branding")
+      .getPublicUrl(objectPath);
+
+    const publicUrl = publicData.publicUrl + "?v=" + Date.now();
+
+    const { error: companyError } = await supabase
+      .from("companies")
+      .update({
+        logo_url: publicUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", activeCompany.id);
+
+    if (companyError) {
+      setError("A imagem foi enviada, mas não foi possível vinculá-la à empresa.");
+      setLogoBusy(false);
+      return;
+    }
+
+    update("logo_url", publicUrl);
+    await refreshCompanies();
+    setMessage("Logo atualizada com sucesso.");
+    setLogoBusy(false);
+  }
+
+  async function removeLogo() {
+    if (!supabase || !activeCompany || !canEdit || logoBusy || !form.logo_url) return;
+
+    const confirmed = window.confirm("Remover a logo atual da empresa?");
+    if (!confirmed) return;
+
+    setLogoBusy(true);
+    setError("");
+    setMessage("");
+
+    const objectPath = `${activeCompany.id}/logo`;
+    await supabase.storage.from("company-branding").remove([objectPath]);
+
+    const { error: companyError } = await supabase
+      .from("companies")
+      .update({
+        logo_url: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", activeCompany.id);
+
+    if (companyError) {
+      setError("Não foi possível remover a logo da empresa.");
+      setLogoBusy(false);
+      return;
+    }
+
+    update("logo_url", "");
+    await refreshCompanies();
+    setMessage("Logo removida.");
+    setLogoBusy(false);
   }
 
   async function save(event: FormEvent) {
@@ -529,19 +622,59 @@ export function CompanySettingsPage() {
               )}
             </div>
 
-            <label>
-              URL pública da logo
-              <input
-                type="url"
-                value={form.logo_url}
-                onChange={(event) => update("logo_url", event.target.value)}
-                disabled={!canEdit}
-                placeholder="https://..."
-              />
-              <small>
-                Nesta primeira etapa usamos uma URL. O upload direto de arquivos entra no acabamento da v1.0.
-              </small>
-            </label>
+            <div className="company-logo-controls">
+              <div>
+                <strong>Logo da empresa</strong>
+                <span>PNG, JPG ou WebP, até 5 MB.</span>
+              </div>
+
+              <div className="company-logo-actions">
+                <label
+                  className={
+                    canEdit && !logoBusy
+                      ? "company-logo-upload"
+                      : "company-logo-upload disabled"
+                  }
+                >
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    disabled={!canEdit || logoBusy}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.currentTarget.value = "";
+                      if (file) void uploadLogo(file);
+                    }}
+                  />
+                  {logoBusy ? "Enviando..." : form.logo_url ? "Trocar logo" : "Enviar logo"}
+                </label>
+
+                {form.logo_url && canEdit && (
+                  <button
+                    type="button"
+                    className="table-action danger company-logo-remove"
+                    onClick={() => void removeLogo()}
+                    disabled={logoBusy}
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+
+              <label className="company-logo-url">
+                Ou use uma URL pública
+                <input
+                  type="url"
+                  value={form.logo_url}
+                  onChange={(event) => update("logo_url", event.target.value)}
+                  disabled={!canEdit || logoBusy}
+                  placeholder="https://..."
+                />
+                <small>
+                  O upload direto salva a imagem automaticamente. A URL continua disponível como alternativa.
+                </small>
+              </label>
+            </div>
           </div>
         </section>
 
