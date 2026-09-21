@@ -66,6 +66,39 @@ const adminNav: Array<[string, Page]> = [
   ["Auditoria", "audit"],
 ];
 
+function CompanyAvatar({
+  company,
+  variant = "switcher",
+}: {
+  company: { name: string; logo_url?: string | null } | null;
+  variant?: "switcher" | "menu";
+}) {
+  const name = company?.name?.trim() || "Empresa";
+  const initial = name.slice(0, 1).toUpperCase();
+  const logoUrl = company?.logo_url?.trim();
+
+  return (
+    <span
+      className={
+        variant === "menu" ? "company-menu-avatar" : "company-switcher-avatar"
+      }
+      aria-hidden="true"
+    >
+      <span className="company-avatar-fallback">{initial}</span>
+      {logoUrl && (
+        <img
+          className="company-avatar-image"
+          src={logoUrl}
+          alt=""
+          onError={(event) => {
+            event.currentTarget.style.display = "none";
+          }}
+        />
+      )}
+    </span>
+  );
+}
+
 function SidebarIcon({
   name,
 }: {
@@ -449,9 +482,7 @@ function Workspace() {
               aria-expanded={companyMenuOpen}
               aria-haspopup="menu"
             >
-              <span className="company-switcher-avatar">
-              {(activeCompany?.name?.slice(0, 1) ?? "E").toUpperCase()}
-            </span>
+              <CompanyAvatar company={activeCompany} />
             <span className="company-switcher-name">{activeCompany?.name ?? "Empresa"}</span>
             <svg
               className="company-switcher-chevron"
@@ -489,9 +520,7 @@ function Workspace() {
                     onClick={() => chooseCompany(company.id)}
                     role="menuitem"
                   >
-                    <span className="company-menu-avatar">
-                      {company.name.slice(0, 1).toUpperCase()}
-                    </span>
+                    <CompanyAvatar company={company} variant="menu" />
                     <span className="company-menu-copy">
                       <strong>{company.name}</strong>
                       <small>{roleLabel(role)}</small>
