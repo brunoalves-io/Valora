@@ -3646,6 +3646,92 @@ tr:last-child td { border-bottom: 0; }
   background: white;
 }
 
+.company-logo-controls {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.company-logo-controls > div:first-child strong,
+.company-logo-controls > div:first-child span {
+  display: block;
+}
+
+.company-logo-controls > div:first-child strong {
+  color: #3c4a5f;
+  font-size: 11px;
+}
+
+.company-logo-controls > div:first-child span {
+  margin-top: 3px;
+  color: #8c97a7;
+  font-size: 9px;
+}
+
+.company-logo-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.company-logo-upload {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 36px;
+  border: 1px solid #46be91;
+  border-radius: 9px;
+  padding: 8px 12px;
+  background: #eaf8f2;
+  color: #24795b !important;
+  cursor: pointer;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  transition:
+    background .15s ease,
+    border-color .15s ease,
+    color .15s ease,
+    transform .15s ease;
+}
+
+.company-logo-upload:hover:not(.disabled) {
+  border-color: #38a97f;
+  background: #ddf4ea;
+  color: #1c684d !important;
+}
+
+.company-logo-upload:active:not(.disabled) {
+  transform: translateY(1px);
+}
+
+.company-logo-upload.disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.company-logo-upload input {
+  position: absolute;
+  width: 1px !important;
+  height: 1px;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.company-logo-remove {
+  min-height: 36px;
+  padding-inline: 10px;
+}
+
+.company-logo-url {
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid #edf1f4;
+}
+
 .settings-preference-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
