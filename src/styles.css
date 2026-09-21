@@ -728,12 +728,12 @@ nav {
 }
 
 .table-action.edit {
-  color: #35658a;
+  color: #c56a16;
 }
 
 .table-action.edit:hover:not(:disabled) {
-  color: #244f70;
-  background: #eff6fb;
+  color: #9f4f08;
+  background: #fff4e8;
 }
 
 .table-action.danger {
