@@ -21,6 +21,21 @@ set
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
+drop policy if exists "company members can read branding" on storage.objects;
+create policy "company members can read branding"
+  on storage.objects
+  for select
+  to authenticated
+  using (
+    bucket_id = 'company-branding'
+    and exists (
+      select 1
+      from public.company_members cm
+      where cm.company_id::text = split_part(name, '/', 1)
+        and cm.user_id = auth.uid()
+    )
+  );
+
 drop policy if exists "company managers can upload branding" on storage.objects;
 create policy "company managers can upload branding"
   on storage.objects
