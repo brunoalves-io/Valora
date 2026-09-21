@@ -61,13 +61,7 @@ export function ConfirmDialog({
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-description"
       >
-        <div className="confirm-dialog-brand">
-          <span className="confirm-dialog-brand-mark">V</span>
-          <strong>Valora diz</strong>
-        </div>
-
         <div className="confirm-dialog-content">
-          <div className="confirm-dialog-icon" aria-hidden="true">!</div>
           <div className="confirm-dialog-copy">
             <h2 id="confirm-dialog-title">{title}</h2>
             <p id="confirm-dialog-description">{description}</p>
