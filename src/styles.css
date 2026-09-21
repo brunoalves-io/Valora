@@ -309,13 +309,21 @@ code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
   padding: 16px 8px;
   margin-bottom: 12px;
 }
-.company-switcher > span {
-  display: block;
+.company-switcher-heading {
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.company-switcher-label {
   color: #7386a4;
   font-size: 10px;
   font-weight: 900;
+  line-height: 1;
   letter-spacing: .1em;
-  margin-bottom: 7px;
 }
 .company-switcher select {
   width: 100%;
@@ -400,7 +408,6 @@ code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
 .company-role-badge {
   display: inline-flex;
   width: fit-content;
-  margin-top: 8px;
 }
 
 .company-menu {
@@ -2258,12 +2265,17 @@ tr:last-child td { border-bottom: 0; }
 /* Valora v0.7.0 team, permissions and audit */
 .company-role-badge {
   display: inline-flex;
-  align-self: flex-start;
-  margin-top: 7px;
-  padding: 4px 7px;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex: 0 0 auto;
+  margin: 0;
+  min-height: 20px;
+  padding: 4px 8px;
   border-radius: 999px;
   font-size: 9px;
   font-weight: 900;
+  line-height: 1;
   text-transform: uppercase;
   letter-spacing: .04em;
   background: #22344f;
@@ -4279,12 +4291,6 @@ tr:last-child td { border-bottom: 0; }
     width: 100%;
     min-width: 0 !important;
   }
-}
-
-
-.company-switcher:has(.company-switcher-trigger.open) > .company-role-badge {
-  opacity: .28;
-  transition: opacity .15s ease;
 }
 
 
