@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; type: "income" | "expense" | "both" };
@@ -38,6 +39,7 @@ export function TransactionsPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -134,6 +136,34 @@ export function TransactionsPage() {
     () => new Map(partners.map((partner) => [partner.id, partner.name])),
     [partners],
   );
+
+  async function deleteTransaction(item: Transaction) {
+    if (!supabase || !activeCompany || deletingId) return;
+
+    const confirmed = window.confirm(
+      `Excluir o lançamento "${item.description}"?\n\nEssa ação é permanente e removerá este lançamento dos saldos e relatórios.`,
+    );
+
+    if (!confirmed) return;
+
+    setDeletingId(item.id);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("transactions")
+      .delete()
+      .eq("id", item.id)
+      .eq("company_id", activeCompany.id);
+
+    if (deleteError) {
+      setError(getDeleteErrorMessage(deleteError, "este lançamento"));
+      setDeletingId(null);
+      return;
+    }
+
+    setDeletingId(null);
+    await load();
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -399,6 +429,7 @@ export function TransactionsPage() {
                   <th>Cliente / Fornecedor</th>
                   <th>Status</th>
                   <th className="right">Valor</th>
+                  <th className="right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -415,6 +446,15 @@ export function TransactionsPage() {
                     <td>{item.status === "paid" ? "Pago" : "Pendente"}</td>
                     <td className={`right amount ${item.type}`}>
                       {item.type === "income" ? "+" : "−"} {money.format(Number(item.amount))}
+                    </td>
+                    <td className="right">
+                      <button
+                        className="table-action danger"
+                        onClick={() => void deleteTransaction(item)}
+                        disabled={deletingId === item.id}
+                      >
+                        {deletingId === item.id ? "Excluindo..." : "Excluir"}
+                      </button>
                     </td>
                   </tr>
                 ))}
