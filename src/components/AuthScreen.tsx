@@ -1,6 +1,68 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../contexts/AuthContext";
 
+function translateAuthError(error: unknown) {
+  const raw = error instanceof Error ? error.message : "";
+  const message = raw.toLowerCase();
+
+  if (
+    message.includes("invalid login credentials") ||
+    message.includes("invalid credentials")
+  ) {
+    return "E-mail ou senha incorretos.";
+  }
+
+  if (
+    message.includes("email not confirmed") ||
+    message.includes("email_not_confirmed")
+  ) {
+    return "Confirme seu e-mail antes de entrar.";
+  }
+
+  if (
+    message.includes("user already registered") ||
+    message.includes("already registered") ||
+    message.includes("already been registered")
+  ) {
+    return "Já existe uma conta cadastrada com este e-mail.";
+  }
+
+  if (
+    message.includes("unable to validate email") ||
+    message.includes("invalid email") ||
+    message.includes("email address") && message.includes("invalid")
+  ) {
+    return "Informe um endereço de e-mail válido.";
+  }
+
+  if (
+    message.includes("password should be at least") ||
+    message.includes("password") && message.includes("characters")
+  ) {
+    return "A senha precisa ter pelo menos 6 caracteres.";
+  }
+
+  if (
+    message.includes("rate limit") ||
+    message.includes("too many requests") ||
+    message.includes("over_request_rate_limit")
+  ) {
+    return "Muitas tentativas em pouco tempo. Aguarde alguns instantes e tente novamente.";
+  }
+
+  if (
+    message.includes("network") ||
+    message.includes("failed to fetch") ||
+    message.includes("fetch")
+  ) {
+    return "Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.";
+  }
+
+  return raw
+    ? "Não foi possível continuar. Verifique os dados informados e tente novamente."
+    : "Não foi possível continuar.";
+}
+
 export function AuthScreen() {
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -49,7 +111,7 @@ export function AuthScreen() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível continuar.");
+      setError(translateAuthError(err));
     } finally {
       setBusy(false);
     }
