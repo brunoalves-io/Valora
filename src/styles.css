@@ -405,6 +405,31 @@ nav {
   opacity: .38;
 }
 
+.record-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.record-actions.right {
+  justify-content: flex-end;
+}
+
+.table-action.danger {
+  color: #bb3e49;
+}
+
+.table-action.danger:hover:not(:disabled) {
+  color: #9f2f39;
+  background: #fff0f1;
+}
+
+.table-action.danger:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
 .sidebar-footer {
   margin-top: auto;
   padding-top: 14px;
