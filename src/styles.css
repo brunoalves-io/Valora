@@ -145,6 +145,86 @@ code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
   border-color: #46bf91;
   box-shadow: 0 0 0 3px rgba(70, 191, 145, .12);
 }
+
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 82px;
+}
+
+.password-field input[aria-invalid="true"] {
+  border-color: #e08b93;
+  box-shadow: 0 0 0 3px rgba(208, 82, 94, .08);
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 8px;
+  background: transparent;
+  color: #6f7c90;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.password-toggle:hover {
+  background: #f0f4f7;
+  color: #2f6f57;
+}
+
+.password-requirements {
+  display: grid;
+  gap: 6px;
+  margin-top: -7px;
+  padding: 0 2px;
+}
+
+.password-requirements span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #8b96a7;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.password-requirements i {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #f0f3f6;
+  color: #8b96a7;
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.password-requirements span.valid {
+  color: #2b7d5e;
+}
+
+.password-requirements span.valid i {
+  background: #e5f7ef;
+  color: #23845f;
+}
+
+.password-requirements span.invalid {
+  color: #b14d57;
+}
+
+.password-requirements span.invalid i {
+  background: #fff0f1;
+  color: #b14d57;
+}
+
 .auth-submit { width: 100%; padding: 13px 16px; }
 .auth-switch {
   border: 0;
