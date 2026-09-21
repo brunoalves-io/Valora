@@ -221,9 +221,9 @@ function Workspace() {
           {activeRole && (
             <small className={"company-role-badge " + activeRole}>
               {activeRole === "owner"
-                ? "Owner"
+                ? "Líder"
                 : activeRole === "admin"
-                  ? "Admin"
+                  ? "Administrador"
                   : activeRole === "member"
                     ? "Membro"
                     : "Somente leitura"}
