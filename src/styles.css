@@ -646,10 +646,41 @@ code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
 }
 
 nav {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
+  align-content: start;
   gap: 3px;
   overflow-y: auto;
-  padding-right: 2px;
+  overflow-x: hidden;
+  margin-right: -5px;
+  padding-right: 7px;
+  scrollbar-width: thin;
+  scrollbar-color: #40506a transparent;
+}
+
+nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+nav::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #40506a;
+  border: 1px solid #101a2d;
+  background-clip: padding-box;
+}
+
+nav::-webkit-scrollbar-thumb:hover {
+  background: #5a6d89;
+}
+
+nav::-webkit-scrollbar-button,
+nav::-webkit-scrollbar-corner {
+  display: none;
 }
 
 .nav-item,
@@ -758,26 +789,42 @@ nav {
 }
 
 .sidebar-footer {
-  margin-top: auto;
+  flex: 0 0 auto;
+  margin-top: 12px;
   padding-top: 14px;
   border-top: 1px solid #1e2d45;
 }
+
 .user-mini {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 6px 8px 11px;
+  min-width: 0;
+  padding: 7px 11px 12px 41px;
 }
-.user-mini strong, .user-mini small {
+
+.user-mini-copy {
+  min-width: 0;
+}
+
+.user-mini strong,
+.user-mini small {
   display: block;
-  max-width: 150px;
+  max-width: 170px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.user-mini strong { font-size: 12px; }
-.user-mini small { color: #7f91ad; font-size: 10px; margin-top: 3px; }
-.user-avatar { width: 34px; height: 34px; border-radius: 50%; }
+
+.user-mini strong {
+  color: #f2f6fb;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.user-mini small {
+  margin-top: 3px;
+  color: #7f91ad;
+  font-size: 9px;
+  line-height: 1.35;
+}
 .settings { width: 100%; }
 
 .workspace {
