@@ -651,10 +651,7 @@ function Workspace() {
 
         <div className="sidebar-footer">
           <div className="user-mini">
-            <div className="user-avatar">
-              {(user?.email?.slice(0, 1) ?? "U").toUpperCase()}
-            </div>
-            <div>
+            <div className="user-mini-copy">
               <strong>{user?.user_metadata?.full_name || "Usuário"}</strong>
               <small>{user?.email}</small>
             </div>
