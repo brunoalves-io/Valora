@@ -800,7 +800,7 @@ nav::-webkit-scrollbar-corner {
   min-height: 50px;
   display: flex;
   align-items: center;
-  padding: 8px 10px 10px 42px;
+  padding: 8px 11px 10px;
 }
 
 .user-mini-copy {
@@ -814,7 +814,7 @@ nav::-webkit-scrollbar-corner {
 .user-mini strong,
 .user-mini small {
   display: block;
-  max-width: 180px;
+  max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
