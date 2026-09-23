@@ -91,7 +91,36 @@ code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
   display: flex;
   flex-direction: column;
 }
-.auth-hero .brand span { color: #9fb1ca; }
+.auth-hero > .brand.large {
+  gap: clamp(14px, 1.1vw, 18px);
+  width: fit-content;
+}
+
+.auth-hero > .brand.large .brand-mark {
+  width: clamp(62px, 4.1vw, 74px);
+  height: clamp(62px, 4.1vw, 74px);
+  border-radius: clamp(16px, 1.2vw, 20px);
+  font-size: clamp(30px, 2.05vw, 38px);
+  box-shadow:
+    0 10px 28px rgba(31, 177, 126, .12),
+    inset 0 0 0 1px rgba(255, 255, 255, .18);
+}
+
+.auth-hero > .brand.large strong {
+  color: #fff;
+  font-size: clamp(27px, 1.75vw, 32px);
+  font-weight: 850;
+  line-height: 1.05;
+  letter-spacing: -.025em;
+}
+
+.auth-hero > .brand.large span {
+  margin-top: 5px;
+  color: #9fb1ca;
+  font-size: clamp(12px, .8vw, 14px);
+  line-height: 1.3;
+}
+
 .auth-copy { margin: auto 0; max-width: 620px; }
 .auth-copy h1 {
   font-size: clamp(40px, 5vw, 66px);
