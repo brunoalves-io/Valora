@@ -326,6 +326,12 @@ export function ValoraAIPage() {
       setConversations((current) => [conversation as Conversation, ...current]);
     }
 
+    if (!conversationId) {
+      setError("Não foi possível preparar a conversa para a Valora IA.");
+      setSending(false);
+      return;
+    }
+
     const optimisticUser: Message = {
       id: "temp-user-" + Date.now(),
       role: "user",
