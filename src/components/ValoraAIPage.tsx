@@ -19,6 +19,16 @@ type Message = {
   created_at: string;
 };
 
+type AIRequestMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+type RetryRequest = {
+  conversationId: string;
+  messages: AIRequestMessage[];
+};
+
 const suggestions = [
   "Como está meu caixa nos próximos 30 dias?",
   "Quais despesas mais pesaram neste mês?",
@@ -38,6 +48,30 @@ function formatTime(value: string) {
   });
 }
 
+function friendlyAIError(message: string, code?: string) {
+  const normalized = message.toLocaleLowerCase("pt-BR");
+
+  if (
+    code === "AI_TEMPORARILY_UNAVAILABLE" ||
+    normalized.includes("503") ||
+    normalized.includes("high demand") ||
+    normalized.includes("overloaded") ||
+    normalized.includes("temporarily unavailable")
+  ) {
+    return "A Valora IA está temporariamente sobrecarregada. Aguarde alguns instantes e tente novamente.";
+  }
+
+  if (code === "AI_RATE_LIMIT" || normalized.includes("429")) {
+    return "A Valora IA atingiu temporariamente o limite de solicitações. Aguarde alguns instantes e tente novamente.";
+  }
+
+  if (code === "AI_PROVIDER_UNREACHABLE") {
+    return "Não foi possível conectar ao serviço de IA. Verifique sua conexão e tente novamente.";
+  }
+
+  return message;
+}
+
 export function ValoraAIPage() {
   const { activeCompany } = useCompany();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -49,6 +83,7 @@ export function ValoraAIPage() {
   const [sending, setSending] = useState(false);
   const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
   const [pendingConversationDelete, setPendingConversationDelete] = useState<Conversation | null>(null);
+  const [retryRequest, setRetryRequest] = useState<RetryRequest | null>(null);
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -104,6 +139,7 @@ export function ValoraAIPage() {
     setActiveConversationId(null);
     setMessages([]);
     setQuestion("");
+    setRetryRequest(null);
     setError("");
     void loadConversations(false);
   }, [activeCompany?.id]);
@@ -132,6 +168,7 @@ export function ValoraAIPage() {
     setActiveConversationId(null);
     setMessages([]);
     setQuestion("");
+    setRetryRequest(null);
     setError("");
   }
 
@@ -166,6 +203,88 @@ export function ValoraAIPage() {
     await loadConversations(false);
   }
 
+  async function requestAIAnswer(
+    conversationId: string,
+    historyForAI: AIRequestMessage[],
+  ) {
+    if (!supabase) return false;
+
+    const { data: aiData, error: invokeError } = await supabase.functions.invoke(
+      "valora-ai",
+      {
+        body: {
+          companyId: activeCompany?.id,
+          messages: historyForAI,
+        },
+      },
+    );
+
+    if (invokeError || !aiData?.answer) {
+      let message =
+        invokeError?.message ||
+        aiData?.error ||
+        "A Valora IA não conseguiu responder agora.";
+      let code = aiData?.code as string | undefined;
+
+      const response = (invokeError as { context?: Response } | null)?.context;
+      if (response) {
+        try {
+          const body = await response.clone().json();
+          if (body?.error) message = body.error;
+          if (body?.code) code = body.code;
+        } catch {
+          // Keep the original Functions error when the body is not JSON.
+        }
+      }
+
+      setError(friendlyAIError(String(message), code));
+      setRetryRequest({ conversationId, messages: historyForAI });
+      return false;
+    }
+
+    const { data: savedAssistant, error: assistantSaveError } = await supabase
+      .from("ai_messages")
+      .insert({
+        conversation_id: conversationId,
+        company_id: activeCompany?.id,
+        role: "assistant",
+        content: String(aiData.answer),
+        metadata: {
+          model: aiData.model ?? null,
+          fallback_used: aiData.fallbackUsed ?? false,
+          generated_at: aiData.generatedAt ?? null,
+        },
+      })
+      .select("id, role, content, metadata, created_at")
+      .single();
+
+    if (assistantSaveError || !savedAssistant) {
+      setError(
+        assistantSaveError?.message ||
+          "A resposta foi gerada, mas não pôde ser salva no histórico.",
+      );
+      setRetryRequest(null);
+      return false;
+    }
+
+    setMessages((current) => [...current, savedAssistant as Message]);
+    setRetryRequest(null);
+    setError("");
+    return true;
+  }
+
+  async function retryLastRequest() {
+    if (!retryRequest || sending) return;
+
+    setSending(true);
+    setError("");
+
+    await requestAIAnswer(retryRequest.conversationId, retryRequest.messages);
+
+    setSending(false);
+    await loadConversations(false);
+  }
+
   async function ask(text: string) {
     if (!supabase || !activeCompany || sending) return;
 
@@ -178,6 +297,7 @@ export function ValoraAIPage() {
     }
 
     setSending(true);
+    setRetryRequest(null);
     setError("");
     setQuestion("");
 
@@ -250,61 +370,7 @@ export function ValoraAIPage() {
       ),
     );
 
-    const { data: aiData, error: invokeError } = await supabase.functions.invoke(
-      "valora-ai",
-      {
-        body: {
-          companyId: activeCompany.id,
-          messages: historyForAI,
-        },
-      },
-    );
-
-    if (invokeError || !aiData?.answer) {
-      let message =
-        invokeError?.message ||
-        aiData?.error ||
-        "A Valora IA não conseguiu responder agora.";
-
-      const response = (invokeError as { context?: Response } | null)?.context;
-      if (response) {
-        try {
-          const body = await response.clone().json();
-          if (body?.error) message = body.error;
-        } catch {
-          // Keep the original Functions error when the body is not JSON.
-        }
-      }
-
-      setError(message);
-      setSending(false);
-      await loadConversations(false);
-      return;
-    }
-
-    const { data: savedAssistant, error: assistantSaveError } = await supabase
-      .from("ai_messages")
-      .insert({
-        conversation_id: conversationId,
-        company_id: activeCompany.id,
-        role: "assistant",
-        content: String(aiData.answer),
-        metadata: {
-          model: aiData.model ?? null,
-          generated_at: aiData.generatedAt ?? null,
-        },
-      })
-      .select("id, role, content, metadata, created_at")
-      .single();
-
-    if (assistantSaveError || !savedAssistant) {
-      setError(
-        assistantSaveError?.message ||
-          "A resposta foi gerada, mas não pôde ser salva no histórico.",
-      );
-    } else {
-      setMessages((current) => [...current, savedAssistant as Message]);
-    }
+    await requestAIAnswer(conversationId, historyForAI);
 
     setSending(false);
     await loadConversations(false);
@@ -452,7 +518,21 @@ export function ValoraAIPage() {
             <div ref={endRef} />
           </div>
 
-          {error && <div className="form-alert error ai-error">{error}</div>}
+          {error && (
+            <div className="form-alert error ai-error">
+              <span>{error}</span>
+              {retryRequest && (
+                <button
+                  type="button"
+                  className="ai-retry-button"
+                  onClick={() => void retryLastRequest()}
+                  disabled={sending}
+                >
+                  {sending ? "Tentando..." : "Tentar novamente"}
+                </button>
+              )}
+            </div>
+          )}
 
           <form className="ai-composer" onSubmit={submit}>
             <textarea
