@@ -536,7 +536,7 @@ export function CompanySettingsPage() {
               />
             </label>
 
-            <label>
+            <label className="complement-field">
               Complemento
               <input
                 value={form.address_complement}
@@ -547,7 +547,7 @@ export function CompanySettingsPage() {
               />
             </label>
 
-            <label>
+            <label className="district-field">
               Bairro
               <input
                 value={form.address_district}
@@ -557,7 +557,7 @@ export function CompanySettingsPage() {
               />
             </label>
 
-            <label>
+            <label className="city-field">
               Cidade
               <input
                 value={form.address_city}
@@ -576,11 +576,12 @@ export function CompanySettingsPage() {
                 }
                 disabled={!canEdit}
                 maxLength={2}
-                placeholder="CE"
+                inputMode="text"
+                autoCapitalize="characters"
               />
             </label>
 
-            <label>
+            <label className="postal-code-field">
               CEP
               <input
                 value={form.postal_code}
