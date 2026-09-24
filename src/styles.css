@@ -3730,19 +3730,44 @@ tr:last-child td { border-bottom: 0; }
 }
 
 .address-settings-grid {
-  grid-template-columns: minmax(0, 2fr) minmax(90px, .55fr) repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
 }
 
 .address-settings-grid .street-field {
-  grid-column: span 3;
+  grid-column: span 8;
 }
 
 .address-settings-grid .number-field {
-  grid-column: span 1;
+  grid-column: span 2;
+}
+
+.address-settings-grid .postal-code-field {
+  grid-column: span 2;
+}
+
+.address-settings-grid .complement-field {
+  grid-column: span 4;
+}
+
+.address-settings-grid .district-field {
+  grid-column: span 3;
+}
+
+.address-settings-grid .city-field {
+  grid-column: span 3;
 }
 
 .address-settings-grid .state-field {
-  max-width: 110px;
+  grid-column: span 2;
+  max-width: none;
+}
+
+.address-settings-grid .number-field input,
+.address-settings-grid .postal-code-field input,
+.address-settings-grid .state-field input {
+  text-align: left;
 }
 
 .company-brand-settings {
@@ -4083,7 +4108,12 @@ tr:last-child td { border-bottom: 0; }
   }
 
   .address-settings-grid .street-field,
-  .address-settings-grid .number-field {
+  .address-settings-grid .number-field,
+  .address-settings-grid .postal-code-field,
+  .address-settings-grid .complement-field,
+  .address-settings-grid .district-field,
+  .address-settings-grid .city-field,
+  .address-settings-grid .state-field {
     grid-column: auto;
   }
 
@@ -4111,7 +4141,12 @@ tr:last-child td { border-bottom: 0; }
 
   .settings-grid label.wide,
   .address-settings-grid .street-field,
-  .address-settings-grid .number-field {
+  .address-settings-grid .number-field,
+  .address-settings-grid .postal-code-field,
+  .address-settings-grid .complement-field,
+  .address-settings-grid .district-field,
+  .address-settings-grid .city-field,
+  .address-settings-grid .state-field {
     grid-column: auto;
   }
 
