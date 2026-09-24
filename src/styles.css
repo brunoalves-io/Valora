@@ -3849,15 +3849,18 @@ tr:last-child td { border-bottom: 0; }
   align-items: center;
   justify-content: center;
   width: fit-content;
-  min-height: 38px;
+  min-height: 40px;
   border: 1px solid #46be91;
   border-radius: 9px;
-  padding: 9px 13px;
+  padding: 9px 14px;
   background: #eaf8f2;
   color: #24795b !important;
   cursor: pointer;
-  font-size: 10px !important;
-  font-weight: 900 !important;
+  font-family: inherit;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1;
+  letter-spacing: 0;
   transition:
     background .15s ease,
     border-color .15s ease,
@@ -3891,16 +3894,32 @@ tr:last-child td { border-bottom: 0; }
 }
 
 .company-logo-remove {
-  min-height: 38px;
+  min-height: 40px;
   border: 1px solid #f1d1d5;
   border-radius: 9px;
-  padding: 8px 11px;
+  padding: 9px 14px;
   background: #fff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  text-decoration: none;
 }
 
 .company-logo-remove:hover:not(:disabled) {
   border-color: #e7b9be;
   background: #fff5f6;
+}
+
+.company-logo-actions .company-logo-upload,
+.company-logo-actions .company-logo-remove {
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+.company-logo-actions .company-logo-remove:hover:not(:disabled) {
+  text-decoration: none;
 }
 
 .company-logo-url-disclosure {
