@@ -634,46 +634,49 @@ export function CompanySettingsPage() {
             </div>
 
             <div className="company-logo-controls">
-              <div className="company-logo-copy">
-                <strong>Logo da empresa</strong>
-                <span>PNG, JPG ou WebP, até 5 MB.</span>
-                <small>
-                  Ela aparece no seletor da empresa e fica disponível para propostas e documentos.
-                </small>
-              </div>
+              <div className="company-logo-primary-row">
+                <div className="company-logo-copy">
+                  <strong>Logo da empresa</strong>
+                  <span>PNG, JPG ou WebP, até 5 MB.</span>
+                </div>
 
-              <div className="company-logo-actions">
-                <label
-                  className={
-                    canEdit && !logoBusy
-                      ? "company-logo-upload"
-                      : "company-logo-upload disabled"
-                  }
-                >
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    disabled={!canEdit || logoBusy}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      event.currentTarget.value = "";
-                      if (file) void uploadLogo(file);
-                    }}
-                  />
-                  {logoBusy ? "Enviando..." : form.logo_url ? "Trocar logo" : "Enviar logo"}
-                </label>
-
-                {form.logo_url && canEdit && (
-                  <button
-                    type="button"
-                    className="table-action danger company-logo-remove"
-                    onClick={() => setLogoRemovalOpen(true)}
-                    disabled={logoBusy}
+                <div className="company-logo-actions">
+                  <label
+                    className={
+                      canEdit && !logoBusy
+                        ? "company-logo-upload"
+                        : "company-logo-upload disabled"
+                    }
                   >
-                    Remover logo
-                  </button>
-                )}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      disabled={!canEdit || logoBusy}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.currentTarget.value = "";
+                        if (file) void uploadLogo(file);
+                      }}
+                    />
+                    {logoBusy ? "Enviando..." : form.logo_url ? "Trocar logo" : "Enviar logo"}
+                  </label>
+
+                  {form.logo_url && canEdit && (
+                    <button
+                      type="button"
+                      className="table-action danger company-logo-remove"
+                      onClick={() => setLogoRemovalOpen(true)}
+                      disabled={logoBusy}
+                    >
+                      Remover logo
+                    </button>
+                  )}
+                </div>
               </div>
+
+              <small className="company-logo-helper">
+                Ela aparece no seletor da empresa e fica disponível para propostas e documentos.
+              </small>
 
               <details className="company-logo-url-disclosure">
                 <summary>
