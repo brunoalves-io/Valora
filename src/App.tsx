@@ -280,7 +280,9 @@ function MissingConfiguration() {
     <div className="config-page">
       <div className="config-card">
         <div className="brand">
-          <div className="brand-mark">V</div>
+          <div className="brand-mark">
+            <img src="/valora-logo.png" alt="" aria-hidden="true" />
+          </div>
           <div>
             <strong>Valora</strong>
             <span>Configuração inicial</span>
@@ -451,7 +453,9 @@ function Workspace() {
     <div className={activeRole === "viewer" ? "shell role-viewer" : "shell"}>
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">V</div>
+          <div className="brand-mark">
+            <img src="/valora-logo.png" alt="" aria-hidden="true" />
+          </div>
           <div>
             <strong>Valora</strong>
             <span>Gestão inteligente</span>

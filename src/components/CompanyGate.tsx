@@ -202,7 +202,9 @@ export function CompanyGate({ children }: { children: ReactNode }) {
       <div className="company-gate">
         <div className="company-card">
           <div className="brand">
-            <div className="brand-mark">V</div>
+            <div className="brand-mark">
+            <img src="/valora-logo.png" alt="" aria-hidden="true" />
+          </div>
             <div>
               <strong>Valora</strong>
               <span>Seu espaço empresarial</span>
@@ -238,7 +240,9 @@ export function CompanyGate({ children }: { children: ReactNode }) {
     <div className="onboarding-page">
       <aside className="onboarding-side">
         <div className="brand large">
-          <div className="brand-mark">V</div>
+          <div className="brand-mark">
+            <img src="/valora-logo.png" alt="" aria-hidden="true" />
+          </div>
           <div>
             <strong>Valora</strong>
             <span>Gestão inteligente</span>

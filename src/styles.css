@@ -28,10 +28,16 @@ code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: linear-gradient(145deg, #80e5bd, #37bd89);
-  color: #0b2b21;
-  font-weight: 900;
-  font-size: 22px;
+  overflow: hidden;
+  background: transparent;
+  box-shadow: 0 4px 14px rgba(31, 177, 126, .12);
+}
+
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 .brand strong { display: block; font-size: 20px; }
 .brand span { display: block; color: #8ea0bf; font-size: 12px; margin-top: 2px; }

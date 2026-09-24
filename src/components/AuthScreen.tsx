@@ -121,7 +121,9 @@ export function AuthScreen() {
     <div className="auth-page">
       <section className="auth-hero">
         <div className="brand large">
-          <div className="brand-mark">V</div>
+          <div className="brand-mark">
+            <img src="/valora-logo.png" alt="" aria-hidden="true" />
+          </div>
           <div>
             <strong>Valora</strong>
             <span>Gestão inteligente</span>
