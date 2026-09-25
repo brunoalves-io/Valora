@@ -453,10 +453,7 @@ function Workspace() {
   return (
     <div className={activeRole === "viewer" ? "shell role-viewer" : "shell"}>
       <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">
-            <img src={valoraLogo} alt="" aria-hidden="true" />
-          </div>
+        <div className="brand sidebar-wordmark">
           <div>
             <strong>Valora</strong>
             <span>Gestão inteligente</span>
