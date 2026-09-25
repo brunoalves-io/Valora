@@ -4,7 +4,7 @@
 
 # Valora
 
-### Gestão empresarial e financeira inteligente.
+### Intelligent business and financial management.
 
 Valora is an intelligent business and financial management platform with cash flow, accounts payable and receivable, reports, customers, suppliers, proposals, automations, and AI-powered insights.
 
