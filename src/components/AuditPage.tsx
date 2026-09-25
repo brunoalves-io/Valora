@@ -44,6 +44,7 @@ const entityLabels: Record<string, string> = {
   credit_cards: "Cartão",
   recurring_rules: "Recorrência",
   automation_rules: "Regra de automação",
+  companies: "Configurações da empresa",
   team_member: "Membro da equipe",
   team_invitation: "Convite",
 };
@@ -177,7 +178,7 @@ export function AuditPage() {
     return (
       <section className="panel empty-state">
         <strong>Área restrita.</strong>
-        <span>Somente Owner e Admin podem consultar a auditoria.</span>
+        <span>Somente Líder e Administrador podem consultar a auditoria.</span>
       </section>
     );
   }

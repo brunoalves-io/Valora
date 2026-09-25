@@ -1,7 +1,9 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type PartnerKind = "customer" | "supplier" | "both";
 type ViewKind = "customer" | "supplier";
@@ -42,6 +44,9 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Partner | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -150,30 +155,7 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
     return map;
   }, [transactions]);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!supabase || !activeCompany) return;
-
-    setSaving(true);
-    setError("");
-
-    const { error: insertError } = await supabase.from("business_partners").insert({
-      company_id: activeCompany.id,
-      kind: form.kind,
-      name: form.name.trim(),
-      document: form.document.trim() || null,
-      email: form.email.trim() || null,
-      phone: form.phone.trim() || null,
-      city: form.city.trim() || null,
-      notes: form.notes.trim() || null,
-    });
-
-    if (insertError) {
-      setError(insertError.message);
-      setSaving(false);
-      return;
-    }
-
+  function resetForm() {
     setForm({
       name: "",
       kind: view,
@@ -183,8 +165,119 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
       city: "",
       notes: "",
     });
+    setEditingId(null);
     setShowForm(false);
+    setError("");
+  }
+
+  function openNewPartner() {
+    setEditingId(null);
+    setForm({
+      name: "",
+      kind: view,
+      document: "",
+      email: "",
+      phone: "",
+      city: "",
+      notes: "",
+    });
+    setError("");
+    setShowForm(true);
+  }
+
+  function editPartner(partner: Partner) {
+    setEditingId(partner.id);
+    setForm({
+      name: partner.name,
+      kind: partner.kind,
+      document: partner.document ?? "",
+      email: partner.email ?? "",
+      phone: partner.phone ?? "",
+      city: partner.city ?? "",
+      notes: partner.notes ?? "",
+    });
+    setError("");
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!supabase || !activeCompany) return;
+
+    setSaving(true);
+    setError("");
+
+    const payload = {
+      kind: form.kind,
+      name: form.name.trim(),
+      document: form.document.trim() || null,
+      email: form.email.trim() || null,
+      phone: form.phone.trim() || null,
+      city: form.city.trim() || null,
+      notes: form.notes.trim() || null,
+    };
+
+    const mutation = editingId
+      ? supabase
+          .from("business_partners")
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq("id", editingId)
+          .eq("company_id", activeCompany.id)
+      : supabase.from("business_partners").insert({
+          company_id: activeCompany.id,
+          ...payload,
+        });
+
+    const { error: mutationError } = await mutation;
+
+    if (mutationError) {
+      setError(
+        editingId
+          ? `Não foi possível atualizar este ${singular}.`
+          : mutationError.message,
+      );
+      setSaving(false);
+      return;
+    }
+
     setSaving(false);
+    resetForm();
+    await load();
+  }
+
+  function requestDeletePartner(partner: Partner) {
+    if (deletingId) return;
+    setPendingDelete(partner);
+  }
+
+  async function confirmDeletePartner() {
+    if (!supabase || !activeCompany || !pendingDelete || deletingId) return;
+    const partner = pendingDelete;
+    setDeletingId(partner.id);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("business_partners")
+      .delete()
+      .eq("id", partner.id)
+      .eq("company_id", activeCompany.id);
+
+    if (deleteError) {
+      setError(
+        getDeleteErrorMessage(
+          deleteError,
+          `este ${isCustomer ? "cliente" : "fornecedor"}`,
+          `Não é possível excluir este ${isCustomer ? "cliente" : "fornecedor"} porque há propostas vinculadas. Você pode desativá-lo para manter o histórico.`,
+        ),
+      );
+      setDeletingId(null);
+      setPendingDelete(null);
+      return;
+    }
+
+    setDeletingId(null);
+    setPendingDelete(null);
     await load();
   }
 
@@ -219,7 +312,13 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
               : "Cadastre fornecedores e acompanhe compromissos financeiros por relacionamento."}
           </p>
         </div>
-        <button className="primary" onClick={() => setShowForm((value) => !value)}>
+        <button
+          className="primary"
+          onClick={() => {
+            if (showForm) resetForm();
+            else openNewPartner();
+          }}
+        >
           {showForm ? "Fechar" : "+ Novo " + singular}
         </button>
       </header>
@@ -246,8 +345,12 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
         <form className="panel partner-form" onSubmit={submit}>
           <div className="form-heading">
             <div>
-              <h2>Novo {singular}</h2>
-              <p>Cadastre os dados essenciais agora. Detalhes avançados podem vir depois.</p>
+              <h2>{editingId ? "Editar " + singular : "Novo " + singular}</h2>
+              <p>
+                {editingId
+                  ? "Atualize os dados deste relacionamento."
+                  : "Cadastre os dados essenciais agora. Detalhes avançados podem vir depois."}
+              </p>
             </div>
           </div>
 
@@ -325,11 +428,15 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
           {error && <div className="form-alert error">{error}</div>}
 
           <div className="form-actions">
-            <button type="button" className="ghost" onClick={() => setShowForm(false)}>
+            <button type="button" className="ghost" onClick={resetForm}>
               Cancelar
             </button>
             <button className="primary" disabled={saving}>
-              {saving ? "Salvando..." : "Salvar " + singular}
+              {saving
+                ? "Salvando..."
+                : editingId
+                  ? "Salvar alterações"
+                  : "Salvar " + singular}
             </button>
           </div>
         </form>
@@ -397,9 +504,21 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
                         </span>
                       </td>
                       <td className="right">
-                        <button className="table-action" onClick={() => void toggleActive(partner)}>
-                          {partner.active ? "Desativar" : "Reativar"}
-                        </button>
+                        <div className="record-actions right">
+                          <button className="table-action edit" onClick={() => editPartner(partner)}>
+                            Editar
+                          </button>
+                          <button className="table-action" onClick={() => void toggleActive(partner)}>
+                            {partner.active ? "Desativar" : "Reativar"}
+                          </button>
+                          <button
+                            className="table-action danger"
+                            onClick={() => requestDeletePartner(partner)}
+                            disabled={deletingId === partner.id}
+                          >
+                            {deletingId === partner.id ? "Excluindo..." : "Excluir"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -409,6 +528,16 @@ export function BusinessPartnersPage({ view }: { view: ViewKind }) {
           </div>
         )}
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title={isCustomer ? "Excluir cliente?" : "Excluir fornecedor?"}
+        description={pendingDelete ? `Você está prestes a excluir “${pendingDelete.name}”.` : ""}
+        warning="Lançamentos vinculados serão mantidos sem este cadastro. Se houver proposta vinculada, a exclusão será bloqueada."
+        confirmLabel={isCustomer ? "Excluir cliente" : "Excluir fornecedor"}
+        busy={Boolean(deletingId)}
+        onCancel={() => { if (!deletingId) setPendingDelete(null); }}
+        onConfirm={() => void confirmDeletePartner()}
+      />
     </>
   );
 }

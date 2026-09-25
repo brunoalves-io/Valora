@@ -1,7 +1,9 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type Card = {
   id: string;
@@ -58,6 +60,9 @@ export function CardsPage() {
   const [showPurchaseForm, setShowPurchaseForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Card | null>(null);
   const [error, setError] = useState("");
   const [statementAccounts, setStatementAccounts] = useState<Record<string, string>>({});
   const [cardForm, setCardForm] = useState({
@@ -224,6 +229,53 @@ export function CardsPage() {
     [cards],
   );
 
+  function resetCardForm() {
+    setCardForm({
+      name: "",
+      brand: "",
+      last_four: "",
+      credit_limit: "",
+      closing_day: "25",
+      due_day: "5",
+      default_payment_account_id: accounts[0]?.id ?? "",
+    });
+    setEditingCardId(null);
+    setShowCardForm(false);
+    setError("");
+  }
+
+  function openNewCard() {
+    setEditingCardId(null);
+    setCardForm({
+      name: "",
+      brand: "",
+      last_four: "",
+      credit_limit: "",
+      closing_day: "25",
+      due_day: "5",
+      default_payment_account_id: accounts[0]?.id ?? "",
+    });
+    setError("");
+    setShowCardForm(true);
+  }
+
+  function editCard(card: Card) {
+    setEditingCardId(card.id);
+    setCardForm({
+      name: card.name,
+      brand: card.brand ?? "",
+      last_four: card.last_four ?? "",
+      credit_limit: String(card.credit_limit).replace(".", ","),
+      closing_day: String(card.closing_day),
+      due_day: String(card.due_day),
+      default_payment_account_id: card.default_payment_account_id ?? "",
+    });
+    setShowPurchaseForm(false);
+    setError("");
+    setShowCardForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function createCard(event: FormEvent) {
     event.preventDefault();
     if (!supabase || !activeCompany) return;
@@ -252,8 +304,7 @@ export function CardsPage() {
     setSaving(true);
     setError("");
 
-    const { error: insertError } = await supabase.from("credit_cards").insert({
-      company_id: activeCompany.id,
+    const payload = {
       name: cardForm.name.trim(),
       brand: cardForm.brand.trim() || null,
       last_four: cardForm.last_four || null,
@@ -261,25 +312,31 @@ export function CardsPage() {
       closing_day: closingDay,
       due_day: dueDay,
       default_payment_account_id: cardForm.default_payment_account_id || null,
-    });
+    };
 
-    if (insertError) {
-      setError(insertError.message);
+    const mutation = editingCardId
+      ? supabase
+          .from("credit_cards")
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq("id", editingCardId)
+          .eq("company_id", activeCompany.id)
+      : supabase.from("credit_cards").insert({
+          company_id: activeCompany.id,
+          ...payload,
+        });
+
+    const { error: mutationError } = await mutation;
+
+    if (mutationError) {
+      setError(
+        editingCardId ? "Não foi possível atualizar este cartão." : mutationError.message,
+      );
       setSaving(false);
       return;
     }
 
-    setCardForm({
-      name: "",
-      brand: "",
-      last_four: "",
-      credit_limit: "",
-      closing_day: "25",
-      due_day: "5",
-      default_payment_account_id: accounts[0]?.id ?? "",
-    });
-    setShowCardForm(false);
     setSaving(false);
+    resetCardForm();
     await load();
   }
 
@@ -370,6 +427,35 @@ export function CardsPage() {
     await load();
   }
 
+  function requestDeleteCard(card: Card) {
+    if (deletingId) return;
+    setPendingDelete(card);
+  }
+
+  async function confirmDeleteCard() {
+    if (!supabase || !activeCompany || !pendingDelete || deletingId) return;
+    const card = pendingDelete;
+    setDeletingId(card.id);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("credit_cards")
+      .delete()
+      .eq("id", card.id)
+      .eq("company_id", activeCompany.id);
+
+    if (deleteError) {
+      setError(getDeleteErrorMessage(deleteError, "este cartão"));
+      setDeletingId(null);
+      setPendingDelete(null);
+      return;
+    }
+
+    setDeletingId(null);
+    setPendingDelete(null);
+    await load();
+  }
+
   async function toggleCard(card: Card) {
     if (!supabase) return;
 
@@ -395,7 +481,13 @@ export function CardsPage() {
           <p>Controle limites, compras parceladas, faturas e pagamentos.</p>
         </div>
         <div className="header-actions">
-          <button className="ghost" onClick={() => setShowCardForm((value) => !value)}>
+          <button
+            className="ghost"
+            onClick={() => {
+              if (showCardForm) resetCardForm();
+              else openNewCard();
+            }}
+          >
             {showCardForm ? "Fechar cadastro" : "+ Novo cartão"}
           </button>
           <button
@@ -412,8 +504,12 @@ export function CardsPage() {
         <form className="panel card-form" onSubmit={createCard}>
           <div className="form-heading">
             <div>
-              <h2>Novo cartão</h2>
-              <p>Cadastre os dados usados para montar as faturas automaticamente.</p>
+              <h2>{editingCardId ? "Editar cartão" : "Novo cartão"}</h2>
+              <p>
+                {editingCardId
+                  ? "Atualize os dados do cartão sem alterar as compras já registradas."
+                  : "Cadastre os dados usados para montar as faturas automaticamente."}
+              </p>
             </div>
           </div>
           <div className="card-form-grid">
@@ -500,11 +596,15 @@ export function CardsPage() {
           </div>
           {error && <div className="form-alert error">{error}</div>}
           <div className="form-actions">
-            <button type="button" className="ghost" onClick={() => setShowCardForm(false)}>
+            <button type="button" className="ghost" onClick={resetCardForm}>
               Cancelar
             </button>
             <button className="primary" disabled={saving}>
-              {saving ? "Salvando..." : "Salvar cartão"}
+              {saving
+                ? "Salvando..."
+                : editingCardId
+                  ? "Salvar alterações"
+                  : "Salvar cartão"}
             </button>
           </div>
         </form>
@@ -680,9 +780,21 @@ export function CardsPage() {
                   </div>
                   <div className="credit-card-footer">
                     <span>Fecha dia {card.closing_day} · vence dia {card.due_day}</span>
-                    <button className="table-action" onClick={() => void toggleCard(card)}>
-                      {card.active ? "Desativar" : "Reativar"}
-                    </button>
+                    <div className="record-actions">
+                      <button className="table-action edit" onClick={() => editCard(card)}>
+                        Editar
+                      </button>
+                      <button className="table-action" onClick={() => void toggleCard(card)}>
+                        {card.active ? "Desativar" : "Reativar"}
+                      </button>
+                      <button
+                        className="table-action danger"
+                        onClick={() => requestDeleteCard(card)}
+                        disabled={deletingId === card.id}
+                      >
+                        {deletingId === card.id ? "Excluindo..." : "Excluir"}
+                      </button>
+                    </div>
                   </div>
                 </article>
               );
@@ -782,6 +894,16 @@ export function CardsPage() {
           </section>
         </>
       )}
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Excluir cartão?"
+        description={pendingDelete ? `Você está prestes a excluir “${pendingDelete.name}”.` : ""}
+        warning="As compras e parcelas já registradas serão preservadas no histórico, mas deixarão de ficar vinculadas ao cartão."
+        confirmLabel="Excluir cartão"
+        busy={Boolean(deletingId)}
+        onCancel={() => { if (!deletingId) setPendingDelete(null); }}
+        onConfirm={() => void confirmDeleteCard()}
+      />
     </>
   );
 }

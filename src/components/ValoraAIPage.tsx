@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 
@@ -16,6 +17,16 @@ type Message = {
   content: string;
   metadata: Record<string, unknown>;
   created_at: string;
+};
+
+type AIRequestMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+type RetryRequest = {
+  conversationId: string;
+  messages: AIRequestMessage[];
 };
 
 const suggestions = [
@@ -37,6 +48,30 @@ function formatTime(value: string) {
   });
 }
 
+function friendlyAIError(message: string, code?: string) {
+  const normalized = message.toLocaleLowerCase("pt-BR");
+
+  if (
+    code === "AI_TEMPORARILY_UNAVAILABLE" ||
+    normalized.includes("503") ||
+    normalized.includes("high demand") ||
+    normalized.includes("overloaded") ||
+    normalized.includes("temporarily unavailable")
+  ) {
+    return "A Valora IA está temporariamente sobrecarregada. Aguarde alguns instantes e tente novamente.";
+  }
+
+  if (code === "AI_RATE_LIMIT" || normalized.includes("429")) {
+    return "A Valora IA atingiu temporariamente o limite de solicitações. Aguarde alguns instantes e tente novamente.";
+  }
+
+  if (code === "AI_PROVIDER_UNREACHABLE") {
+    return "Não foi possível conectar ao serviço de IA. Verifique sua conexão e tente novamente.";
+  }
+
+  return message;
+}
+
 export function ValoraAIPage() {
   const { activeCompany } = useCompany();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -46,6 +81,9 @@ export function ValoraAIPage() {
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
+  const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
+  const [pendingConversationDelete, setPendingConversationDelete] = useState<Conversation | null>(null);
+  const [retryRequest, setRetryRequest] = useState<RetryRequest | null>(null);
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -101,6 +139,7 @@ export function ValoraAIPage() {
     setActiveConversationId(null);
     setMessages([]);
     setQuestion("");
+    setRetryRequest(null);
     setError("");
     void loadConversations(false);
   }, [activeCompany?.id]);
@@ -129,16 +168,19 @@ export function ValoraAIPage() {
     setActiveConversationId(null);
     setMessages([]);
     setQuestion("");
+    setRetryRequest(null);
     setError("");
   }
 
-  async function removeConversation(conversation: Conversation) {
-    if (!supabase) return;
+  function requestRemoveConversation(conversation: Conversation) {
+    if (deletingConversationId) return;
+    setPendingConversationDelete(conversation);
+  }
 
-    const confirmed = window.confirm(
-      `Excluir a conversa "${conversation.title}"?`,
-    );
-    if (!confirmed) return;
+  async function confirmRemoveConversation() {
+    if (!supabase || !pendingConversationDelete || deletingConversationId) return;
+    const conversation = pendingConversationDelete;
+    setDeletingConversationId(conversation.id);
 
     const { error: deleteError } = await supabase
       .from("ai_conversations")
@@ -147,6 +189,8 @@ export function ValoraAIPage() {
 
     if (deleteError) {
       setError(deleteError.message);
+      setDeletingConversationId(null);
+      setPendingConversationDelete(null);
       return;
     }
 
@@ -154,6 +198,90 @@ export function ValoraAIPage() {
       startNewConversation();
     }
 
+    setDeletingConversationId(null);
+    setPendingConversationDelete(null);
+    await loadConversations(false);
+  }
+
+  async function requestAIAnswer(
+    conversationId: string,
+    historyForAI: AIRequestMessage[],
+  ) {
+    if (!supabase) return false;
+
+    const { data: aiData, error: invokeError } = await supabase.functions.invoke(
+      "valora-ai",
+      {
+        body: {
+          companyId: activeCompany?.id,
+          messages: historyForAI,
+        },
+      },
+    );
+
+    if (invokeError || !aiData?.answer) {
+      let message =
+        invokeError?.message ||
+        aiData?.error ||
+        "A Valora IA não conseguiu responder agora.";
+      let code = aiData?.code as string | undefined;
+
+      const response = (invokeError as { context?: Response } | null)?.context;
+      if (response) {
+        try {
+          const body = await response.clone().json();
+          if (body?.error) message = body.error;
+          if (body?.code) code = body.code;
+        } catch {
+          // Keep the original Functions error when the body is not JSON.
+        }
+      }
+
+      setError(friendlyAIError(String(message), code));
+      setRetryRequest({ conversationId, messages: historyForAI });
+      return false;
+    }
+
+    const { data: savedAssistant, error: assistantSaveError } = await supabase
+      .from("ai_messages")
+      .insert({
+        conversation_id: conversationId,
+        company_id: activeCompany?.id,
+        role: "assistant",
+        content: String(aiData.answer),
+        metadata: {
+          model: aiData.model ?? null,
+          fallback_used: aiData.fallbackUsed ?? false,
+          generated_at: aiData.generatedAt ?? null,
+        },
+      })
+      .select("id, role, content, metadata, created_at")
+      .single();
+
+    if (assistantSaveError || !savedAssistant) {
+      setError(
+        assistantSaveError?.message ||
+          "A resposta foi gerada, mas não pôde ser salva no histórico.",
+      );
+      setRetryRequest(null);
+      return false;
+    }
+
+    setMessages((current) => [...current, savedAssistant as Message]);
+    setRetryRequest(null);
+    setError("");
+    return true;
+  }
+
+  async function retryLastRequest() {
+    if (!retryRequest || sending) return;
+
+    setSending(true);
+    setError("");
+
+    await requestAIAnswer(retryRequest.conversationId, retryRequest.messages);
+
+    setSending(false);
     await loadConversations(false);
   }
 
@@ -169,6 +297,7 @@ export function ValoraAIPage() {
     }
 
     setSending(true);
+    setRetryRequest(null);
     setError("");
     setQuestion("");
 
@@ -195,6 +324,12 @@ export function ValoraAIPage() {
       createdConversation = true;
       setActiveConversationId(conversation.id);
       setConversations((current) => [conversation as Conversation, ...current]);
+    }
+
+    if (!conversationId) {
+      setError("Não foi possível preparar a conversa para a Valora IA.");
+      setSending(false);
+      return;
     }
 
     const optimisticUser: Message = {
@@ -241,61 +376,7 @@ export function ValoraAIPage() {
       ),
     );
 
-    const { data: aiData, error: invokeError } = await supabase.functions.invoke(
-      "valora-ai",
-      {
-        body: {
-          companyId: activeCompany.id,
-          messages: historyForAI,
-        },
-      },
-    );
-
-    if (invokeError || !aiData?.answer) {
-      let message =
-        invokeError?.message ||
-        aiData?.error ||
-        "A Valora IA não conseguiu responder agora.";
-
-      const response = (invokeError as { context?: Response } | null)?.context;
-      if (response) {
-        try {
-          const body = await response.clone().json();
-          if (body?.error) message = body.error;
-        } catch {
-          // Keep the original Functions error when the body is not JSON.
-        }
-      }
-
-      setError(message);
-      setSending(false);
-      await loadConversations(false);
-      return;
-    }
-
-    const { data: savedAssistant, error: assistantSaveError } = await supabase
-      .from("ai_messages")
-      .insert({
-        conversation_id: conversationId,
-        company_id: activeCompany.id,
-        role: "assistant",
-        content: String(aiData.answer),
-        metadata: {
-          model: aiData.model ?? null,
-          generated_at: aiData.generatedAt ?? null,
-        },
-      })
-      .select("id, role, content, metadata, created_at")
-      .single();
-
-    if (assistantSaveError || !savedAssistant) {
-      setError(
-        assistantSaveError?.message ||
-          "A resposta foi gerada, mas não pôde ser salva no histórico.",
-      );
-    } else {
-      setMessages((current) => [...current, savedAssistant as Message]);
-    }
+    await requestAIAnswer(conversationId, historyForAI);
 
     setSending(false);
     await loadConversations(false);
@@ -366,7 +447,7 @@ export function ValoraAIPage() {
                   </button>
                   <button
                     className="ai-conversation-delete"
-                    onClick={() => void removeConversation(conversation)}
+                    onClick={() => requestRemoveConversation(conversation)}
                     title="Excluir conversa"
                   >
                     ×
@@ -443,7 +524,21 @@ export function ValoraAIPage() {
             <div ref={endRef} />
           </div>
 
-          {error && <div className="form-alert error ai-error">{error}</div>}
+          {error && (
+            <div className="form-alert error ai-error">
+              <span>{error}</span>
+              {retryRequest && (
+                <button
+                  type="button"
+                  className="ai-retry-button"
+                  onClick={() => void retryLastRequest()}
+                  disabled={sending}
+                >
+                  {sending ? "Tentando..." : "Tentar novamente"}
+                </button>
+              )}
+            </div>
+          )}
 
           <form className="ai-composer" onSubmit={submit}>
             <textarea
@@ -475,6 +570,16 @@ export function ValoraAIPage() {
           </p>
         </section>
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingConversationDelete)}
+        title="Excluir conversa?"
+        description={pendingConversationDelete ? `Você está prestes a excluir “${pendingConversationDelete.title}”.` : ""}
+        warning="Essa ação é permanente e removerá o histórico desta conversa."
+        confirmLabel="Excluir conversa"
+        busy={Boolean(deletingConversationId)}
+        onCancel={() => { if (!deletingConversationId) setPendingConversationDelete(null); }}
+        onConfirm={() => void confirmRemoveConversation()}
+      />
     </>
   );
 }

@@ -1,5 +1,68 @@
 import { useState, type FormEvent } from "react";
+import valoraLogo from "../assets/valora-logo.svg";
 import { useAuth } from "../contexts/AuthContext";
+
+function translateAuthError(error: unknown) {
+  const raw = error instanceof Error ? error.message : "";
+  const message = raw.toLowerCase();
+
+  if (
+    message.includes("invalid login credentials") ||
+    message.includes("invalid credentials")
+  ) {
+    return "E-mail ou senha incorretos.";
+  }
+
+  if (
+    message.includes("email not confirmed") ||
+    message.includes("email_not_confirmed")
+  ) {
+    return "Confirme seu e-mail antes de entrar.";
+  }
+
+  if (
+    message.includes("user already registered") ||
+    message.includes("already registered") ||
+    message.includes("already been registered")
+  ) {
+    return "Já existe uma conta cadastrada com este e-mail.";
+  }
+
+  if (
+    message.includes("unable to validate email") ||
+    message.includes("invalid email") ||
+    message.includes("email address") && message.includes("invalid")
+  ) {
+    return "Informe um endereço de e-mail válido.";
+  }
+
+  if (
+    message.includes("password should be at least") ||
+    message.includes("password") && message.includes("characters")
+  ) {
+    return "A senha precisa ter pelo menos 6 caracteres.";
+  }
+
+  if (
+    message.includes("rate limit") ||
+    message.includes("too many requests") ||
+    message.includes("over_request_rate_limit")
+  ) {
+    return "Muitas tentativas em pouco tempo. Aguarde alguns instantes e tente novamente.";
+  }
+
+  if (
+    message.includes("network") ||
+    message.includes("failed to fetch") ||
+    message.includes("fetch")
+  ) {
+    return "Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.";
+  }
+
+  return raw
+    ? "Não foi possível continuar. Verifique os dados informados e tente novamente."
+    : "Não foi possível continuar.";
+}
 
 export function AuthScreen() {
   const { signIn, signUp } = useAuth();
@@ -7,15 +70,36 @@ export function AuthScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setBusy(true);
     setError("");
     setMessage("");
+
+    if (mode === "signup") {
+      if (name.trim().length < 2) {
+        setError("Informe seu nome completo.");
+        return;
+      }
+
+      if (password.length < 6) {
+        setError("A senha precisa ter pelo menos 6 caracteres.");
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setError("As senhas não coincidem. Digite novamente.");
+        return;
+      }
+    }
+
+    setBusy(true);
 
     try {
       if (mode === "login") {
@@ -28,7 +112,7 @@ export function AuthScreen() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível continuar.");
+      setError(translateAuthError(err));
     } finally {
       setBusy(false);
     }
@@ -38,7 +122,9 @@ export function AuthScreen() {
     <div className="auth-page">
       <section className="auth-hero">
         <div className="brand large">
-          <div className="brand-mark">V</div>
+          <div className="brand-mark">
+            <img src={valoraLogo} alt="" aria-hidden="true" />
+          </div>
           <div>
             <strong>Valora</strong>
             <span>Gestão inteligente</span>
@@ -93,16 +179,91 @@ export function AuthScreen() {
 
           <label>
             Senha
-            <input
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              placeholder="Mínimo de 6 caracteres"
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              minLength={6}
-              required
-            />
+            <div className="password-field">
+              <input
+                value={password}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  setError("");
+                }}
+                type={showPassword ? "text" : "password"}
+                placeholder="Mínimo de 6 caracteres"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                minLength={6}
+                required
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword((value) => !value)}
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              >
+                {showPassword ? "Ocultar" : "Mostrar"}
+              </button>
+            </div>
           </label>
+
+          {mode === "signup" && (
+            <>
+              <label>
+                Repetir senha
+                <div className="password-field">
+                  <input
+                    value={confirmPassword}
+                    onChange={(event) => {
+                      setConfirmPassword(event.target.value);
+                      setError("");
+                    }}
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Digite a mesma senha novamente"
+                    autoComplete="new-password"
+                    minLength={6}
+                    required
+                    aria-invalid={
+                      confirmPassword.length > 0 && password !== confirmPassword
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowConfirmPassword((value) => !value)}
+                    aria-label={
+                      showConfirmPassword
+                        ? "Ocultar confirmação de senha"
+                        : "Mostrar confirmação de senha"
+                    }
+                  >
+                    {showConfirmPassword ? "Ocultar" : "Mostrar"}
+                  </button>
+                </div>
+              </label>
+
+              <div className="password-requirements" aria-live="polite">
+                <span className={password.length >= 6 ? "valid" : ""}>
+                  <i>{password.length >= 6 ? "✓" : "•"}</i>
+                  Pelo menos 6 caracteres
+                </span>
+                <span
+                  className={
+                    confirmPassword.length > 0 && password === confirmPassword
+                      ? "valid"
+                      : confirmPassword.length > 0
+                        ? "invalid"
+                        : ""
+                  }
+                >
+                  <i>
+                    {confirmPassword.length > 0 && password === confirmPassword
+                      ? "✓"
+                      : confirmPassword.length > 0
+                        ? "×"
+                        : "•"}
+                  </i>
+                  As duas senhas devem ser iguais
+                </span>
+              </div>
+            </>
+          )}
 
           {error && <div className="form-alert error">{error}</div>}
           {message && <div className="form-alert success">{message}</div>}
@@ -116,6 +277,10 @@ export function AuthScreen() {
             type="button"
             onClick={() => {
               setMode(mode === "login" ? "signup" : "login");
+              setPassword("");
+              setConfirmPassword("");
+              setShowPassword(false);
+              setShowConfirmPassword(false);
               setError("");
               setMessage("");
             }}
