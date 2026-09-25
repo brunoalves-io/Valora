@@ -1,6 +1,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import valoraLogo from "./assets/valora-logo.svg";
+import { AppUpdateGate } from "./components/AppUpdateGate";
 import { AccountsPage } from "./components/AccountsPage";
 import { AuthScreen } from "./components/AuthScreen";
 import { CategoriesPage } from "./components/CategoriesPage";
@@ -703,7 +704,9 @@ function AuthenticatedApp() {
   return (
     <CompanyProvider>
       <CompanyGate>
-        <Workspace />
+        <AppUpdateGate>
+          <Workspace />
+        </AppUpdateGate>
       </CompanyGate>
     </CompanyProvider>
   );
