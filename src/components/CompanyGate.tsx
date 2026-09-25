@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
+import valoraLogo from "../assets/valora-logo.svg";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 
@@ -203,7 +204,7 @@ export function CompanyGate({ children }: { children: ReactNode }) {
         <div className="company-card">
           <div className="brand">
             <div className="brand-mark">
-            <img src="/valora-logo.png" alt="" aria-hidden="true" />
+            <img src={valoraLogo} alt="" aria-hidden="true" />
           </div>
             <div>
               <strong>Valora</strong>
@@ -241,7 +242,7 @@ export function CompanyGate({ children }: { children: ReactNode }) {
       <aside className="onboarding-side">
         <div className="brand large">
           <div className="brand-mark">
-            <img src="/valora-logo.png" alt="" aria-hidden="true" />
+            <img src={valoraLogo} alt="" aria-hidden="true" />
           </div>
           <div>
             <strong>Valora</strong>

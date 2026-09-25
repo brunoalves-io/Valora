@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import valoraLogo from "../assets/valora-logo.svg";
 import { useAuth } from "../contexts/AuthContext";
 
 function translateAuthError(error: unknown) {
@@ -122,7 +123,7 @@ export function AuthScreen() {
       <section className="auth-hero">
         <div className="brand large">
           <div className="brand-mark">
-            <img src="/valora-logo.png" alt="" aria-hidden="true" />
+            <img src={valoraLogo} alt="" aria-hidden="true" />
           </div>
           <div>
             <strong>Valora</strong>

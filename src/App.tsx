@@ -1,5 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
+import valoraLogo from "./assets/valora-logo.svg";
 import { AccountsPage } from "./components/AccountsPage";
 import { AuthScreen } from "./components/AuthScreen";
 import { CategoriesPage } from "./components/CategoriesPage";
@@ -281,7 +282,7 @@ function MissingConfiguration() {
       <div className="config-card">
         <div className="brand">
           <div className="brand-mark">
-            <img src="/valora-logo.png" alt="" aria-hidden="true" />
+            <img src={valoraLogo} alt="" aria-hidden="true" />
           </div>
           <div>
             <strong>Valora</strong>
@@ -454,7 +455,7 @@ function Workspace() {
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">
-            <img src="/valora-logo.png" alt="" aria-hidden="true" />
+            <img src={valoraLogo} alt="" aria-hidden="true" />
           </div>
           <div>
             <strong>Valora</strong>
