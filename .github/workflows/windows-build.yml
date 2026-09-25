@@ -24,6 +24,10 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://ezamgphhlkeqcntgvfvj.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_6YbXDlis6FDcj68SILDNdw__cDelwzT
+      VALORA_UPDATER_PUBLIC_KEY: ${{ vars.VALORA_UPDATER_PUBLIC_KEY }}
+      VALORA_UPDATER_ENDPOINT: https://github.com/brunoalves-io/Valora/releases/latest/download/latest.json
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
