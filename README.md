@@ -1,6 +1,14 @@
+<div align="center">
+
+<img src="./valora-logo.svg" alt="Valora" width="190">
+
 # Valora
 
+### Gestão empresarial e financeira inteligente.
+
 Valora is an intelligent business and financial management platform with cash flow, accounts payable and receivable, reports, customers, suppliers, proposals, automations, and AI-powered insights.
+
+</div>
 
 ## Product vision
 
