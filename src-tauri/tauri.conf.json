@@ -40,6 +40,7 @@
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico"
       }
-    }
+    },
+    "createUpdaterArtifacts": true
   }
 }
