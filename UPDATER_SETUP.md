@@ -38,3 +38,15 @@ Stable builds check:
 The next implementation step after the keys are configured is to enable `createUpdaterArtifacts` for stable builds and publish the signed NSIS artifact plus `latest.json` with each versioned release.
 
 Official reference: https://v2.tauri.app/plugin/updater/
+
+
+## Configuration status
+
+The GitHub Actions variable and signing secrets have now been created.
+
+The workflow publishes:
+- the Windows NSIS installer;
+- its Tauri `.sig` signature;
+- a static `latest.json` updater manifest.
+
+Stable installations use the latest non-prerelease GitHub Release through the configured endpoint. Preview and release-candidate builds also publish signed updater assets for validation, but they do not become the stable update channel.
