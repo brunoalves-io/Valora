@@ -336,7 +336,29 @@ code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
   top: 0;
   max-height: 100vh;
 }
-.sidebar > .brand { padding: 0 8px 22px; }
+.sidebar > .brand {
+  padding: 4px 12px 22px;
+}
+
+.sidebar-wordmark {
+  min-height: 52px;
+  align-items: center;
+}
+
+.sidebar-wordmark strong {
+  color: #fff;
+  font-size: 22px;
+  font-weight: 850;
+  line-height: 1.05;
+  letter-spacing: -.025em;
+}
+
+.sidebar-wordmark span {
+  margin-top: 4px;
+  color: #8ea0bf;
+  font-size: 12px;
+  line-height: 1.25;
+}
 
 .company-switcher {
   border-top: 1px solid #1e2d45;
