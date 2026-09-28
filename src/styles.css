@@ -3740,6 +3740,24 @@ tr:last-child td { border-bottom: 0; }
   line-height: 1.4;
 }
 
+.contact-settings-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 15px 16px;
+}
+
+.contact-settings-grid .contact-email-field {
+  grid-column: span 6;
+}
+
+.contact-settings-grid .contact-phone-field,
+.contact-settings-grid .contact-whatsapp-field {
+  grid-column: span 3;
+}
+
+.contact-settings-grid .contact-site-field {
+  grid-column: 1 / -1;
+}
+
 .address-settings-grid {
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 16px;
@@ -4145,12 +4163,17 @@ tr:last-child td { border-bottom: 0; }
   }
 
   .settings-grid,
+  .contact-settings-grid,
   .address-settings-grid,
   .company-brand-settings {
     grid-template-columns: 1fr;
   }
 
   .settings-grid label.wide,
+  .contact-settings-grid .contact-email-field,
+  .contact-settings-grid .contact-phone-field,
+  .contact-settings-grid .contact-whatsapp-field,
+  .contact-settings-grid .contact-site-field,
   .address-settings-grid .street-field,
   .address-settings-grid .number-field,
   .address-settings-grid .postal-code-field,
