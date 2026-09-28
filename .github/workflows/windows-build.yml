@@ -44,6 +44,28 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      - name: Configure Tauri updater for bundling
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:VALORA_UPDATER_PUBLIC_KEY)) {
+            throw "VALORA_UPDATER_PUBLIC_KEY is not configured."
+          }
+
+          $configPath = "src-tauri\tauri.conf.json"
+          $config = Get-Content $configPath -Raw | ConvertFrom-Json
+
+          if (-not $config.plugins) {
+            $config | Add-Member -NotePropertyName plugins -NotePropertyValue ([pscustomobject]@{})
+          }
+
+          $updater = [pscustomobject]@{
+            pubkey = $env:VALORA_UPDATER_PUBLIC_KEY
+            endpoints = @($env:VALORA_UPDATER_ENDPOINT)
+          }
+
+          $config.plugins | Add-Member -NotePropertyName updater -NotePropertyValue $updater -Force
+          $config | ConvertTo-Json -Depth 100 | Set-Content $configPath -Encoding utf8
+
       - name: Build Valora Windows installer
         run: npm run tauri:build -- --bundles nsis
 
