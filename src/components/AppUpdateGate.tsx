@@ -64,10 +64,6 @@ export function AppUpdateGate({ children }: { children: ReactNode }) {
             aria-modal="true"
             aria-labelledby="app-update-title"
           >
-            <div className="app-update-icon" aria-hidden="true">
-              ↑
-            </div>
-
             <div className="app-update-copy">
               <span>ATUALIZAÇÃO DO VALORA</span>
               <h2 id="app-update-title">Nova versão disponível</h2>
