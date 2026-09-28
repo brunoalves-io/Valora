@@ -102,7 +102,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish rolling preview release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref != 'refs/heads/test/updater-1.0.1'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -138,6 +138,43 @@ jobs:
             gh release edit "$env:RELEASE_TAG" --title "Valora v1.0.0-preview" --notes "$notes" --prerelease
           } else {
             gh release create "$env:RELEASE_TAG" "$stableInstaller" "$stableSignature" "$manifestPath" --title "Valora v1.0.0-preview" --notes "$notes" --prerelease
+          }
+
+      - name: Publish updater integration test release
+        if: github.ref == 'refs/heads/test/updater-1.0.1'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v1.0.1-updater-test
+          INSTALLER_PATH: ${{ steps.installer.outputs.path }}
+          SIGNATURE_PATH: ${{ steps.signature.outputs.path }}
+          RELEASE_ASSET: Valora_1.0.1_x64-setup.exe
+        run: |
+          $releaseInstaller = Join-Path $env:RUNNER_TEMP $env:RELEASE_ASSET
+          $releaseSignature = "$releaseInstaller.sig"
+          Copy-Item "$env:INSTALLER_PATH" "$releaseInstaller" -Force
+          Copy-Item "$env:SIGNATURE_PATH" "$releaseSignature" -Force
+
+          $signature = (Get-Content "$env:SIGNATURE_PATH" -Raw).Trim()
+          $manifestPath = Join-Path $env:RUNNER_TEMP "latest.json"
+          $manifest = @{
+            version = "1.0.1"
+            notes = "Temporary Valora updater integration test."
+            pub_date = (Get-Date).ToUniversalTime().ToString("o")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $signature
+                url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:RELEASE_TAG/$env:RELEASE_ASSET"
+              }
+            }
+          } | ConvertTo-Json -Depth 5
+          Set-Content -Path "$manifestPath" -Value $manifest -Encoding utf8
+
+          if (gh release view "$env:RELEASE_TAG" 2>$null) {
+            gh release upload "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --clobber
+            gh release edit "$env:RELEASE_TAG" --title "Valora Updater Test 1.0.1" --notes "Temporary stable-channel release used only to validate the signed updater."
+          } else {
+            gh release create "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --title "Valora Updater Test 1.0.1" --notes "Temporary stable-channel release used only to validate the signed updater."
           }
 
       - name: Publish release branch build
