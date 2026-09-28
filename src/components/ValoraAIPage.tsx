@@ -401,10 +401,6 @@ export function ValoraAIPage() {
             Converse com os dados financeiros da {activeCompany?.name ?? "empresa"}.
           </p>
         </div>
-        <div className="ai-readonly-badge">
-          <span>✦</span>
-          Modo consulta
-        </div>
       </header>
 
       <section className="ai-workspace">
