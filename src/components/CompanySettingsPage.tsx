@@ -499,7 +499,7 @@ export function CompanySettingsPage() {
             </label>
 
             <label className="contact-whatsapp-field">
-              WhatsApp
+              WhatsApp Business
               <input
                 value={form.whatsapp}
                 onChange={(event) => update("whatsapp", formatPhone(event.target.value))}
