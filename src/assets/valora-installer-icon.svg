@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Valora installer">
+  <rect width="1024" height="1024" rx="164" fill="#49c390"/>
+  <path fill="#000" d="M468 67h86v223c0 3 2 4 4 4h130L512 470 334 294h130c2 0 4-2 4-4V67Z"/>
+  <path fill="#000" d="M172 384h96l-93 224h672l-93-224h96l111 274v228c0 47-34 81-81 81H142c-47 0-81-34-81-79V658l111-274Z"/>
+  <circle cx="781" cy="788" r="67" fill="#49c390"/>
+</svg>
