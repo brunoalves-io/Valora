@@ -536,6 +536,19 @@ export function CompanySettingsPage() {
               />
             </label>
 
+            <label className="postal-code-field">
+              CEP
+              <input
+                value={form.postal_code}
+                onChange={(event) =>
+                  update("postal_code", formatPostalCode(event.target.value))
+                }
+                disabled={!canEdit}
+                inputMode="numeric"
+                placeholder="00000-000"
+              />
+            </label>
+
             <label className="complement-field">
               Complemento
               <input
@@ -581,18 +594,6 @@ export function CompanySettingsPage() {
               />
             </label>
 
-            <label className="postal-code-field">
-              CEP
-              <input
-                value={form.postal_code}
-                onChange={(event) =>
-                  update("postal_code", formatPostalCode(event.target.value))
-                }
-                disabled={!canEdit}
-                inputMode="numeric"
-                placeholder="00000-000"
-              />
-            </label>
           </div>
         </section>
 
