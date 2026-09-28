@@ -17,6 +17,7 @@ type CompanySettings = {
   municipal_registration: string;
   email: string;
   phone: string;
+  whatsapp: string;
   website: string;
   address_street: string;
   address_number: string;
@@ -40,6 +41,7 @@ const emptySettings: CompanySettings = {
   municipal_registration: "",
   email: "",
   phone: "",
+  whatsapp: "",
   website: "",
   address_street: "",
   address_number: "",
@@ -126,7 +128,7 @@ export function CompanySettingsPage() {
       const { data, error: queryError } = await client
         .from("companies")
         .select(
-          "name, legal_name, tax_id, state_registration, municipal_registration, email, phone, website, address_street, address_number, address_complement, address_district, address_city, address_state, postal_code, country_code, currency_code, locale, timezone, logo_url",
+          "name, legal_name, tax_id, state_registration, municipal_registration, email, phone, whatsapp, website, address_street, address_number, address_complement, address_district, address_city, address_state, postal_code, country_code, currency_code, locale, timezone, logo_url",
         )
         .eq("id", companyId)
         .single();
@@ -147,6 +149,7 @@ export function CompanySettingsPage() {
         municipal_registration: row.municipal_registration ?? "",
         email: row.email ?? "",
         phone: row.phone ?? "",
+        whatsapp: row.whatsapp ?? "",
         website: row.website ?? "",
         address_street: row.address_street ?? "",
         address_number: row.address_number ?? "",
@@ -175,6 +178,7 @@ export function CompanySettingsPage() {
       form.tax_id,
       form.email,
       form.phone,
+      form.whatsapp,
       form.address_street,
       form.address_city,
       form.address_state,
@@ -317,6 +321,7 @@ export function CompanySettingsPage() {
         municipal_registration: cleanNullable(form.municipal_registration),
         email: cleanNullable(form.email),
         phone: cleanNullable(form.phone),
+        whatsapp: cleanNullable(form.whatsapp),
         website: cleanNullable(form.website),
         address_street: cleanNullable(form.address_street),
         address_number: cleanNullable(form.address_number),
@@ -469,8 +474,8 @@ export function CompanySettingsPage() {
             </div>
           </div>
 
-          <div className="settings-grid">
-            <label>
+          <div className="settings-grid contact-settings-grid">
+            <label className="contact-email-field">
               E-mail
               <input
                 type="email"
@@ -482,7 +487,7 @@ export function CompanySettingsPage() {
               />
             </label>
 
-            <label>
+            <label className="contact-phone-field">
               Telefone
               <input
                 value={form.phone}
@@ -493,7 +498,18 @@ export function CompanySettingsPage() {
               />
             </label>
 
-            <label className="wide">
+            <label className="contact-whatsapp-field">
+              WhatsApp
+              <input
+                value={form.whatsapp}
+                onChange={(event) => update("whatsapp", formatPhone(event.target.value))}
+                disabled={!canEdit}
+                inputMode="tel"
+                placeholder="(00) 00000-0000"
+              />
+            </label>
+
+            <label className="contact-site-field">
               Site
               <input
                 value={form.website}
