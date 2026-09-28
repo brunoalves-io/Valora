@@ -3106,23 +3106,6 @@ tr:last-child td { border-bottom: 0; }
   align-items: center !important;
 }
 
-.ai-readonly-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 11px;
-  border-radius: 999px;
-  background: #edf9f4;
-  color: #237b5a;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.ai-readonly-badge span {
-  font-size: 14px;
-}
-
 .ai-workspace {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);
