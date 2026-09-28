@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri icon src/assets/valora-logo.svg && tauri dev",
-    "tauri:build": "tauri icon src/assets/valora-logo.svg && tauri icon src/assets/valora-installer-icon.svg -o src-tauri/installer-icons && tauri build"
+    "tauri:build": "tauri icon src/assets/valora-logo.svg && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-installer-header.ps1 && tauri build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
