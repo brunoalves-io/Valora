@@ -4892,20 +4892,6 @@ tr:last-child td { border-bottom: 0; }
   animation: confirmDialogIn .16s ease-out;
 }
 
-.app-update-icon {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 17px;
-  border: 1px solid #ccebdd;
-  border-radius: 13px;
-  background: #eaf8f2;
-  color: #23815d;
-  font-size: 22px;
-  font-weight: 900;
-}
-
 .app-update-copy > span {
   display: block;
   margin-bottom: 7px;
