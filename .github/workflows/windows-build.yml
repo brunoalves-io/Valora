@@ -2,17 +2,24 @@ name: Valora Windows Build
 
 on:
   push:
+    branches:
+      - main
+      - "release/**"
   workflow_dispatch:
     inputs:
       publish_release:
-        description: "Create a GitHub Release after a successful build"
+        description: "Publish this exact version as an official GitHub Release"
         required: true
         default: false
         type: boolean
       release_tag:
-        description: "Release tag, for example v0.1.0"
+        description: "Official release tag, for example v1.0.11"
         required: false
-        default: "v0.1.0"
+        default: ""
+
+concurrency:
+  group: valora-windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -43,6 +50,48 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm install
+
+      - name: Validate release version
+        if: startsWith(github.ref, 'refs/heads/release/') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
+        shell: pwsh
+        env:
+          MANUAL_TAG: ${{ inputs.release_tag }}
+        run: |
+          $package = Get-Content "package.json" -Raw | ConvertFrom-Json
+          $tauri = Get-Content "src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json
+          $cargoLine = Select-String -Path "src-tauri\Cargo.toml" -Pattern '^version = "([^"]+)"' | Select-Object -First 1
+          if (-not $cargoLine) {
+            throw "Could not read the Cargo package version."
+          }
+
+          $cargoVersion = $cargoLine.Matches[0].Groups[1].Value
+          $packageVersion = [string]$package.version
+          $tauriVersion = [string]$tauri.version
+
+          if ($packageVersion -ne $tauriVersion -or $packageVersion -ne $cargoVersion) {
+            throw "Version mismatch: package.json=$packageVersion, tauri.conf.json=$tauriVersion, Cargo.toml=$cargoVersion"
+          }
+
+          if ($env:GITHUB_REF -like "refs/heads/release/*") {
+            $tag = $env:GITHUB_REF_NAME.Replace("release/", "")
+          } else {
+            $tag = $env:MANUAL_TAG
+          }
+
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            throw "A release tag is required."
+          }
+
+          if (-not $tag.StartsWith("v")) {
+            throw "Release tags must use the v prefix, for example v1.0.11."
+          }
+
+          $tagVersion = $tag.TrimStart("v")
+          if ($tagVersion -ne $packageVersion) {
+            throw "Release tag $tag does not match application version $packageVersion."
+          }
+
+          Write-Host "Validated official release $tag."
 
       - name: Configure Tauri updater for bundling
         shell: pwsh
@@ -78,7 +127,6 @@ jobs:
             throw "Valora installer was not generated."
           }
           "path=$($file.FullName)" >> $env:GITHUB_OUTPUT
-          "name=$($file.Name)" >> $env:GITHUB_OUTPUT
           Write-Host "Installer: $($file.FullName)"
 
       - name: Locate updater signature
@@ -101,83 +149,7 @@ jobs:
             src-tauri/target/release/bundle/nsis/*.exe.sig
           if-no-files-found: error
 
-      - name: Publish rolling preview release
-        if: github.event_name == 'push' && github.ref != 'refs/heads/test/updater-1.0.1'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: v1.0.0-preview
-          INSTALLER_PATH: ${{ steps.installer.outputs.path }}
-          SIGNATURE_PATH: ${{ steps.signature.outputs.path }}
-          RELEASE_ASSET: Valora_1.0.0_x64-setup.exe
-        run: |
-          $stableInstaller = Join-Path $env:RUNNER_TEMP $env:RELEASE_ASSET
-          $stableSignature = "$stableInstaller.sig"
-          Copy-Item "$env:INSTALLER_PATH" "$stableInstaller" -Force
-          Copy-Item "$env:SIGNATURE_PATH" "$stableSignature" -Force
-
-          $signature = (Get-Content "$env:SIGNATURE_PATH" -Raw).Trim()
-          $manifestPath = Join-Path $env:RUNNER_TEMP "latest.json"
-          $manifest = @{
-            version = "1.0.0"
-            notes = "Latest successful Valora Windows preview build."
-            pub_date = (Get-Date).ToUniversalTime().ToString("o")
-            platforms = @{
-              "windows-x86_64" = @{
-                signature = $signature
-                url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:RELEASE_TAG/$env:RELEASE_ASSET"
-              }
-            }
-          } | ConvertTo-Json -Depth 5
-          Set-Content -Path "$manifestPath" -Value $manifest -Encoding utf8
-
-          $notes = "Latest successful Valora Windows preview build.`n`nBranch: $env:GITHUB_REF_NAME`nCommit: $env:GITHUB_SHA"
-
-          if (gh release view "$env:RELEASE_TAG" 2>$null) {
-            gh release upload "$env:RELEASE_TAG" "$stableInstaller" "$stableSignature" "$manifestPath" --clobber
-            gh release edit "$env:RELEASE_TAG" --title "Valora v1.0.0-preview" --notes "$notes" --prerelease
-          } else {
-            gh release create "$env:RELEASE_TAG" "$stableInstaller" "$stableSignature" "$manifestPath" --title "Valora v1.0.0-preview" --notes "$notes" --prerelease
-          }
-
-      - name: Publish updater integration test release
-        if: github.ref == 'refs/heads/test/updater-1.0.1'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: v1.0.10-updater-test
-          INSTALLER_PATH: ${{ steps.installer.outputs.path }}
-          SIGNATURE_PATH: ${{ steps.signature.outputs.path }}
-          RELEASE_ASSET: Valora_1.0.10_x64-setup.exe
-        run: |
-          $releaseInstaller = Join-Path $env:RUNNER_TEMP $env:RELEASE_ASSET
-          $releaseSignature = "$releaseInstaller.sig"
-          Copy-Item "$env:INSTALLER_PATH" "$releaseInstaller" -Force
-          Copy-Item "$env:SIGNATURE_PATH" "$releaseSignature" -Force
-
-          $signature = (Get-Content "$env:SIGNATURE_PATH" -Raw).Trim()
-          $manifestPath = Join-Path $env:RUNNER_TEMP "latest.json"
-          $manifest = @{
-            version = "1.0.10"
-            notes = "Temporary Valora updater integration test."
-            pub_date = (Get-Date).ToUniversalTime().ToString("o")
-            platforms = @{
-              "windows-x86_64" = @{
-                signature = $signature
-                url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:RELEASE_TAG/$env:RELEASE_ASSET"
-              }
-            }
-          } | ConvertTo-Json -Depth 5
-          Set-Content -Path "$manifestPath" -Value $manifest -Encoding utf8
-
-          if (gh release view "$env:RELEASE_TAG" 2>$null) {
-            gh release upload "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --clobber
-            gh release edit "$env:RELEASE_TAG" --title "Valora Updater Test 1.0.10" --notes "Temporary stable-channel release used only to validate the signed updater."
-          } else {
-            gh release create "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --title "Valora Updater Test 1.0.10" --notes "Temporary stable-channel release used only to validate the signed updater."
-          }
-
-      - name: Publish release branch build
+      - name: Publish official release branch
         if: startsWith(github.ref, 'refs/heads/release/')
         shell: pwsh
         env:
@@ -190,6 +162,7 @@ jobs:
           $assetName = "Valora_$($version)_x64-setup.exe"
           $releaseInstaller = Join-Path $env:RUNNER_TEMP $assetName
           $releaseSignature = "$releaseInstaller.sig"
+
           Copy-Item "$env:INSTALLER_PATH" "$releaseInstaller" -Force
           Copy-Item "$env:SIGNATURE_PATH" "$releaseSignature" -Force
 
@@ -197,7 +170,7 @@ jobs:
           $manifestPath = Join-Path $env:RUNNER_TEMP "latest.json"
           $manifest = @{
             version = $version
-            notes = "Valora $tag release candidate."
+            notes = "Valora $tag."
             pub_date = (Get-Date).ToUniversalTime().ToString("o")
             platforms = @{
               "windows-x86_64" = @{
@@ -208,13 +181,16 @@ jobs:
           } | ConvertTo-Json -Depth 5
           Set-Content -Path "$manifestPath" -Value $manifest -Encoding utf8
 
+          $notes = "Official Valora Windows release $tag.`n`nCommit: $env:GITHUB_SHA"
+
           if (gh release view "$tag" 2>$null) {
             gh release upload "$tag" "$releaseInstaller" "$releaseSignature" "$manifestPath" --clobber
+            gh release edit "$tag" --title "Valora $tag" --notes "$notes"
           } else {
-            gh release create "$tag" "$releaseInstaller" "$releaseSignature" "$manifestPath" --title "Valora $tag" --notes "Valora Windows preview installer." --prerelease
+            gh release create "$tag" "$releaseInstaller" "$releaseSignature" "$manifestPath" --title "Valora $tag" --notes "$notes"
           }
 
-      - name: Publish manual GitHub Release
+      - name: Publish manual official release
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release == true
         shell: pwsh
         env:
@@ -227,6 +203,7 @@ jobs:
           $assetName = "Valora_$($version)_x64-setup.exe"
           $releaseInstaller = Join-Path $env:RUNNER_TEMP $assetName
           $releaseSignature = "$releaseInstaller.sig"
+
           Copy-Item "$env:INSTALLER_PATH" "$releaseInstaller" -Force
           Copy-Item "$env:SIGNATURE_PATH" "$releaseSignature" -Force
 
@@ -245,9 +222,11 @@ jobs:
           } | ConvertTo-Json -Depth 5
           Set-Content -Path "$manifestPath" -Value $manifest -Encoding utf8
 
+          $notes = "Official Valora Windows release $env:RELEASE_TAG.`n`nCommit: $env:GITHUB_SHA"
+
           if (gh release view "$env:RELEASE_TAG" 2>$null) {
             gh release upload "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --clobber
-            gh release edit "$env:RELEASE_TAG" --title "Valora $env:RELEASE_TAG" --notes "Valora Windows installer."
+            gh release edit "$env:RELEASE_TAG" --title "Valora $env:RELEASE_TAG" --notes "$notes"
           } else {
-            gh release create "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --title "Valora $env:RELEASE_TAG" --notes "Valora Windows installer."
+            gh release create "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --title "Valora $env:RELEASE_TAG" --notes "$notes"
           }
