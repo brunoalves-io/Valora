@@ -31,26 +31,26 @@ function SX([double]$value) { return [int][Math]::Round($value * $scale) }
 # Down arrow.
 $g.FillRectangle($black, (SX 120), (SX 8), (SX 6), (SX 14))
 $arrow = [System.Drawing.Point[]]@(
-  (New-Object System.Drawing.Point (SX 111) (SX 21)),
-  (New-Object System.Drawing.Point (SX 135) (SX 21)),
-  (New-Object System.Drawing.Point (SX 123) (SX 32))
+  ([System.Drawing.Point]::new((SX 111), (SX 21))),
+  ([System.Drawing.Point]::new((SX 135), (SX 21))),
+  ([System.Drawing.Point]::new((SX 123), (SX 32)))
 )
 $g.FillPolygon($black, $arrow)
 
 # Download tray, recreated from the high-resolution reference.
 $tray = [System.Drawing.Point[]]@(
-  (New-Object System.Drawing.Point (SX 107) (SX 28)),
-  (New-Object System.Drawing.Point (SX 114) (SX 28)),
-  (New-Object System.Drawing.Point (SX 111) (SX 36)),
-  (New-Object System.Drawing.Point (SX 136) (SX 36)),
-  (New-Object System.Drawing.Point (SX 133) (SX 28)),
-  (New-Object System.Drawing.Point (SX 140) (SX 28)),
-  (New-Object System.Drawing.Point (SX 144) (SX 40)),
-  (New-Object System.Drawing.Point (SX 144) (SX 45)),
-  (New-Object System.Drawing.Point (SX 141) (SX 48)),
-  (New-Object System.Drawing.Point (SX 105) (SX 48)),
-  (New-Object System.Drawing.Point (SX 102) (SX 45)),
-  (New-Object System.Drawing.Point (SX 102) (SX 40))
+  ([System.Drawing.Point]::new((SX 107), (SX 28))),
+  ([System.Drawing.Point]::new((SX 114), (SX 28))),
+  ([System.Drawing.Point]::new((SX 111), (SX 36))),
+  ([System.Drawing.Point]::new((SX 136), (SX 36))),
+  ([System.Drawing.Point]::new((SX 133), (SX 28))),
+  ([System.Drawing.Point]::new((SX 140), (SX 28))),
+  ([System.Drawing.Point]::new((SX 144), (SX 40))),
+  ([System.Drawing.Point]::new((SX 144), (SX 45))),
+  ([System.Drawing.Point]::new((SX 141), (SX 48))),
+  ([System.Drawing.Point]::new((SX 105), (SX 48))),
+  ([System.Drawing.Point]::new((SX 102), (SX 45))),
+  ([System.Drawing.Point]::new((SX 102), (SX 40)))
 )
 $g.FillPolygon($black, $tray)
 
