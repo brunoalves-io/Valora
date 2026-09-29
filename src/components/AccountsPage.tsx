@@ -290,10 +290,6 @@ export function AccountsPage() {
         <section className="account-grid">
           {accounts.map((account) => (
             <article className={account.active ? "account-card" : "account-card inactive"} key={account.id}>
-              <div className="account-card-top">
-                <div className="account-symbol">◉</div>
-                <span className={account.active ? "status-badge active" : "status-badge"}>{account.active ? "Ativa" : "Inativa"}</span>
-              </div>
               <small>{kindLabels[account.kind]}</small>
               <h2>{account.name}</h2>
               <strong>{money.format(balances.get(account.id) ?? 0)}</strong>
