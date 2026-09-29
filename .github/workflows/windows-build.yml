@@ -145,10 +145,10 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: v1.0.8-updater-test
+          RELEASE_TAG: v1.0.9-updater-test
           INSTALLER_PATH: ${{ steps.installer.outputs.path }}
           SIGNATURE_PATH: ${{ steps.signature.outputs.path }}
-          RELEASE_ASSET: Valora_1.0.8_x64-setup.exe
+          RELEASE_ASSET: Valora_1.0.9_x64-setup.exe
         run: |
           $releaseInstaller = Join-Path $env:RUNNER_TEMP $env:RELEASE_ASSET
           $releaseSignature = "$releaseInstaller.sig"
@@ -158,7 +158,7 @@ jobs:
           $signature = (Get-Content "$env:SIGNATURE_PATH" -Raw).Trim()
           $manifestPath = Join-Path $env:RUNNER_TEMP "latest.json"
           $manifest = @{
-            version = "1.0.8"
+            version = "1.0.9"
             notes = "Temporary Valora updater integration test."
             pub_date = (Get-Date).ToUniversalTime().ToString("o")
             platforms = @{
@@ -172,9 +172,9 @@ jobs:
 
           if (gh release view "$env:RELEASE_TAG" 2>$null) {
             gh release upload "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --clobber
-            gh release edit "$env:RELEASE_TAG" --title "Valora Updater Test 1.0.8" --notes "Temporary stable-channel release used only to validate the signed updater."
+            gh release edit "$env:RELEASE_TAG" --title "Valora Updater Test 1.0.9" --notes "Temporary stable-channel release used only to validate the signed updater."
           } else {
-            gh release create "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --title "Valora Updater Test 1.0.8" --notes "Temporary stable-channel release used only to validate the signed updater."
+            gh release create "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --title "Valora Updater Test 1.0.9" --notes "Temporary stable-channel release used only to validate the signed updater."
           }
 
       - name: Publish release branch build
