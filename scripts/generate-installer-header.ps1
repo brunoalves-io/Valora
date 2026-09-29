@@ -7,51 +7,74 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 $outPath = Join-Path $outDir "header.bmp"
 
 # NSIS Modern UI header bitmap: 150 x 57.
-# The artwork is intentionally compact and right-aligned to match the
-# original green installer icon position/scale, but with a white background.
-$bitmap = New-Object System.Drawing.Bitmap 150, 57, ([System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
-$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-$graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-$graphics.Clear([System.Drawing.Color]::White)
+# Render at 4x and downsample to keep the small installer artwork crisp.
+$targetW = 150
+$targetH = 57
+$scale = 4
+$workW = $targetW * $scale
+$workH = $targetH * $scale
+
+$workBitmap = New-Object System.Drawing.Bitmap $workW, $workH, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+$g = [System.Drawing.Graphics]::FromImage($workBitmap)
+$g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+$g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+$g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+$g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+$g.Clear([System.Drawing.Color]::White)
 
 $black = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::Black)
 $white = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
 
-# 40 x 40 visual area positioned at the far right, matching the reference.
-# Download arrow.
-$graphics.FillRectangle($black, 120, 9, 6, 14)
+function SX([double]$value) { return [int][Math]::Round($value * $scale) }
+
+# Artwork area: 40 x 40 at the far right, matching the reference placement.
+# Down arrow.
+$g.FillRectangle($black, (SX 120), (SX 8), (SX 6), (SX 14))
 $arrow = [System.Drawing.Point[]]@(
-  (New-Object System.Drawing.Point 112, 21),
-  (New-Object System.Drawing.Point 134, 21),
-  (New-Object System.Drawing.Point 123, 31)
+  (New-Object System.Drawing.Point (SX 111) (SX 21)),
+  (New-Object System.Drawing.Point (SX 135) (SX 21)),
+  (New-Object System.Drawing.Point (SX 123) (SX 32))
 )
-$graphics.FillPolygon($black, $arrow)
+$g.FillPolygon($black, $arrow)
 
-# Download tray.
+# Download tray, recreated from the high-resolution reference.
 $tray = [System.Drawing.Point[]]@(
-  (New-Object System.Drawing.Point 108, 28),
-  (New-Object System.Drawing.Point 114, 28),
-  (New-Object System.Drawing.Point 111, 36),
-  (New-Object System.Drawing.Point 136, 36),
-  (New-Object System.Drawing.Point 133, 28),
-  (New-Object System.Drawing.Point 139, 28),
-  (New-Object System.Drawing.Point 143, 40),
-  (New-Object System.Drawing.Point 143, 45),
-  (New-Object System.Drawing.Point 140, 48),
-  (New-Object System.Drawing.Point 106, 48),
-  (New-Object System.Drawing.Point 103, 45),
-  (New-Object System.Drawing.Point 103, 40)
+  (New-Object System.Drawing.Point (SX 107) (SX 28)),
+  (New-Object System.Drawing.Point (SX 114) (SX 28)),
+  (New-Object System.Drawing.Point (SX 111) (SX 36)),
+  (New-Object System.Drawing.Point (SX 136) (SX 36)),
+  (New-Object System.Drawing.Point (SX 133) (SX 28)),
+  (New-Object System.Drawing.Point (SX 140) (SX 28)),
+  (New-Object System.Drawing.Point (SX 144) (SX 40)),
+  (New-Object System.Drawing.Point (SX 144) (SX 45)),
+  (New-Object System.Drawing.Point (SX 141) (SX 48)),
+  (New-Object System.Drawing.Point (SX 105) (SX 48)),
+  (New-Object System.Drawing.Point (SX 102) (SX 45)),
+  (New-Object System.Drawing.Point (SX 102) (SX 40))
 )
-$graphics.FillPolygon($black, $tray)
+$g.FillPolygon($black, $tray)
 
-# Small circular detail from the supplied icon.
-$graphics.FillEllipse($white, 134, 39, 6, 6)
+# Circular detail.
+$g.FillEllipse($white, (SX 134), (SX 39), (SX 7), (SX 7))
 
-$graphics.Dispose()
+$g.Dispose()
 $black.Dispose()
 $white.Dispose()
 
-$bitmap.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Bmp)
-$bitmap.Dispose()
+# High-quality downsample to the exact NSIS header size.
+$finalBitmap = New-Object System.Drawing.Bitmap $targetW, $targetH, ([System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
+$g2 = [System.Drawing.Graphics]::FromImage($finalBitmap)
+$g2.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+$g2.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+$g2.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+$g2.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+$g2.Clear([System.Drawing.Color]::White)
+$g2.DrawImage($workBitmap, 0, 0, $targetW, $targetH)
 
-Write-Host "Generated NSIS header image: $outPath"
+$g2.Dispose()
+$workBitmap.Dispose()
+
+$finalBitmap.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Bmp)
+$finalBitmap.Dispose()
+
+Write-Host "Generated high-quality NSIS header image: $outPath"
