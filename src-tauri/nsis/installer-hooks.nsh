@@ -1,4 +1,6 @@
 ; Valora NSIS window branding
+; Keep the custom header artwork on the same right-side position as the original installer icon.
+!define MUI_HEADERIMAGE_RIGHT
 ; Keep the installer executable icon separate from the setup window icon.
 
 !define MUI_CUSTOMFUNCTION_GUIINIT ValoraSetWindowIcon
