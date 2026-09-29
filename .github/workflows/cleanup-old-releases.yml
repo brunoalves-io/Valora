@@ -1,0 +1,30 @@
+name: Cleanup old Valora releases
+
+on:
+  push:
+    branches:
+      - maintenance/release-cleanup
+    paths:
+      - ".github/workflows/cleanup-old-releases.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep only Valora v1.0.10 in Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP_TAG: v1.0.10
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' |
+          while read -r tag; do
+            if [ -n "$tag" ] && [ "$tag" != "$KEEP_TAG" ]; then
+              echo "Removing old release: $tag"
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes
+            fi
+          done
+
+          echo "Release kept: $KEEP_TAG"
