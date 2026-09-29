@@ -230,3 +230,32 @@ jobs:
           } else {
             gh release create "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --title "Valora $env:RELEASE_TAG" --notes "$notes"
           }
+
+
+      - name: Remove older GitHub Releases
+        if: startsWith(github.ref, 'refs/heads/release/') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANUAL_TAG: ${{ inputs.release_tag }}
+        run: |
+          if ($env:GITHUB_REF -like "refs/heads/release/*") {
+            $keepTag = $env:GITHUB_REF_NAME.Replace("release/", "")
+          } else {
+            $keepTag = $env:MANUAL_TAG
+          }
+
+          if ([string]::IsNullOrWhiteSpace($keepTag)) {
+            throw "Could not determine the release tag to keep."
+          }
+
+          $releases = gh release list --limit 100 --json tagName | ConvertFrom-Json
+          foreach ($release in $releases) {
+            $tag = [string]$release.tagName
+            if (-not [string]::IsNullOrWhiteSpace($tag) -and $tag -ne $keepTag) {
+              Write-Host "Removing old GitHub Release: $tag"
+              gh release delete "$tag" --yes
+            }
+          }
+
+          Write-Host "Only the current public release is kept: $keepTag"
