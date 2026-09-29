@@ -15,6 +15,7 @@ export type Company = {
   name: string;
   slug: string;
   created_at: string;
+  logo_url: string | null;
 };
 
 export type CompanyMembership = {
@@ -28,7 +29,7 @@ type CompanyContextValue = {
   activeRole: CompanyMembership["role"] | null;
   loading: boolean;
   refreshCompanies: () => Promise<void>;
-  createCompany: (name: string) => Promise<void>;
+  createCompany: (name: string) => Promise<string>;
   selectCompany: (companyId: string) => void;
 };
 
@@ -58,7 +59,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
     const { data, error } = await supabase
       .from("company_members")
-      .select("role, created_at, company:companies(id, name, slug, created_at)")
+      .select("role, created_at, company:companies(id, name, slug, created_at, logo_url)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: true });
 
@@ -121,6 +122,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setActiveCompanyId(companyId);
         localStorage.setItem(STORAGE_KEY, companyId);
         await refreshCompanies();
+        return companyId;
       },
       selectCompany(companyId) {
         setActiveCompanyId(companyId);

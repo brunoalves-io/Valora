@@ -4,19 +4,22 @@ on:
   push:
     branches:
       - main
-      - "feat/**"
       - "release/**"
   workflow_dispatch:
     inputs:
       publish_release:
-        description: "Create a GitHub Release after a successful build"
+        description: "Publish this exact version as an official GitHub Release"
         required: true
         default: false
         type: boolean
       release_tag:
-        description: "Release tag, for example v0.1.0"
+        description: "Official release tag, for example v1.0.11"
         required: false
-        default: "v0.1.0"
+        default: ""
+
+concurrency:
+  group: valora-windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -28,6 +31,10 @@ jobs:
     env:
       VITE_SUPABASE_URL: https://ezamgphhlkeqcntgvfvj.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_6YbXDlis6FDcj68SILDNdw__cDelwzT
+      VALORA_UPDATER_PUBLIC_KEY: ${{ vars.VALORA_UPDATER_PUBLIC_KEY }}
+      VALORA_UPDATER_ENDPOINT: https://github.com/brunoalves-io/Valora/releases/latest/download/latest.json
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -44,6 +51,70 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      - name: Validate release version
+        if: startsWith(github.ref, 'refs/heads/release/') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
+        shell: pwsh
+        env:
+          MANUAL_TAG: ${{ inputs.release_tag }}
+        run: |
+          $package = Get-Content "package.json" -Raw | ConvertFrom-Json
+          $tauri = Get-Content "src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json
+          $cargoLine = Select-String -Path "src-tauri\Cargo.toml" -Pattern '^version = "([^"]+)"' | Select-Object -First 1
+          if (-not $cargoLine) {
+            throw "Could not read the Cargo package version."
+          }
+
+          $cargoVersion = $cargoLine.Matches[0].Groups[1].Value
+          $packageVersion = [string]$package.version
+          $tauriVersion = [string]$tauri.version
+
+          if ($packageVersion -ne $tauriVersion -or $packageVersion -ne $cargoVersion) {
+            throw "Version mismatch: package.json=$packageVersion, tauri.conf.json=$tauriVersion, Cargo.toml=$cargoVersion"
+          }
+
+          if ($env:GITHUB_REF -like "refs/heads/release/*") {
+            $tag = $env:GITHUB_REF_NAME.Replace("release/", "")
+          } else {
+            $tag = $env:MANUAL_TAG
+          }
+
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            throw "A release tag is required."
+          }
+
+          if (-not $tag.StartsWith("v")) {
+            throw "Release tags must use the v prefix, for example v1.0.11."
+          }
+
+          $tagVersion = $tag.TrimStart("v")
+          if ($tagVersion -ne $packageVersion) {
+            throw "Release tag $tag does not match application version $packageVersion."
+          }
+
+          Write-Host "Validated official release $tag."
+
+      - name: Configure Tauri updater for bundling
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:VALORA_UPDATER_PUBLIC_KEY)) {
+            throw "VALORA_UPDATER_PUBLIC_KEY is not configured."
+          }
+
+          $configPath = "src-tauri\tauri.conf.json"
+          $config = Get-Content $configPath -Raw | ConvertFrom-Json
+
+          if (-not $config.plugins) {
+            $config | Add-Member -NotePropertyName plugins -NotePropertyValue ([pscustomobject]@{})
+          }
+
+          $updater = [pscustomobject]@{
+            pubkey = $env:VALORA_UPDATER_PUBLIC_KEY
+            endpoints = @($env:VALORA_UPDATER_ENDPOINT)
+          }
+
+          $config.plugins | Add-Member -NotePropertyName updater -NotePropertyValue $updater -Force
+          $config | ConvertTo-Json -Depth 100 | Set-Content $configPath -Encoding utf8
+
       - name: Build Valora Windows installer
         run: npm run tauri:build -- --bundles nsis
 
@@ -56,40 +127,106 @@ jobs:
             throw "Valora installer was not generated."
           }
           "path=$($file.FullName)" >> $env:GITHUB_OUTPUT
-          "name=$($file.Name)" >> $env:GITHUB_OUTPUT
           Write-Host "Installer: $($file.FullName)"
+
+      - name: Locate updater signature
+        id: signature
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem "src-tauri\target\release\bundle\nsis\*.exe.sig" | Select-Object -First 1
+          if (-not $file) {
+            throw "Valora updater signature was not generated."
+          }
+          "path=$($file.FullName)" >> $env:GITHUB_OUTPUT
+          Write-Host "Signature: $($file.FullName)"
 
       - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: Valora-Windows-Installer
-          path: src-tauri/target/release/bundle/nsis/*.exe
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.exe.sig
           if-no-files-found: error
 
-      - name: Publish release branch build
+      - name: Publish official release branch
         if: startsWith(github.ref, 'refs/heads/release/')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           INSTALLER_PATH: ${{ steps.installer.outputs.path }}
+          SIGNATURE_PATH: ${{ steps.signature.outputs.path }}
         run: |
           $tag = $env:GITHUB_REF_NAME.Replace("release/", "")
+          $version = $tag.TrimStart("v")
+          $assetName = "Valora_$($version)_x64-setup.exe"
+          $releaseInstaller = Join-Path $env:RUNNER_TEMP $assetName
+          $releaseSignature = "$releaseInstaller.sig"
+
+          Copy-Item "$env:INSTALLER_PATH" "$releaseInstaller" -Force
+          Copy-Item "$env:SIGNATURE_PATH" "$releaseSignature" -Force
+
+          $signature = (Get-Content "$env:SIGNATURE_PATH" -Raw).Trim()
+          $manifestPath = Join-Path $env:RUNNER_TEMP "latest.json"
+          $manifest = @{
+            version = $version
+            notes = "Valora $tag."
+            pub_date = (Get-Date).ToUniversalTime().ToString("o")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $signature
+                url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$assetName"
+              }
+            }
+          } | ConvertTo-Json -Depth 5
+          Set-Content -Path "$manifestPath" -Value $manifest -Encoding utf8
+
+          $notes = "Official Valora Windows release $tag.`n`nCommit: $env:GITHUB_SHA"
+
           if (gh release view "$tag" 2>$null) {
-            gh release upload "$tag" "$env:INSTALLER_PATH" --clobber
+            gh release upload "$tag" "$releaseInstaller" "$releaseSignature" "$manifestPath" --clobber
+            gh release edit "$tag" --title "Valora $tag" --notes "$notes"
           } else {
-            gh release create "$tag" "$env:INSTALLER_PATH" --title "Valora $tag" --notes "Valora Windows preview installer." --prerelease
+            gh release create "$tag" "$releaseInstaller" "$releaseSignature" "$manifestPath" --title "Valora $tag" --notes "$notes"
           }
 
-      - name: Publish manual GitHub Release
+      - name: Publish manual official release
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release == true
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           INSTALLER_PATH: ${{ steps.installer.outputs.path }}
+          SIGNATURE_PATH: ${{ steps.signature.outputs.path }}
         run: |
+          $version = $env:RELEASE_TAG.TrimStart("v")
+          $assetName = "Valora_$($version)_x64-setup.exe"
+          $releaseInstaller = Join-Path $env:RUNNER_TEMP $assetName
+          $releaseSignature = "$releaseInstaller.sig"
+
+          Copy-Item "$env:INSTALLER_PATH" "$releaseInstaller" -Force
+          Copy-Item "$env:SIGNATURE_PATH" "$releaseSignature" -Force
+
+          $signature = (Get-Content "$env:SIGNATURE_PATH" -Raw).Trim()
+          $manifestPath = Join-Path $env:RUNNER_TEMP "latest.json"
+          $manifest = @{
+            version = $version
+            notes = "Valora $env:RELEASE_TAG."
+            pub_date = (Get-Date).ToUniversalTime().ToString("o")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $signature
+                url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:RELEASE_TAG/$assetName"
+              }
+            }
+          } | ConvertTo-Json -Depth 5
+          Set-Content -Path "$manifestPath" -Value $manifest -Encoding utf8
+
+          $notes = "Official Valora Windows release $env:RELEASE_TAG.`n`nCommit: $env:GITHUB_SHA"
+
           if (gh release view "$env:RELEASE_TAG" 2>$null) {
-            gh release upload "$env:RELEASE_TAG" "$env:INSTALLER_PATH" --clobber
+            gh release upload "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --clobber
+            gh release edit "$env:RELEASE_TAG" --title "Valora $env:RELEASE_TAG" --notes "$notes"
           } else {
-            gh release create "$env:RELEASE_TAG" "$env:INSTALLER_PATH" --title "Valora $env:RELEASE_TAG" --notes "Valora Windows installer."
+            gh release create "$env:RELEASE_TAG" "$releaseInstaller" "$releaseSignature" "$manifestPath" --title "Valora $env:RELEASE_TAG" --notes "$notes"
           }

@@ -54,6 +54,8 @@ Deno.serve(async (request) => {
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const geminiApiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
   const geminiModel = Deno.env.get("GEMINI_MODEL")?.trim() || "gemini-3.5-flash-lite";
+  const geminiFallbackModel =
+    Deno.env.get("GEMINI_FALLBACK_MODEL")?.trim() || "gemini-2.5-flash-lite";
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return jsonResponse({ error: "Supabase function environment is incomplete" }, 500);
@@ -137,35 +139,105 @@ Deno.serve(async (request) => {
     parts: [{ text: message.content }],
   }));
 
-  let geminiResponse: Response;
-  try {
-    geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": geminiApiKey,
-        },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: systemInstruction }],
+  const requestBody = JSON.stringify({
+    system_instruction: {
+      parts: [{ text: systemInstruction }],
+    },
+    contents,
+    generationConfig: {
+      maxOutputTokens: 1400,
+    },
+  });
+
+  const sleep = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
+  const transientStatuses = new Set([429, 500, 502, 503, 504]);
+  const models = Array.from(
+    new Set([geminiModel, geminiFallbackModel].filter(Boolean)),
+  );
+
+  let finalResponse: Response | null = null;
+  let finalData: Record<string, any> = {};
+  let usedModel = geminiModel;
+
+  for (let modelIndex = 0; modelIndex < models.length; modelIndex += 1) {
+    const model = models[modelIndex];
+    const maxAttempts = modelIndex === 0 ? 3 : 2;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      let response: Response;
+      try {
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": geminiApiKey,
+            },
+            body: requestBody,
           },
-          contents,
-          generationConfig: {
-            maxOutputTokens: 1400,
-          },
-        }),
-      },
-    );
-  } catch {
-    return jsonResponse({
-      error: "Não foi possível conectar ao provedor de IA.",
-      code: "AI_PROVIDER_UNREACHABLE",
-    }, 502);
+        );
+      } catch {
+        if (attempt < maxAttempts) {
+          await sleep(450 * attempt);
+          continue;
+        }
+
+        if (modelIndex < models.length - 1) break;
+
+        return jsonResponse({
+          error:
+            "A Valora IA não conseguiu se conectar ao serviço de IA. Tente novamente em alguns instantes.",
+          code: "AI_PROVIDER_UNREACHABLE",
+        }, 502);
+      }
+
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok) {
+        finalResponse = response;
+        finalData = data;
+        usedModel = model;
+        break;
+      }
+
+      finalResponse = response;
+      finalData = data;
+      usedModel = model;
+
+      const canRetry = transientStatuses.has(response.status);
+      if (canRetry && attempt < maxAttempts) {
+        const retryAfter = Number(response.headers.get("retry-after"));
+        const delay = Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 2500)
+          : 500 * attempt;
+        await sleep(delay);
+        continue;
+      }
+
+      const canUseFallback =
+        modelIndex < models.length - 1 &&
+        (canRetry || response.status === 404);
+
+      if (canUseFallback) break;
+      break;
+    }
+
+    if (finalResponse?.ok) break;
   }
 
-  const geminiData = await geminiResponse.json().catch(() => ({}));
+  const geminiResponse = finalResponse;
+  const geminiData = finalData;
+
+  if (!geminiResponse) {
+    return jsonResponse({
+      error:
+        "A Valora IA está temporariamente indisponível. Aguarde alguns instantes e tente novamente.",
+      code: "AI_TEMPORARILY_UNAVAILABLE",
+    }, 503);
+  }
 
   if (!geminiResponse.ok) {
     const providerMessage =
@@ -177,31 +249,37 @@ Deno.serve(async (request) => {
 
     console.error("Valora AI provider error", {
       status: geminiResponse.status,
-      model: geminiModel,
+      model: usedModel,
       message: providerDetail,
     });
 
-    let publicMessage = "A IA não conseguiu responder.";
+    let publicMessage =
+      "A Valora IA não conseguiu responder agora. Tente novamente em alguns instantes.";
     let code = "AI_PROVIDER_ERROR";
     let responseStatus = 502;
 
     if (geminiResponse.status === 400) {
-      publicMessage = "O Gemini recusou a solicitação: " + providerDetail;
+      publicMessage =
+        "A solicitação não pôde ser processada pela IA. Tente reformular a pergunta.";
       code = "AI_BAD_REQUEST";
     } else if (geminiResponse.status === 401 || geminiResponse.status === 403) {
-      publicMessage = "A chave do Gemini não foi aceita: " + providerDetail;
+      publicMessage =
+        "A integração da Valora IA precisa ser revisada pelo administrador.";
       code = "AI_AUTH_ERROR";
     } else if (geminiResponse.status === 404) {
-      publicMessage = "O modelo de IA configurado não foi encontrado: " + providerDetail;
+      publicMessage =
+        "O modelo de IA configurado está indisponível no momento.";
       code = "AI_MODEL_ERROR";
     } else if (geminiResponse.status === 429) {
       publicMessage =
-        "O limite temporário da IA foi atingido: " + providerDetail;
+        "A Valora IA atingiu temporariamente o limite de solicitações. Aguarde alguns instantes e tente novamente.";
       code = "AI_RATE_LIMIT";
       responseStatus = 429;
-    } else {
+    } else if ([500, 502, 503, 504].includes(geminiResponse.status)) {
       publicMessage =
-        "O Gemini retornou erro " + geminiResponse.status + ": " + providerDetail;
+        "A Valora IA está temporariamente sobrecarregada. Aguarde alguns instantes e tente novamente.";
+      code = "AI_TEMPORARILY_UNAVAILABLE";
+      responseStatus = 503;
     }
 
     return jsonResponse({
@@ -209,7 +287,7 @@ Deno.serve(async (request) => {
       code,
       detail: providerDetail,
       providerStatus: geminiResponse.status,
-      model: geminiModel,
+      model: usedModel,
     }, responseStatus);
   }
 
@@ -236,7 +314,8 @@ Deno.serve(async (request) => {
 
   return jsonResponse({
     answer,
-    model: geminiModel,
+    model: usedModel,
+    fallbackUsed: usedModel !== geminiModel,
     generatedAt: new Date().toISOString(),
   });
 });

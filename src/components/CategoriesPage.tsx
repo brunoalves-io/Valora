@@ -1,7 +1,9 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type CategoryType = "income" | "expense" | "both";
 type Category = {
@@ -23,6 +25,9 @@ export function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -68,6 +73,32 @@ export function CategoriesPage() {
     [categories],
   );
 
+  function resetForm() {
+    setForm({ name: "", type: "expense", parent_id: "" });
+    setEditingId(null);
+    setShowForm(false);
+    setError("");
+  }
+
+  function openNewCategory() {
+    setEditingId(null);
+    setForm({ name: "", type: "expense", parent_id: "" });
+    setError("");
+    setShowForm(true);
+  }
+
+  function editCategory(category: Category) {
+    setEditingId(category.id);
+    setForm({
+      name: category.name,
+      type: category.type,
+      parent_id: category.parent_id ?? "",
+    });
+    setError("");
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!supabase || !activeCompany) return;
@@ -75,22 +106,65 @@ export function CategoriesPage() {
     setSaving(true);
     setError("");
 
-    const { error: insertError } = await supabase.from("categories").insert({
-      company_id: activeCompany.id,
-      name: form.name.trim(),
-      type: form.type,
-      parent_id: form.parent_id || null,
-    });
+    const mutation = editingId
+      ? supabase
+          .from("categories")
+          .update({
+            name: form.name.trim(),
+            type: form.type,
+            parent_id: form.parent_id || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingId)
+          .eq("company_id", activeCompany.id)
+      : supabase.from("categories").insert({
+          company_id: activeCompany.id,
+          name: form.name.trim(),
+          type: form.type,
+          parent_id: form.parent_id || null,
+        });
 
-    if (insertError) {
-      setError(insertError.message);
+    const { error: mutationError } = await mutation;
+
+    if (mutationError) {
+      setError(
+        editingId ? "Não foi possível atualizar esta categoria." : mutationError.message,
+      );
       setSaving(false);
       return;
     }
 
-    setForm({ name: "", type: "expense", parent_id: "" });
-    setShowForm(false);
     setSaving(false);
+    resetForm();
+    await load();
+  }
+
+  function requestDeleteCategory(category: Category) {
+    if (deletingId) return;
+    setPendingDelete(category);
+  }
+
+  async function confirmDeleteCategory() {
+    if (!supabase || !activeCompany || !pendingDelete || deletingId) return;
+    const category = pendingDelete;
+    setDeletingId(category.id);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("categories")
+      .delete()
+      .eq("id", category.id)
+      .eq("company_id", activeCompany.id);
+
+    if (deleteError) {
+      setError(getDeleteErrorMessage(deleteError, "esta categoria"));
+      setDeletingId(null);
+      setPendingDelete(null);
+      return;
+    }
+
+    setDeletingId(null);
+    setPendingDelete(null);
     await load();
   }
 
@@ -118,7 +192,13 @@ export function CategoriesPage() {
           <h1>Categorias</h1>
           <p>Estruture receitas e despesas com categorias e subcategorias.</p>
         </div>
-        <button className="primary" onClick={() => setShowForm((value) => !value)}>
+        <button
+          className="primary"
+          onClick={() => {
+            if (showForm) resetForm();
+            else openNewCategory();
+          }}
+        >
           {showForm ? "Fechar" : "+ Nova categoria"}
         </button>
       </header>
@@ -127,8 +207,12 @@ export function CategoriesPage() {
         <form className="panel simple-form" onSubmit={submit}>
           <div className="form-heading">
             <div>
-              <h2>Nova categoria</h2>
-              <p>Para criar uma subcategoria, selecione uma categoria principal.</p>
+              <h2>{editingId ? "Editar categoria" : "Nova categoria"}</h2>
+              <p>
+                {editingId
+                  ? "Atualize nome, tipo ou vínculo com a categoria principal."
+                  : "Para criar uma subcategoria, selecione uma categoria principal."}
+              </p>
             </div>
           </div>
           <div className="simple-form-grid">
@@ -148,14 +232,18 @@ export function CategoriesPage() {
               Categoria principal
               <select value={form.parent_id} onChange={(event) => setForm({ ...form, parent_id: event.target.value })}>
                 <option value="">Nenhuma</option>
-                {parentOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                {parentOptions
+                  .filter((category) => category.id !== editingId)
+                  .map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
             </label>
           </div>
           {error && <div className="form-alert error">{error}</div>}
           <div className="form-actions">
-            <button type="button" className="ghost" onClick={() => setShowForm(false)}>Cancelar</button>
-            <button className="primary" disabled={saving}>{saving ? "Salvando..." : "Salvar categoria"}</button>
+            <button type="button" className="ghost" onClick={resetForm}>Cancelar</button>
+            <button className="primary" disabled={saving}>
+              {saving ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar categoria"}
+            </button>
           </div>
         </form>
       )}
@@ -182,9 +270,21 @@ export function CategoriesPage() {
                     <td>{category.parent_id ? "Subcategoria" : "Principal"}</td>
                     <td>{category.active ? "Ativa" : "Inativa"}</td>
                     <td className="right">
-                      <button className="table-action" onClick={() => void toggleActive(category)}>
-                        {category.active ? "Desativar" : "Reativar"}
-                      </button>
+                      <div className="record-actions right">
+                        <button className="table-action edit" onClick={() => editCategory(category)}>
+                          Editar
+                        </button>
+                        <button className="table-action" onClick={() => void toggleActive(category)}>
+                          {category.active ? "Desativar" : "Reativar"}
+                        </button>
+                        <button
+                          className="table-action danger"
+                          onClick={() => requestDeleteCategory(category)}
+                          disabled={deletingId === category.id}
+                        >
+                          {deletingId === category.id ? "Excluindo..." : "Excluir"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -193,6 +293,16 @@ export function CategoriesPage() {
           </div>
         )}
       </section>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Excluir categoria?"
+        description={pendingDelete ? `Você está prestes a excluir “${pendingDelete.name}”.` : ""}
+        warning="Lançamentos serão preservados sem a categoria. Subcategorias também ficarão sem categoria principal."
+        confirmLabel="Excluir categoria"
+        busy={Boolean(deletingId)}
+        onCancel={() => { if (!deletingId) setPendingDelete(null); }}
+        onConfirm={() => void confirmDeleteCategory()}
+      />
     </>
   );
 }
