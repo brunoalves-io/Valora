@@ -386,8 +386,11 @@ export function BankReconciliationPage() {
   async function reloadReconciliations() {
     if (!supabase || !activeCompany || !accountId) return;
 
+    const client = supabase;
+    const companyId = activeCompany.id;
+
     const [transactionResult, reconciliationResult] = await Promise.all([
-      supabase
+      client
         .from("transactions")
         .select("id, description, amount, type, status, due_date, paid_at, account_id")
         .eq("company_id", companyId)
@@ -395,7 +398,7 @@ export function BankReconciliationPage() {
         .eq("status", "paid")
         .order("due_date", { ascending: false })
         .limit(2500),
-      supabase
+      client
         .from("bank_reconciliations")
         .select("transaction_id, statement_reference, statement_date")
         .eq("company_id", companyId)
@@ -416,6 +419,9 @@ export function BankReconciliationPage() {
 
   async function confirmReconciliation() {
     if (!supabase || !activeCompany || !accountId || !parsed) return;
+
+    const client = supabase;
+    const companyId = activeCompany.id;
 
     if (!canManage) {
       setError("Seu perfil possui acesso somente para leitura.");
@@ -456,10 +462,10 @@ export function BankReconciliationPage() {
       const choice = effectiveChoices[recommendation.row.id];
       const transactionId = choice === "__new__" ? null : choice;
 
-      const { error: reconcileError } = await supabase.rpc(
+      const { error: reconcileError } = await client.rpc(
         "reconcile_bank_statement_entry",
         {
-          p_company_id: activeCompany.id,
+          p_company_id: companyId,
           p_account_id: accountId,
           p_transaction_id: transactionId,
           p_source_format: parsed.format,
