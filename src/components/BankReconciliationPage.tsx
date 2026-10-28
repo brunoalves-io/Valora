@@ -754,7 +754,7 @@ export function BankReconciliationPage() {
                 {saving
                   ? "Conciliando..."
                   : summary.match + summary.create === 0 && summary.already === summary.total
-                    ? "Tudo conciliado ✓"
+                    ? "Tudo conciliado"
                     : `Confirmar ${summary.match + summary.create} item${summary.match + summary.create === 1 ? "" : "s"}`}
               </button>
             </div>
