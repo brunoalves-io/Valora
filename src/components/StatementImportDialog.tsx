@@ -69,6 +69,7 @@ export function StatementImportDialog({
   useEffect(() => {
     if (!open || !accountId || rows.length === 0 || !supabase) return;
 
+    const client = supabase;
     let cancelled = false;
 
     async function checkDuplicates() {
@@ -78,7 +79,7 @@ export function StatementImportDialog({
       const minDate = dates[0];
       const maxDate = dates[dates.length - 1];
 
-      const { data, error: queryError } = await supabase
+      const { data, error: queryError } = await client
         .from("transactions")
         .select("description, amount, type, due_date")
         .eq("company_id", companyId)
