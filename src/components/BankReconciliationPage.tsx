@@ -289,14 +289,31 @@ export function BankReconciliationPage() {
         })
         .sort((a, b) => b.score - a.score);
 
-      const best = candidates.find((candidate) => !usedByAutoMatch.has(candidate.transaction.id));
+      const availableCandidates = candidates.filter(
+        (candidate) => !usedByAutoMatch.has(candidate.transaction.id),
+      );
+      const best = availableCandidates[0];
+      const second = availableCandidates[1];
+      const isUniqueCandidate = availableCandidates.length === 1;
+      const leadOverSecond = best && second ? best.score - second.score : Number.POSITIVE_INFINITY;
+      const shouldAutoMatch = Boolean(
+        best &&
+          (
+            (best.score >= 80 && leadOverSecond >= 12) ||
+            (isUniqueCandidate && best.score >= 60)
+          ),
+      );
+
       let defaultChoice = "__new__";
       let confidence: Recommendation["confidence"] = "none";
 
-      if (best && best.score >= 55) {
+      if (best && shouldAutoMatch) {
         defaultChoice = best.transaction.id;
         usedByAutoMatch.add(best.transaction.id);
-        confidence = best.score >= 80 ? "strong" : "possible";
+        confidence =
+          best.score >= 85 || (isUniqueCandidate && best.score >= 70)
+            ? "strong"
+            : "possible";
       }
 
       return {
@@ -650,7 +667,7 @@ export function BankReconciliationPage() {
                             <strong>{row.description}</strong>
                             <span>
                               {formatDate(row.date)}
-                              {row.sourceId ? ` • ref. ${row.sourceId}` : ""}
+                              {row.sourceId ? ` • FITID ${row.sourceId}` : ""}
                             </span>
                           </div>
                         </td>
@@ -664,7 +681,9 @@ export function BankReconciliationPage() {
                         </td>
                         <td>
                           {recommendation.alreadyReconciled ? (
-                            <span className="reconciliation-status done">Conciliado</span>
+                            <span className="reconciliation-status done">
+                              {row.sourceId ? "FITID já conciliado" : "Conciliado"}
+                            </span>
                           ) : (
                             <div className="reconciliation-match-cell">
                               <select
