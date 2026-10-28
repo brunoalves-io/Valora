@@ -117,16 +117,18 @@ export function BankReconciliationPage() {
   useEffect(() => {
     if (!supabase || !activeCompany) return;
 
+    const client = supabase;
+    const companyId = activeCompany.id;
     let cancelled = false;
 
     async function loadAccounts() {
       setLoading(true);
       setError("");
 
-      const { data, error: accountError } = await supabase
+      const { data, error: accountError } = await client
         .from("financial_accounts")
         .select("id, name, kind, active")
-        .eq("company_id", activeCompany.id)
+        .eq("company_id", companyId)
         .order("active", { ascending: false })
         .order("name");
 
@@ -163,6 +165,7 @@ export function BankReconciliationPage() {
     }
 
     const client = supabase;
+    const companyId = activeCompany.id;
     let cancelled = false;
 
     async function loadAccountData() {
@@ -173,7 +176,7 @@ export function BankReconciliationPage() {
         client
           .from("transactions")
           .select("id, description, amount, type, status, due_date, paid_at, account_id")
-          .eq("company_id", activeCompany.id)
+          .eq("company_id", companyId)
           .eq("account_id", accountId)
           .eq("status", "paid")
           .order("due_date", { ascending: false })
@@ -181,7 +184,7 @@ export function BankReconciliationPage() {
         client
           .from("bank_reconciliations")
           .select("transaction_id, statement_reference, statement_date")
-          .eq("company_id", activeCompany.id)
+          .eq("company_id", companyId)
           .eq("account_id", accountId)
           .order("statement_date", { ascending: false })
           .limit(2500),
@@ -387,7 +390,7 @@ export function BankReconciliationPage() {
       supabase
         .from("transactions")
         .select("id, description, amount, type, status, due_date, paid_at, account_id")
-        .eq("company_id", activeCompany.id)
+        .eq("company_id", companyId)
         .eq("account_id", accountId)
         .eq("status", "paid")
         .order("due_date", { ascending: false })
@@ -395,7 +398,7 @@ export function BankReconciliationPage() {
       supabase
         .from("bank_reconciliations")
         .select("transaction_id, statement_reference, statement_date")
-        .eq("company_id", activeCompany.id)
+        .eq("company_id", companyId)
         .eq("account_id", accountId)
         .order("statement_date", { ascending: false })
         .limit(2500),
