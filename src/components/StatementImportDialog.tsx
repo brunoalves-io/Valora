@@ -112,7 +112,7 @@ export function StatementImportDialog({
           return {
             ...row,
             duplicate,
-            selected: duplicate ? false : row.selected,
+            selected: duplicate ? false : row.duplicate ? true : row.selected,
           };
         }),
       );
@@ -125,7 +125,7 @@ export function StatementImportDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, accountId, companyId, rows.length]);
+  }, [open, accountId, companyId, fileName, rows.length]);
 
   const selectedCount = useMemo(
     () => rows.filter((row) => row.selected && !row.duplicate).length,
