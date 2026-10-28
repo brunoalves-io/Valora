@@ -5316,3 +5316,186 @@ tr:last-child td { border-bottom: 0; }
     padding: 13px 18px 18px;
   }
 }
+
+
+/* Valora v1.0.13 account statement */
+.account-statement-action {
+  color: #25825f;
+}
+
+.account-statement-action:hover:not(:disabled) {
+  color: #1e6c4f;
+  background: #edf9f4;
+}
+
+.account-statement-page-header {
+  align-items: flex-end;
+}
+
+.account-statement-back {
+  margin: 0 0 14px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #5e6c80;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.account-statement-back:hover {
+  color: #23815d;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.account-statement-summary {
+  display: grid;
+  grid-template-columns: 1.2fr repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.account-statement-summary article {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #e2e7ed;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(28, 41, 61, .04);
+}
+
+.account-statement-summary article.account-statement-balance-card {
+  border-color: #cfe7dd;
+  background: linear-gradient(145deg, #f2fbf7, #fff);
+}
+
+.account-statement-summary span,
+.account-statement-summary strong,
+.account-statement-summary small {
+  display: block;
+}
+
+.account-statement-summary span {
+  color: #8793a4;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.account-statement-summary strong {
+  overflow: hidden;
+  margin-top: 8px;
+  color: #344258;
+  font-size: 20px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-statement-summary strong.income {
+  color: #238660;
+}
+
+.account-statement-summary strong.expense {
+  color: #bc4650;
+}
+
+.account-statement-summary small {
+  margin-top: 7px;
+  color: #8b96a6;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.account-statement-filters {
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.account-statement-filter-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) minmax(120px, .7fr) minmax(135px, .8fr) minmax(135px, .8fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.account-statement-filter-grid label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: #556277;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.account-statement-filter-grid input,
+.account-statement-filter-grid select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid #d9e0e9;
+  border-radius: 9px;
+  padding: 9px 11px;
+  background: #fff;
+  color: #26354b;
+  font-family: inherit;
+  outline: none;
+}
+
+.account-statement-filter-grid input:focus,
+.account-statement-filter-grid select:focus {
+  border-color: #46bf91;
+  box-shadow: 0 0 0 3px rgba(70, 191, 145, .11);
+}
+
+.account-statement-table {
+  min-width: 760px;
+}
+
+.account-statement-table td strong {
+  color: #3c495e;
+  font-size: 12px;
+}
+
+.account-running-balance {
+  color: #3f4e63;
+  font-weight: 800;
+}
+
+.account-statement-footnote {
+  margin: 10px 2px 0;
+  color: #8994a5;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+@media (max-width: 1120px) {
+  .account-statement-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .account-statement-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .account-statement-search {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 680px) {
+  .account-statement-page-header {
+    align-items: stretch;
+  }
+
+  .account-statement-summary,
+  .account-statement-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-statement-search {
+    grid-column: auto;
+  }
+}
