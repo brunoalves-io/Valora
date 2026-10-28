@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import valoraLogo from "./assets/valora-logo.svg";
 import { AppUpdateGate } from "./components/AppUpdateGate";
 import { AccountsPage } from "./components/AccountsPage";
+import { BankReconciliationPage } from "./components/BankReconciliationPage";
 import { AuthScreen } from "./components/AuthScreen";
 import { CategoriesPage } from "./components/CategoriesPage";
 import { BusinessPartnersPage } from "./components/BusinessPartnersPage";
@@ -31,6 +32,7 @@ type Page =
   | "payables"
   | "receivables"
   | "accounts"
+  | "reconciliation"
   | "categories"
   | "cost-centers"
   | "customers"
@@ -51,6 +53,7 @@ const activeNav: Array<[string, Page]> = [
   ["Contas a pagar", "payables"],
   ["Contas a receber", "receivables"],
   ["Contas e caixas", "accounts"],
+  ["Conciliação bancária", "reconciliation"],
   ["Categorias", "categories"],
   ["Centros de custo", "cost-centers"],
   ["Clientes", "customers"],
@@ -157,6 +160,17 @@ function SidebarIcon({
         <svg {...common}>
           <path d="M4 7.5h15.5A1.5 1.5 0 0 1 21 9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12" />
           <path d="M16 12h5v4h-5a2 2 0 0 1 0-4Z" />
+        </svg>
+      );
+    case "reconciliation":
+      return (
+        <svg {...common}>
+          <path d="M4 7h11" />
+          <path d="m12 4 3 3-3 3" />
+          <path d="M20 17H9" />
+          <path d="m12 14-3 3 3 3" />
+          <path d="M6 12h2" />
+          <path d="M16 12h2" />
         </svg>
       );
     case "categories":
@@ -321,6 +335,8 @@ function CurrentPage({
       return <FinancialObligationsPage type="income" />;
     case "accounts":
       return <AccountsPage />;
+    case "reconciliation":
+      return <BankReconciliationPage />;
     case "categories":
       return <CategoriesPage />;
     case "cost-centers":
