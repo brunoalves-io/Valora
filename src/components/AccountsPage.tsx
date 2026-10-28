@@ -1,6 +1,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { AccountStatementView } from "./AccountStatementView";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
@@ -15,8 +16,11 @@ type Account = {
 };
 type Transaction = {
   id: string;
+  description: string;
   amount: number | string;
   type: "income" | "expense";
+  due_date: string;
+  paid_at: string | null;
   account_id: string | null;
 };
 
@@ -46,6 +50,7 @@ export function AccountsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Account | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -68,7 +73,7 @@ export function AccountsPage() {
         .order("name"),
       supabase
         .from("transactions")
-        .select("id, amount, type, account_id")
+        .select("id, description, amount, type, due_date, paid_at, account_id")
         .eq("company_id", activeCompany.id)
         .eq("status", "paid"),
     ]);
@@ -101,6 +106,10 @@ export function AccountsPage() {
   const totalBalance = accounts
     .filter((account) => account.active)
     .reduce((sum, account) => sum + (balances.get(account.id) ?? 0), 0);
+
+  const selectedAccount = selectedAccountId
+    ? accounts.find((account) => account.id === selectedAccountId) ?? null
+    : null;
 
   function resetForm() {
     setForm({ name: "", kind: "checking", opening_balance: "0,00" });
@@ -219,6 +228,17 @@ export function AccountsPage() {
     await load();
   }
 
+  if (selectedAccount) {
+    return (
+      <AccountStatementView
+        account={selectedAccount}
+        transactions={transactions}
+        currentBalance={balances.get(selectedAccount.id) ?? Number(selectedAccount.opening_balance ?? 0)}
+        onBack={() => setSelectedAccountId(null)}
+      />
+    );
+  }
+
   return (
     <>
       <header className="page-header split">
@@ -296,6 +316,12 @@ export function AccountsPage() {
               <div className="account-card-footer">
                 <span>Inicial: {money.format(Number(account.opening_balance))}</span>
                 <div className="record-actions">
+                  <button
+                    className="table-action account-statement-action"
+                    onClick={() => setSelectedAccountId(account.id)}
+                  >
+                    Extrato
+                  </button>
                   <button className="table-action edit" onClick={() => editAccount(account)}>
                     Editar
                   </button>
