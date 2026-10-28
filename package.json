@@ -1,7 +1,7 @@
 {
   "name": "valora",
   "private": true,
-  "version": "1.0.11",
+  "version": "1.0.12",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,8 @@
     "@supabase/supabase-js": "^2.57.4",
     "@tauri-apps/api": "^2.8.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "@stackline/xlsx": "^1.0.9"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.8.4",
