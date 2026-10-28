@@ -204,7 +204,7 @@ export function AccountStatementView({
       <header className="page-header split account-statement-page-header">
         <div>
           <button type="button" className="account-statement-back" onClick={onBack}>
-            ← Voltar para contas e caixas
+            Voltar para contas e caixas
           </button>
           <p className="eyebrow">EXTRATO DA CONTA</p>
           <h1>{account.name}</h1>
