@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { StatementImportDialog } from "./StatementImportDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
@@ -47,6 +48,7 @@ export function TransactionsPage() {
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState({
     type: "expense" as "income" | "expense",
     description: "",
@@ -335,15 +337,24 @@ export function TransactionsPage() {
           <h1>Lançamentos</h1>
           <p>Receitas e despesas da empresa em um único histórico.</p>
         </div>
-        <button
-          className="primary"
-          onClick={() => {
-            if (showForm) resetForm();
-            else openNewTransaction();
-          }}
-        >
-          {showForm ? "Fechar" : "+ Novo lançamento"}
-        </button>
+        <div className="page-header-actions">
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => setShowImport(true)}
+          >
+            Importar extrato
+          </button>
+          <button
+            className="primary"
+            onClick={() => {
+              if (showForm) resetForm();
+              else openNewTransaction();
+            }}
+          >
+            {showForm ? "Fechar" : "+ Novo lançamento"}
+          </button>
+        </div>
       </header>
 
       {showForm && (
@@ -567,6 +578,13 @@ export function TransactionsPage() {
         )}
       </section>
 
+      <StatementImportDialog
+        open={showImport}
+        companyId={activeCompany?.id ?? ""}
+        accounts={accounts}
+        onClose={() => setShowImport(false)}
+        onImported={load}
+      />
       <ConfirmDialog
         open={Boolean(pendingDelete)}
         title="Excluir lançamento?"
