@@ -259,6 +259,121 @@ function normalizeTabularRows(records: Record<string, unknown>[]) {
   return { rows, skipped };
 }
 
+
+function countDelimiterOutsideQuotes(line: string, delimiter: string) {
+  let quoted = false;
+  let count = 0;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+
+    if (char === '"') {
+      if (quoted && line[index + 1] === '"') {
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (!quoted && char === delimiter) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function detectDelimitedSeparator(text: string) {
+  const firstLine =
+    text
+      .replace(/^\uFEFF/, "")
+      .split(/\r?\n/)
+      .find((line) => line.trim().length > 0) ?? "";
+
+  const candidates = [";", "\t", ","];
+  const scored = candidates
+    .map((delimiter) => ({
+      delimiter,
+      count: countDelimiterOutsideQuotes(firstLine, delimiter),
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  if (!scored[0] || scored[0].count === 0) {
+    throw new Error(
+      "Não consegui identificar o separador do CSV. Use um arquivo com colunas separadas por ponto e vírgula, vírgula ou tabulação.",
+    );
+  }
+
+  return scored[0].delimiter;
+}
+
+function parseDelimitedRows(text: string, delimiter: string) {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (char === '"') {
+      if (quoted && text[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+      continue;
+    }
+
+    if (!quoted && char === delimiter) {
+      row.push(field);
+      field = "";
+      continue;
+    }
+
+    if (!quoted && (char === "\n" || char === "\r")) {
+      if (char === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(field);
+      field = "";
+
+      if (row.some((value) => value.trim().length > 0)) rows.push(row);
+      row = [];
+      continue;
+    }
+
+    field += char;
+  }
+
+  row.push(field);
+  if (row.some((value) => value.trim().length > 0)) rows.push(row);
+
+  return rows;
+}
+
+function parseDelimitedText(text: string) {
+  const cleanText = text.replace(/^\uFEFF/, "");
+  const delimiter = detectDelimitedSeparator(cleanText);
+  const rows = parseDelimitedRows(cleanText, delimiter);
+
+  if (rows.length < 2) {
+    throw new Error("O CSV não contém lançamentos para importar.");
+  }
+
+  const headers = rows[0].map((header) => header.trim());
+  if (headers.some((header) => !header)) {
+    throw new Error("O CSV possui uma ou mais colunas sem nome.");
+  }
+
+  return rows.slice(1).map((values) => {
+    const record: Record<string, unknown> = {};
+
+    headers.forEach((header, index) => {
+      record[header] = values[index]?.trim() ?? "";
+    });
+
+    return record;
+  });
+}
+
 function readOfxTag(block: string, tag: string) {
   const match = block.match(new RegExp(`<${tag}>([^<\\r\\n]+)`, "i"));
   return match?.[1]?.trim() ?? "";
@@ -318,6 +433,18 @@ export async function parseStatementFile(file: File): Promise<StatementParseResu
     return parseOfx(await file.text());
   }
 
+  if (
+    lowerName.endsWith(".csv") ||
+    lowerName.endsWith(".txt") ||
+    lowerName.endsWith(".tsv")
+  ) {
+    const records = parseDelimitedText(await file.text());
+    return {
+      format: "CSV",
+      ...normalizeTabularRows(records),
+    };
+  }
+
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, {
     type: "array",
@@ -333,18 +460,9 @@ export async function parseStatementFile(file: File): Promise<StatementParseResu
     raw: true,
   });
 
-  const normalized = normalizeTabularRows(records);
-
   return {
-    format:
-      lowerName.endsWith(".xlsx") ||
-      lowerName.endsWith(".xls") ||
-      lowerName.endsWith(".xlsm") ||
-      lowerName.endsWith(".xlsb") ||
-      lowerName.endsWith(".ods")
-        ? "Excel"
-        : "CSV",
-    ...normalized,
+    format: "Excel",
+    ...normalizeTabularRows(records),
   };
 }
 
