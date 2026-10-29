@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 
@@ -68,6 +69,22 @@ type SyncRun = {
   error_message: string | null;
 };
 
+type PluggyItem = {
+  id?: string;
+  status?: string;
+  executionStatus?: string;
+  parameter?: {
+    type?: string;
+    data?: string | null;
+  } | null;
+};
+
+type PluggyConnectEventPayload = {
+  event?: string;
+  timestamp?: number;
+  item?: PluggyItem;
+};
+
 type PluggyWidget = {
   init: () => void;
 };
@@ -78,8 +95,9 @@ type PluggyWidgetOptions = {
   includeSandbox?: boolean;
   forceOauthInBrowser?: boolean;
   theme?: "light" | "dark";
-  onSuccess?: (data: { item?: { id?: string } }) => void | Promise<void>;
-  onError?: (error: { message?: string }) => void | Promise<void>;
+  onSuccess?: (data: { item?: PluggyItem }) => void | Promise<void>;
+  onError?: (error: { message?: string; data?: { item?: PluggyItem } }) => void | Promise<void>;
+  onEvent?: (payload: PluggyConnectEventPayload) => void | Promise<void>;
   onClose?: () => void | Promise<void>;
 };
 
@@ -391,12 +409,51 @@ export function BankConnectionsPage() {
 
       if (!window.PluggyConnect) throw new Error("Não foi possível abrir o conector bancário.");
 
+      const openedOauthUrls = new Set<string>();
+
+      async function openOauthUrl(item?: PluggyItem) {
+        const parameter = item?.parameter;
+        const oauthUrl =
+          parameter?.type === "oauth" && typeof parameter.data === "string"
+            ? parameter.data.trim()
+            : "";
+
+        if (!oauthUrl || openedOauthUrls.has(oauthUrl)) return;
+
+        openedOauthUrls.add(oauthUrl);
+
+        try {
+          await invoke("open_external_url", { url: oauthUrl });
+        } catch (openError) {
+          openedOauthUrls.delete(oauthUrl);
+          throw new Error(
+            openError instanceof Error
+              ? openError.message
+              : "Não foi possível abrir a autorização no navegador.",
+          );
+        }
+      }
+
       const widget = new window.PluggyConnect({
         connectToken: token.accessToken,
         updateItem: itemId || undefined,
         includeSandbox: Boolean(token.includeSandbox),
         forceOauthInBrowser: true,
         theme: "light",
+        onEvent: async (payload) => {
+          if (!payload?.item) return;
+
+          try {
+            await openOauthUrl(payload.item);
+          } catch (openError) {
+            setConnecting(false);
+            setError(
+              openError instanceof Error
+                ? openError.message
+                : "Não foi possível abrir a autorização bancária no navegador.",
+            );
+          }
+        },
         onSuccess: async ({ item }) => {
           const connectedItemId = item?.id || itemId;
           if (!connectedItemId) {
