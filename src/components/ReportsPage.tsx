@@ -222,7 +222,7 @@ export function ReportsPage() {
           .order("due_date", { ascending: true }),
         supabase
           .from("categories")
-          .select("id, name, dre_group")
+          .select("*")
           .eq("company_id", activeCompany.id)
           .order("name"),
         supabase
@@ -291,6 +291,9 @@ export function ReportsPage() {
     () => previousPeriod(startDate, endDate),
     [startDate, endDate],
   );
+
+  const dreSchemaReady =
+    categories.length === 0 || categories.every((item) => Boolean(item.dre_group));
 
   function matchesSharedFilters(
     item: Transaction,
@@ -1006,6 +1009,16 @@ export function ReportsPage() {
         </>
       ) : (
         <>
+          {!dreSchemaReady && (
+            <div className="reconciliation-schema-warning">
+              <strong>Ativação da DRE profissional pendente</strong>
+              <span>
+                Aplique a migration <code>20261029_014_professional_dre.sql</code> no Supabase.
+                Enquanto isso, o Valora usa uma classificação padrão por tipo de lançamento.
+              </span>
+            </div>
+          )}
+
           <div className="dre-period-note">
             <strong>Comparação automática</strong>
             <span>
