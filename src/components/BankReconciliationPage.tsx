@@ -725,15 +725,41 @@ export function BankReconciliationPage() {
 
   return (
     <>
-      <header className="page-header split">
+      <header className="page-header split reconciliation-premium-header">
         <div>
           <p className="eyebrow">FINANCEIRO</p>
           <h1>Conciliação bancária</h1>
           <p>
-            Compare movimentações do Open Finance ou um extrato CSV, Excel ou OFX com os lançamentos já registrados no Valora.
+            Compare e concilie as movimentações do Open Finance ou importe um extrato
+            (CSV, Excel ou OFX) com os lançamentos já registrados no Valora.
           </p>
         </div>
+        <button
+          type="button"
+          className="ghost reconciliation-help-button"
+          onClick={() => setShowHelp((current) => !current)}
+        >
+          <span aria-hidden="true">?</span>
+          Como funciona?
+        </button>
       </header>
+
+      {showHelp && (
+        <section className="reconciliation-help-panel">
+          <div>
+            <strong>1. Escolha a origem</strong>
+            <span>Use o Open Finance ou carregue um extrato bancário.</span>
+          </div>
+          <div>
+            <strong>2. Revise as sugestões</strong>
+            <span>O Valora compara valor, data e descrição com seus lançamentos.</span>
+          </div>
+          <div>
+            <strong>3. Confirme</strong>
+            <span>Vincule lançamentos existentes, crie novos ou ignore o que não deve entrar.</span>
+          </div>
+        </section>
+      )}
 
       {schemaReady === false && (
         <div className="reconciliation-schema-warning">
@@ -750,16 +776,27 @@ export function BankReconciliationPage() {
         </div>
       )}
 
-      <section className="panel reconciliation-setup">
-        <div className="reconciliation-setup-grid">
-          <label>
-            Conta ou caixa
+      <section className="panel reconciliation-premium-setup">
+        <div className="reconciliation-account-column">
+          <div className="reconciliation-section-heading">
+            <strong>Conta ou caixa</strong>
+            <span>Selecione a conta usada nesta conciliação</span>
+          </div>
+
+          <label className="reconciliation-account-select">
+            <span className="reconciliation-account-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 10h16" />
+                <path d="M6 10v8M10 10v8M14 10v8M18 10v8" />
+                <path d="M3 20h18M12 3 3 8h18L12 3Z" />
+              </svg>
+            </span>
             <select
               value={accountId}
               onChange={(event) => setAccountId(event.target.value)}
               disabled={saving}
             >
-              <option value="">Selecione</option>
+              <option value="">Selecione uma conta</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.name}{account.active ? "" : " • inativa"}
@@ -768,10 +805,39 @@ export function BankReconciliationPage() {
             </select>
           </label>
 
-          <div className="reconciliation-source-stack">
+          <div
+            className={
+              linkedBankAccounts.length
+                ? "reconciliation-link-state connected"
+                : "reconciliation-link-state"
+            }
+          >
+            <span aria-hidden="true">{linkedBankAccounts.length ? "✓" : "!"}</span>
+            <div>
+              <strong>
+                {linkedBankAccounts.length
+                  ? "Conta vinculada ao Open Finance"
+                  : "Conta sem vínculo com Open Finance"}
+              </strong>
+              <small>
+                {linkedBankAccounts.length
+                  ? `${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} bancária${linkedBankAccounts.length === 1 ? "" : "s"} conectada${linkedBankAccounts.length === 1 ? "" : "s"}`
+                  : "Vincule uma conta em Conexões bancárias para usar o feed automático."}
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <div className="reconciliation-source-column">
+          <div className="reconciliation-section-heading">
+            <strong>Origem dos dados</strong>
+            <span>Escolha como carregar as movimentações</span>
+          </div>
+
+          <div className="reconciliation-source-tabs">
             <button
               type="button"
-              className="reconciliation-open-finance-button"
+              className={activeSource === "open-finance" ? "active" : ""}
               onClick={() => void loadOpenFinanceFeed()}
               disabled={
                 !accountId ||
@@ -781,48 +847,70 @@ export function BankReconciliationPage() {
                 saving
               }
             >
-              <span aria-hidden="true">↻</span>
+              <span className="source-tab-icon" aria-hidden="true">↻</span>
               <span>
-                <strong>
-                  {loadingOpenFinance ? "Carregando Open Finance..." : "Usar Open Finance"}
-                </strong>
-                <small>
-                  {linkedBankAccounts.length
-                    ? `${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} bancária${linkedBankAccounts.length === 1 ? "" : "s"} vinculada${linkedBankAccounts.length === 1 ? "" : "s"}`
-                    : "Vincule uma conta em Conexões bancárias"}
-                </small>
+                <strong>Open Finance</strong>
+                <small>{linkedBankAccounts.length ? "Feed bancário conectado" : "Sem conta vinculada"}</small>
               </span>
+              <i aria-hidden="true" />
             </button>
 
-            <div className="reconciliation-source-divider">
-              <span>ou importe um arquivo</span>
-            </div>
+            <span className="reconciliation-source-or">OU</span>
 
-            <div className="reconciliation-file">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.txt,.tsv,.xlsx,.xls,.xlsm,.xlsb,.ods,.ofx,.qfx"
-              onChange={handleFile}
-              disabled={!accountId || parsing || saving}
-            />
             <button
               type="button"
-              className="ghost"
+              className={activeSource === "file" ? "active file" : "file"}
               onClick={() => fileInputRef.current?.click()}
               disabled={!accountId || parsing || saving}
             >
-              {parsing ? "Lendo extrato..." : fileName ? "Trocar extrato" : "Selecionar extrato"}
+              <span className="source-tab-icon" aria-hidden="true">⇧</span>
+              <span>
+                <strong>{activeSource === "file" ? "Trocar extrato" : "Importar arquivo"}</strong>
+                <small>CSV, Excel, ODS, OFX ou QFX</small>
+              </span>
+              <i aria-hidden="true" />
             </button>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            className="reconciliation-hidden-file"
+            type="file"
+            accept=".csv,.txt,.tsv,.xlsx,.xls,.xlsm,.xlsb,.ods,.ofx,.qfx"
+            onChange={handleFile}
+            disabled={!accountId || parsing || saving}
+          />
+
+          <div className={"reconciliation-source-detail " + activeSource}>
+            <span className="source-detail-icon" aria-hidden="true">
+              {activeSource === "file" ? "⇧" : "↻"}
+            </span>
             <div>
-              <strong>{fileName || "Nenhum extrato selecionado"}</strong>
+              <strong>
+                {activeSource === "open-finance"
+                  ? "Usar movimentações do Open Finance"
+                  : activeSource === "file"
+                    ? fileName || "Extrato selecionado"
+                    : "Selecione uma origem para começar"}
+              </strong>
               <small>
-                {parsed
-                  ? `${parsed.format} • ${parsed.rows.length} movimentação${parsed.rows.length === 1 ? "" : "ões"}`
-                  : "CSV, Excel, ODS, OFX ou QFX"}
+                {activeSource === "open-finance"
+                  ? `Carregando o feed de ${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} bancária${linkedBankAccounts.length === 1 ? "" : "s"} vinculada${linkedBankAccounts.length === 1 ? "" : "s"}.`
+                  : activeSource === "file" && parsed
+                    ? `${parsed.format} • ${parsed.rows.length} movimentação${parsed.rows.length === 1 ? "" : "ões"} lida${parsed.rows.length === 1 ? "" : "s"}`
+                    : "O Valora compara automaticamente os dados carregados com seus lançamentos."}
               </small>
             </div>
-            </div>
+            {activeSource === "open-finance" && (
+              <button
+                type="button"
+                className="primary"
+                onClick={() => void loadOpenFinanceFeed()}
+                disabled={loadingOpenFinance || saving}
+              >
+                {loadingOpenFinance ? "Atualizando..." : "Atualizar dados"}
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -836,26 +924,44 @@ export function BankReconciliationPage() {
 
       {parsed && recommendations.length > 0 && (
         <>
-          <section className="reconciliation-summary">
-            <article>
-              <span>No extrato</span>
-              <strong>{summary.total}</strong>
-              <small>movimentações lidas</small>
+          <section className="reconciliation-premium-summary">
+            <article className="total">
+              <span className="summary-icon" aria-hidden="true">▤</span>
+              <div>
+                <span>Movimentações lidas</span>
+                <strong>{summary.total}</strong>
+                <small>{parsed.format}</small>
+              </div>
             </article>
-            <article>
-              <span>Já conciliadas</span>
-              <strong>{summary.already}</strong>
-              <small>nenhuma ação necessária</small>
+
+            <article className="done">
+              <span className="summary-icon" aria-hidden="true">✓</span>
+              <div>
+                <span>Já conciliadas</span>
+                <strong>{summary.already}</strong>
+                <small>{reconciledPercent}% do total</small>
+                <i><b style={{ width: `${reconciledPercent}%` }} /></i>
+              </div>
             </article>
-            <article>
-              <span>Vincular existentes</span>
-              <strong>{summary.match}</strong>
-              <small>sugestões ou escolhas manuais</small>
+
+            <article className="match">
+              <span className="summary-icon" aria-hidden="true">↗</span>
+              <div>
+                <span>Sugestões pendentes</span>
+                <strong>{summary.match}</strong>
+                <small>{matchPercent}% do total</small>
+                <i><b style={{ width: `${matchPercent}%` }} /></i>
+              </div>
             </article>
-            <article>
-              <span>Criar no Valora</span>
-              <strong>{summary.create}</strong>
-              <small>movimentações ainda não registradas</small>
+
+            <article className="create">
+              <span className="summary-icon" aria-hidden="true">+</span>
+              <div>
+                <span>A criar no Valora</span>
+                <strong>{summary.create}</strong>
+                <small>{createPercent}% do total</small>
+                <i><b style={{ width: `${createPercent}%` }} /></i>
+              </div>
             </article>
           </section>
 
@@ -865,24 +971,133 @@ export function BankReconciliationPage() {
             </div>
           )}
 
-          <section className="panel table-panel reconciliation-table-panel">
+          <section className="reconciliation-filter-bar">
+            <label className="reconciliation-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5" />
+                <path d="m16 16 4 4" />
+              </svg>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar por descrição, valor, data ou referência..."
+              />
+            </label>
+
+            <div className="reconciliation-type-filters">
+              <button
+                type="button"
+                className={typeFilter === "all" ? "active" : ""}
+                onClick={() => setTypeFilter("all")}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                className={typeFilter === "expense" ? "active expense" : "expense"}
+                onClick={() => setTypeFilter("expense")}
+              >
+                Despesas
+              </button>
+              <button
+                type="button"
+                className={typeFilter === "income" ? "active income" : "income"}
+                onClick={() => setTypeFilter("income")}
+              >
+                Receitas
+              </button>
+            </div>
+
+            <select
+              className="reconciliation-period-filter"
+              value={periodFilter}
+              onChange={(event) =>
+                setPeriodFilter(event.target.value as "all" | "30" | "60" | "90")
+              }
+            >
+              <option value="all">Todo o período</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="60">Últimos 60 dias</option>
+              <option value="90">Últimos 90 dias</option>
+            </select>
+
+            <button
+              type="button"
+              className={showMoreFilters ? "ghost active reconciliation-more-filters" : "ghost reconciliation-more-filters"}
+              onClick={() => setShowMoreFilters((current) => !current)}
+            >
+              Mais filtros
+            </button>
+          </section>
+
+          {showMoreFilters && (
+            <section className="reconciliation-advanced-filters">
+              <span>Situação</span>
+              {[
+                ["all", "Todas"],
+                ["done", "Conciliadas"],
+                ["match", "Vincular existentes"],
+                ["new", "Criar no Valora"],
+                ["skip", "Ignoradas"],
+              ].map(([value, label]) => (
+                <button
+                  type="button"
+                  key={value}
+                  className={situationFilter === value ? "active" : ""}
+                  onClick={() =>
+                    setSituationFilter(
+                      value as "all" | "done" | "match" | "new" | "skip",
+                    )
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </section>
+          )}
+
+          <section className="panel reconciliation-premium-table-panel">
+            <div className="reconciliation-table-heading">
+              <div>
+                <h2>Extrato bancário</h2>
+                <p>
+                  {filteredRecommendations.length === recommendations.length
+                    ? `${recommendations.length} movimentação${recommendations.length === 1 ? "" : "ões"} carregada${recommendations.length === 1 ? "" : "s"}`
+                    : `${filteredRecommendations.length} de ${recommendations.length} movimentações exibidas`}
+                </p>
+              </div>
+              <span className="reconciliation-source-badge">
+                {parsed.format}
+              </span>
+            </div>
+
             <div className="table-scroll">
-              <table className="reconciliation-table">
+              <table className="reconciliation-premium-table">
                 <thead>
                   <tr>
-                    <th>Extrato bancário</th>
+                    <th>Data</th>
+                    <th>Descrição</th>
                     <th>Tipo</th>
                     <th className="right">Valor</th>
-                    <th>Conciliação</th>
+                    <th>Situação</th>
+                    <th>Ação</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recommendations.map((recommendation) => {
+                  {filteredRecommendations.map((recommendation) => {
                     const row = recommendation.row;
                     const choice = effectiveChoices[row.id];
                     const selectedCandidate = recommendation.candidates.find(
                       (candidate) => candidate.transaction.id === choice,
                     );
+                    const situation =
+                      recommendation.alreadyReconciled || choice === "__done__"
+                        ? "done"
+                        : choice === "__skip__"
+                          ? "skip"
+                          : choice === "__new__"
+                            ? "new"
+                            : "match";
 
                     return (
                       <tr
@@ -890,12 +1105,26 @@ export function BankReconciliationPage() {
                         className={recommendation.alreadyReconciled ? "reconciled" : ""}
                       >
                         <td>
-                          <div className="reconciliation-bank-entry">
-                            <strong>{row.description}</strong>
-                            <span>
-                              {formatDate(row.date)}
-                              {row.sourceId ? ` • FITID ${row.sourceId}` : ""}
+                          <div className="reconciliation-date-cell">
+                            <strong>{formatDate(row.date)}</strong>
+                            <small>{parsed.format === "Open Finance" ? "Open Finance" : parsed.format}</small>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="reconciliation-description-cell">
+                            <span className="reconciliation-row-icon" aria-hidden="true">
+                              {row.type === "income" ? "↑" : "↓"}
                             </span>
+                            <div>
+                              <strong>{row.description}</strong>
+                              <small title={row.sourceId ?? undefined}>
+                                {row.sourceId
+                                  ? parsed.format === "Open Finance"
+                                    ? `Ref. ${row.sourceId.slice(0, 34)}${row.sourceId.length > 34 ? "…" : ""}`
+                                    : `FITID ${row.sourceId}`
+                                  : "Sem referência externa"}
+                              </small>
+                            </div>
                           </div>
                         </td>
                         <td>
@@ -907,12 +1136,25 @@ export function BankReconciliationPage() {
                           {row.type === "income" ? "+" : "−"} {money.format(row.amount)}
                         </td>
                         <td>
+                          <span className={`reconciliation-premium-status ${situation}`}>
+                            <i aria-hidden="true" />
+                            {situation === "done"
+                              ? "Conciliada"
+                              : situation === "skip"
+                                ? "Ignorar"
+                                : situation === "match"
+                                  ? "Vincular"
+                                  : "A conciliar"}
+                          </span>
+                        </td>
+                        <td>
                           {recommendation.alreadyReconciled ? (
-                            <span className="reconciliation-status done">
-                              {row.sourceId ? "FITID já conciliado" : "Conciliado"}
-                            </span>
+                            <div className="reconciliation-done-action">
+                              <strong>Concluído</strong>
+                              <small>Esta movimentação já foi conciliada.</small>
+                            </div>
                           ) : (
-                            <div className="reconciliation-match-cell">
+                            <div className="reconciliation-match-cell premium">
                               <select
                                 value={choice}
                                 onChange={(event) =>
@@ -934,37 +1176,45 @@ export function BankReconciliationPage() {
                                 ))}
                                 <option value="__skip__">Ignorar esta movimentação</option>
                               </select>
-
-                              {choice === "__new__" && (
-                                <small>Nenhum lançamento existente será alterado.</small>
-                              )}
-                              {choice === "__skip__" && (
-                                <small>Esta linha não será conciliada nem importada.</small>
-                              )}
-                              {selectedCandidate && (
-                                <small>
-                                  {recommendation.confidence === "strong"
-                                    ? "Sugestão forte por valor, data e descrição."
-                                    : recommendation.confidence === "possible"
-                                      ? "Sugestão automática. Revise antes de confirmar."
-                                      : "Correspondência escolhida manualmente."}
-                                </small>
-                              )}
+                              <small>
+                                {choice === "__new__"
+                                  ? "Cria um novo lançamento ao confirmar."
+                                  : choice === "__skip__"
+                                    ? "A movimentação ficará fora desta conciliação."
+                                    : selectedCandidate
+                                      ? recommendation.confidence === "strong"
+                                        ? "Sugestão forte por valor, data e descrição."
+                                        : recommendation.confidence === "possible"
+                                          ? "Sugestão automática. Revise antes de confirmar."
+                                          : "Correspondência escolhida manualmente."
+                                      : "Revise a ação antes de confirmar."}
+                              </small>
                             </div>
                           )}
                         </td>
                       </tr>
                     );
                   })}
+
+                  {filteredRecommendations.length === 0 && (
+                    <tr>
+                      <td colSpan={6}>
+                        <div className="reconciliation-filter-empty">
+                          <strong>Nenhuma movimentação encontrada</strong>
+                          <span>Ajuste a busca ou os filtros para ver outros resultados.</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
 
-            <div className="reconciliation-actions">
+            <div className="reconciliation-actions premium">
               <span>
                 {summary.skip > 0
                   ? `${summary.skip} item${summary.skip === 1 ? "" : "s"} será${summary.skip === 1 ? "" : "ão"} ignorado${summary.skip === 1 ? "" : "s"}.`
-                  : "Revise as sugestões antes de confirmar."}
+                  : "Revise as sugestões antes de confirmar a conciliação."}
               </span>
               <button
                 type="button"
@@ -989,18 +1239,19 @@ export function BankReconciliationPage() {
 
           {parsed.skipped > 0 && (
             <p className="reconciliation-footnote">
-              {parsed.skipped} linha{parsed.skipped === 1 ? "" : "s"} do arquivo foi{parsed.skipped === 1 ? "" : "ram"} ignorada{parsed.skipped === 1 ? "" : "s"} por dados inválidos ou incompletos.
+              {parsed.skipped} linha{parsed.skipped === 1 ? "" : "s"} foi{parsed.skipped === 1 ? "" : "ram"} ignorada{parsed.skipped === 1 ? "" : "s"} por dados inválidos ou incompletos.
             </p>
           )}
         </>
       )}
 
       {!parsed && (
-        <section className="panel reconciliation-empty">
-          <strong>Comece escolhendo uma conta e um extrato.</strong>
-          <span>
-            O Valora compara valores, datas e descrições para sugerir quais lançamentos correspondem às movimentações do banco.
-          </span>
+        <section className="panel reconciliation-premium-empty">
+          <span aria-hidden="true">↔</span>
+          <strong>Escolha uma origem para começar</strong>
+          <p>
+            O Valora compara valor, data e descrição para encontrar correspondências e preparar a conciliação com segurança.
+          </p>
         </section>
       )}
     </>
