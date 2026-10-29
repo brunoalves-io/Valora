@@ -6,12 +6,21 @@ import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
 
 type CategoryType = "income" | "expense" | "both";
+type DreGroup =
+  | "revenue"
+  | "other_income"
+  | "cost"
+  | "operating_expense"
+  | "tax"
+  | "other_expense";
+
 type Category = {
   id: string;
   name: string;
   type: CategoryType;
   active: boolean;
   parent_id: string | null;
+  dre_group: DreGroup;
 };
 
 const typeLabels: Record<CategoryType, string> = {
@@ -19,6 +28,39 @@ const typeLabels: Record<CategoryType, string> = {
   expense: "Despesa",
   both: "Ambos",
 };
+
+const dreGroupLabels: Record<DreGroup, string> = {
+  revenue: "Receita operacional",
+  other_income: "Outras receitas",
+  cost: "Custos diretos",
+  operating_expense: "Despesas operacionais",
+  tax: "Impostos e deduções",
+  other_expense: "Outras despesas",
+};
+
+function defaultDreGroup(type: CategoryType): DreGroup {
+  return type === "income" ? "revenue" : "operating_expense";
+}
+
+function dreOptionsForType(type: CategoryType) {
+  if (type === "income") {
+    return [
+      ["revenue", dreGroupLabels.revenue],
+      ["other_income", dreGroupLabels.other_income],
+    ] as Array<[DreGroup, string]>;
+  }
+
+  if (type === "expense") {
+    return [
+      ["cost", dreGroupLabels.cost],
+      ["operating_expense", dreGroupLabels.operating_expense],
+      ["tax", dreGroupLabels.tax],
+      ["other_expense", dreGroupLabels.other_expense],
+    ] as Array<[DreGroup, string]>;
+  }
+
+  return Object.entries(dreGroupLabels) as Array<[DreGroup, string]>;
+}
 
 export function CategoriesPage() {
   const { activeCompany } = useCompany();
@@ -34,6 +76,7 @@ export function CategoriesPage() {
     name: "",
     type: "expense" as CategoryType,
     parent_id: "",
+    dre_group: "operating_expense" as DreGroup,
   });
 
   async function load() {
@@ -43,7 +86,7 @@ export function CategoriesPage() {
 
     const { data, error: queryError } = await supabase
       .from("categories")
-      .select("id, name, type, active, parent_id")
+      .select("id, name, type, active, parent_id, dre_group")
       .eq("company_id", activeCompany.id)
       .order("name");
 
@@ -74,7 +117,7 @@ export function CategoriesPage() {
   );
 
   function resetForm() {
-    setForm({ name: "", type: "expense", parent_id: "" });
+    setForm({ name: "", type: "expense", parent_id: "", dre_group: "operating_expense" });
     setEditingId(null);
     setShowForm(false);
     setError("");
@@ -82,7 +125,7 @@ export function CategoriesPage() {
 
   function openNewCategory() {
     setEditingId(null);
-    setForm({ name: "", type: "expense", parent_id: "" });
+    setForm({ name: "", type: "expense", parent_id: "", dre_group: "operating_expense" });
     setError("");
     setShowForm(true);
   }
@@ -93,6 +136,7 @@ export function CategoriesPage() {
       name: category.name,
       type: category.type,
       parent_id: category.parent_id ?? "",
+      dre_group: category.dre_group,
     });
     setError("");
     setShowForm(true);
@@ -113,6 +157,7 @@ export function CategoriesPage() {
             name: form.name.trim(),
             type: form.type,
             parent_id: form.parent_id || null,
+            dre_group: form.dre_group,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingId)
@@ -122,6 +167,7 @@ export function CategoriesPage() {
           name: form.name.trim(),
           type: form.type,
           parent_id: form.parent_id || null,
+          dre_group: form.dre_group,
         });
 
     const { error: mutationError } = await mutation;
@@ -222,10 +268,34 @@ export function CategoriesPage() {
             </label>
             <label>
               Tipo
-              <select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as CategoryType, parent_id: "" })}>
+              <select
+                value={form.type}
+                onChange={(event) => {
+                  const type = event.target.value as CategoryType;
+                  setForm({
+                    ...form,
+                    type,
+                    parent_id: "",
+                    dre_group: defaultDreGroup(type),
+                  });
+                }}
+              >
                 <option value="expense">Despesa</option>
                 <option value="income">Receita</option>
                 <option value="both">Ambos</option>
+              </select>
+            </label>
+            <label>
+              Grupo na DRE
+              <select
+                value={form.dre_group}
+                onChange={(event) =>
+                  setForm({ ...form, dre_group: event.target.value as DreGroup })
+                }
+              >
+                {dreOptionsForType(form.type).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
               </select>
             </label>
             <label>
@@ -257,7 +327,7 @@ export function CategoriesPage() {
           <div className="table-scroll">
             <table>
               <thead>
-                <tr><th>Categoria</th><th>Tipo</th><th>Nível</th><th>Status</th><th></th></tr>
+                <tr><th>Categoria</th><th>Tipo</th><th>Grupo DRE</th><th>Nível</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {categories.map((category) => (
@@ -267,6 +337,7 @@ export function CategoriesPage() {
                       {category.parent_id && <small className="cell-subtitle">Dentro de {parentMap.get(category.parent_id) ?? "Categoria"}</small>}
                     </td>
                     <td><span className={"pill " + category.type}>{typeLabels[category.type]}</span></td>
+                    <td>{dreGroupLabels[category.dre_group]}</td>
                     <td>{category.parent_id ? "Subcategoria" : "Principal"}</td>
                     <td>{category.active ? "Ativa" : "Inativa"}</td>
                     <td className="right">
