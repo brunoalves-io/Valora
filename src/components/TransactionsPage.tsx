@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { StatementImportDialog } from "./StatementImportDialog";
+import {
+  TransactionOrganizerDialog,
+  type OrganizerTransaction,
+} from "./TransactionOrganizerDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { getDeleteErrorMessage } from "../lib/deleteErrors";
@@ -9,6 +13,13 @@ type Account = { id: string; name: string };
 type Category = { id: string; name: string; type: "income" | "expense" | "both" };
 type CostCenter = { id: string; name: string };
 type Partner = { id: string; name: string; kind: "customer" | "supplier" | "both"; active: boolean };
+type TransactionTag = { id: string; name: string };
+type TransactionTagLink = { transaction_id: string; tag_id: string };
+type TransactionAttachmentSummary = {
+  id: string;
+  transaction_id: string;
+  file_path: string;
+};
 type Transaction = {
   id: string;
   description: string;
@@ -35,12 +46,18 @@ function parseMoney(value: string) {
 }
 
 export function TransactionsPage() {
-  const { activeCompany } = useCompany();
+  const { activeCompany, activeRole } = useCompany();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [transactionTags, setTransactionTags] = useState<TransactionTag[]>([]);
+  const [tagLinks, setTagLinks] = useState<TransactionTagLink[]>([]);
+  const [attachmentSummaries, setAttachmentSummaries] = useState<TransactionAttachmentSummary[]>([]);
+  const [extrasReady, setExtrasReady] = useState<boolean | null>(null);
+  const [tagFilter, setTagFilter] = useState("");
+  const [organizingTransaction, setOrganizingTransaction] = useState<OrganizerTransaction | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -61,6 +78,57 @@ export function TransactionsPage() {
     cost_center_id: "",
     partner_id: "",
   });
+
+  const canManage = activeRole === "owner" || activeRole === "admin";
+
+  async function loadExtras() {
+    if (!supabase || !activeCompany) return;
+
+    const [tagResult, linkResult, attachmentResult] = await Promise.all([
+      supabase
+        .from("transaction_tags")
+        .select("id, name")
+        .eq("company_id", activeCompany.id)
+        .order("name"),
+      supabase
+        .from("transaction_tag_links")
+        .select("transaction_id, tag_id")
+        .eq("company_id", activeCompany.id),
+      supabase
+        .from("transaction_attachments")
+        .select("id, transaction_id, file_path")
+        .eq("company_id", activeCompany.id),
+    ]);
+
+    const firstError = tagResult.error || linkResult.error || attachmentResult.error;
+
+    if (firstError) {
+      const message = firstError.message.toLowerCase();
+      const missingSchema =
+        firstError.code === "42P01" ||
+        message.includes("transaction_tags") ||
+        message.includes("transaction_tag_links") ||
+        message.includes("transaction_attachments");
+
+      if (missingSchema) {
+        setExtrasReady(false);
+        setTransactionTags([]);
+        setTagLinks([]);
+        setAttachmentSummaries([]);
+        return;
+      }
+
+      setExtrasReady(false);
+      return;
+    }
+
+    setExtrasReady(true);
+    setTransactionTags((tagResult.data ?? []) as TransactionTag[]);
+    setTagLinks((linkResult.data ?? []) as TransactionTagLink[]);
+    setAttachmentSummaries(
+      (attachmentResult.data ?? []) as TransactionAttachmentSummary[],
+    );
+  }
 
   async function load() {
     if (!supabase || !activeCompany) return;
@@ -113,6 +181,7 @@ export function TransactionsPage() {
       setCategories((categoryResult.data ?? []) as Category[]);
       setCostCenters((costCenterResult.data ?? []) as CostCenter[]);
       setPartners((partnerResult.data ?? []) as Partner[]);
+      await loadExtras();
     }
 
     setLoading(false);
@@ -142,6 +211,42 @@ export function TransactionsPage() {
   const partnerNames = useMemo(
     () => new Map(partners.map((partner) => [partner.id, partner.name])),
     [partners],
+  );
+
+  const tagNames = useMemo(
+    () => new Map(transactionTags.map((tag) => [tag.id, tag.name])),
+    [transactionTags],
+  );
+
+  const tagIdsByTransaction = useMemo(() => {
+    const result = new Map<string, string[]>();
+    for (const link of tagLinks) {
+      const current = result.get(link.transaction_id) ?? [];
+      current.push(link.tag_id);
+      result.set(link.transaction_id, current);
+    }
+    return result;
+  }, [tagLinks]);
+
+  const attachmentCountByTransaction = useMemo(() => {
+    const result = new Map<string, number>();
+    for (const attachment of attachmentSummaries) {
+      result.set(
+        attachment.transaction_id,
+        (result.get(attachment.transaction_id) ?? 0) + 1,
+      );
+    }
+    return result;
+  }, [attachmentSummaries]);
+
+  const displayedTransactions = useMemo(
+    () =>
+      tagFilter
+        ? transactions.filter((item) =>
+            (tagIdsByTransaction.get(item.id) ?? []).includes(tagFilter),
+          )
+        : transactions,
+    [transactions, tagFilter, tagIdsByTransaction],
   );
 
   function resetForm() {
@@ -210,6 +315,23 @@ export function TransactionsPage() {
     const item = pendingDelete;
     setDeletingId(item.id);
     setError("");
+
+    const attachmentPaths = attachmentSummaries
+      .filter((attachment) => attachment.transaction_id === item.id)
+      .map((attachment) => attachment.file_path);
+
+    if (attachmentPaths.length > 0) {
+      const { error: storageError } = await supabase.storage
+        .from("transaction-attachments")
+        .remove(attachmentPaths);
+
+      if (storageError) {
+        setError("Não foi possível remover os anexos deste lançamento. Tente novamente.");
+        setDeletingId(null);
+        setPendingDelete(null);
+        return;
+      }
+    }
 
     const { error: deleteError } = await supabase
       .from("transactions")
@@ -515,6 +637,25 @@ export function TransactionsPage() {
 
       {!showForm && error && <div className="form-alert error page-alert">{error}</div>}
 
+      {extrasReady === true && (
+        <section className="panel transaction-list-toolbar">
+          <label>
+            Filtrar por tag
+            <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
+              <option value="">Todas as tags</option>
+              {transactionTags.map((tag) => (
+                <option key={tag.id} value={tag.id}>{tag.name}</option>
+              ))}
+            </select>
+          </label>
+          <span>
+            {tagFilter
+              ? `${displayedTransactions.length} de ${transactions.length} lançamento(s)`
+              : `${transactions.length} lançamento(s)`}
+          </span>
+        </section>
+      )}
+
       <section className="panel table-panel">
         {loading ? (
           <div className="empty-state">Carregando lançamentos...</div>
@@ -538,9 +679,32 @@ export function TransactionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((item) => (
+                {displayedTransactions.map((item) => (
                   <tr key={item.id}>
-                    <td><strong>{item.description}</strong></td>
+                    <td>
+                      <div className="transaction-description-cell">
+                        <strong>{item.description}</strong>
+                        {extrasReady === true && (
+                          <div className="transaction-row-meta">
+                            {(tagIdsByTransaction.get(item.id) ?? []).slice(0, 3).map((tagId) => (
+                              <span className="transaction-row-tag" key={tagId}>
+                                {tagNames.get(tagId) ?? "Tag"}
+                              </span>
+                            ))}
+                            {(tagIdsByTransaction.get(item.id) ?? []).length > 3 && (
+                              <span>
+                                +{(tagIdsByTransaction.get(item.id) ?? []).length - 3}
+                              </span>
+                            )}
+                            {(attachmentCountByTransaction.get(item.id) ?? 0) > 0 && (
+                              <span>
+                                {attachmentCountByTransaction.get(item.id)} anexo(s)
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td>{new Date(item.due_date + "T12:00:00").toLocaleDateString("pt-BR")}</td>
                     <td>
                       <span className={`pill ${item.type}`}>
@@ -554,6 +718,18 @@ export function TransactionsPage() {
                     </td>
                     <td className="right">
                       <div className="record-actions right">
+                        <button
+                          className="table-action"
+                          onClick={() =>
+                            setOrganizingTransaction({
+                              id: item.id,
+                              description: item.description,
+                            })
+                          }
+                          disabled={deletingId === item.id}
+                        >
+                          Organizar
+                        </button>
                         <button
                           className="table-action edit"
                           onClick={() => editTransaction(item)}
@@ -572,12 +748,27 @@ export function TransactionsPage() {
                     </td>
                   </tr>
                 ))}
+                {displayedTransactions.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="report-empty-cell">
+                      Nenhum lançamento corresponde à tag selecionada.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         )}
       </section>
 
+      <TransactionOrganizerDialog
+        open={Boolean(organizingTransaction)}
+        companyId={activeCompany?.id ?? ""}
+        transaction={organizingTransaction}
+        canManage={canManage}
+        onClose={() => setOrganizingTransaction(null)}
+        onChanged={loadExtras}
+      />
       <StatementImportDialog
         open={showImport}
         companyId={activeCompany?.id ?? ""}
