@@ -31,6 +31,23 @@ type Reconciliation = {
   statement_date: string;
 };
 
+type LinkedBankAccount = {
+  id: string;
+  name: string;
+  provider_account_id: string;
+};
+
+type OpenFinanceTransaction = {
+  id: string;
+  external_account_id: string;
+  provider_transaction_id: string;
+  description: string;
+  movement_type: "income" | "expense";
+  status: "POSTED" | "PENDING" | "UNKNOWN";
+  amount: number | string;
+  transaction_date: string;
+};
+
 type Candidate = {
   transaction: Transaction;
   score: number;
@@ -101,12 +118,14 @@ export function BankReconciliationPage() {
   const [accountId, setAccountId] = useState("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
+  const [linkedBankAccounts, setLinkedBankAccounts] = useState<LinkedBankAccount[]>([]);
   const [parsed, setParsed] = useState<StatementParseResult | null>(null);
   const [fileName, setFileName] = useState("");
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [loadingAccount, setLoadingAccount] = useState(false);
   const [parsing, setParsing] = useState(false);
+  const [loadingOpenFinance, setLoadingOpenFinance] = useState(false);
   const [saving, setSaving] = useState(false);
   const [schemaReady, setSchemaReady] = useState<boolean | null>(null);
   const [error, setError] = useState("");
@@ -161,6 +180,7 @@ export function BankReconciliationPage() {
     if (!supabase || !activeCompany || !accountId) {
       setTransactions([]);
       setReconciliations([]);
+      setLinkedBankAccounts([]);
       return;
     }
 
@@ -172,7 +192,7 @@ export function BankReconciliationPage() {
       setLoadingAccount(true);
       setError("");
 
-      const [transactionResult, reconciliationResult] = await Promise.all([
+      const [transactionResult, reconciliationResult, linkedAccountResult] = await Promise.all([
         client
           .from("transactions")
           .select("id, description, amount, type, status, due_date, paid_at, account_id")
@@ -188,6 +208,12 @@ export function BankReconciliationPage() {
           .eq("account_id", accountId)
           .order("statement_date", { ascending: false })
           .limit(2500),
+        client
+          .from("bank_connection_accounts")
+          .select("id, name, provider_account_id")
+          .eq("company_id", companyId)
+          .eq("local_account_id", accountId)
+          .order("name"),
       ]);
 
       if (cancelled) return;
@@ -199,6 +225,12 @@ export function BankReconciliationPage() {
       }
 
       setTransactions((transactionResult.data ?? []) as Transaction[]);
+
+      if (linkedAccountResult.error) {
+        setLinkedBankAccounts([]);
+      } else {
+        setLinkedBankAccounts((linkedAccountResult.data ?? []) as LinkedBankAccount[]);
+      }
 
       if (reconciliationResult.error) {
         const missingTable =
@@ -372,6 +404,79 @@ export function BankReconciliationPage() {
     (count) => count > 1,
   );
 
+  async function loadOpenFinanceFeed() {
+    if (!supabase || !activeCompany || !accountId || loadingOpenFinance) return;
+
+    if (!linkedBankAccounts.length) {
+      setError(
+        "Esta conta ainda não está vinculada a uma conta bancária em Conexões bancárias.",
+      );
+      return;
+    }
+
+    setLoadingOpenFinance(true);
+    setError("");
+    setSuccess("");
+
+    const externalAccountIds = linkedBankAccounts.map((item) => item.id);
+    const { data, error: feedError } = await supabase
+      .from("bank_connection_transactions")
+      .select(
+        "id, external_account_id, provider_transaction_id, description, movement_type, status, amount, transaction_date",
+      )
+      .eq("company_id", activeCompany.id)
+      .in("external_account_id", externalAccountIds)
+      .eq("status", "POSTED")
+      .order("transaction_date", { ascending: false })
+      .limit(5000);
+
+    if (feedError) {
+      setError("Não foi possível carregar as movimentações do Open Finance.");
+      setLoadingOpenFinance(false);
+      return;
+    }
+
+    const feed = (data ?? []) as OpenFinanceTransaction[];
+    const rows: StatementImportRow[] = feed
+      .filter(
+        (item) =>
+          item.provider_transaction_id &&
+          item.description &&
+          Number(item.amount) > 0 &&
+          (item.movement_type === "income" || item.movement_type === "expense"),
+      )
+      .map((item) => ({
+        id: `open-finance-${item.id}`,
+        sourceId: `pluggy:${item.external_account_id}:${item.provider_transaction_id}`,
+        date: item.transaction_date,
+        description: item.description,
+        amount: Number(item.amount),
+        type: item.movement_type,
+      }));
+
+    if (!rows.length) {
+      setParsed(null);
+      setFileName("");
+      setChoices({});
+      setError(
+        "Nenhuma movimentação confirmada foi encontrada no feed Open Finance desta conta.",
+      );
+      setLoadingOpenFinance(false);
+      return;
+    }
+
+    setParsed({
+      format: "Open Finance",
+      rows,
+      skipped: feed.length - rows.length,
+    });
+    setFileName(
+      `Open Finance · ${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} vinculada${linkedBankAccounts.length === 1 ? "" : "s"}`,
+    );
+    setChoices({});
+    setLoadingOpenFinance(false);
+  }
+
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -534,7 +639,7 @@ export function BankReconciliationPage() {
           <p className="eyebrow">FINANCEIRO</p>
           <h1>Conciliação bancária</h1>
           <p>
-            Compare um extrato CSV, Excel ou OFX com as movimentações já registradas no Valora.
+            Compare movimentações do Open Finance ou um extrato CSV, Excel ou OFX com os lançamentos já registrados no Valora.
           </p>
         </div>
       </header>
@@ -572,7 +677,37 @@ export function BankReconciliationPage() {
             </select>
           </label>
 
-          <div className="reconciliation-file">
+          <div className="reconciliation-source-stack">
+            <button
+              type="button"
+              className="reconciliation-open-finance-button"
+              onClick={() => void loadOpenFinanceFeed()}
+              disabled={
+                !accountId ||
+                !linkedBankAccounts.length ||
+                loadingOpenFinance ||
+                parsing ||
+                saving
+              }
+            >
+              <span aria-hidden="true">↻</span>
+              <span>
+                <strong>
+                  {loadingOpenFinance ? "Carregando Open Finance..." : "Usar Open Finance"}
+                </strong>
+                <small>
+                  {linkedBankAccounts.length
+                    ? `${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} bancária${linkedBankAccounts.length === 1 ? "" : "s"} vinculada${linkedBankAccounts.length === 1 ? "" : "s"}`
+                    : "Vincule uma conta em Conexões bancárias"}
+                </small>
+              </span>
+            </button>
+
+            <div className="reconciliation-source-divider">
+              <span>ou importe um arquivo</span>
+            </div>
+
+            <div className="reconciliation-file">
             <input
               ref={fileInputRef}
               type="file"
@@ -595,6 +730,7 @@ export function BankReconciliationPage() {
                   ? `${parsed.format} • ${parsed.rows.length} movimentação${parsed.rows.length === 1 ? "" : "ões"}`
                   : "CSV, Excel, ODS, OFX ou QFX"}
               </small>
+            </div>
             </div>
           </div>
         </div>
