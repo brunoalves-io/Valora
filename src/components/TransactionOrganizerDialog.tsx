@@ -5,6 +5,7 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { supabase } from "../lib/supabase";
 
 export type OrganizerTransaction = {
@@ -106,6 +107,7 @@ export function TransactionOrganizerDialog({
   const [loading, setLoading] = useState(false);
   const [savingTag, setSavingTag] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
   const [removingAttachmentId, setRemovingAttachmentId] = useState<string | null>(null);
   const [schemaReady, setSchemaReady] = useState<boolean | null>(null);
   const [error, setError] = useState("");
@@ -357,24 +359,33 @@ export function TransactionOrganizerDialog({
   async function downloadAttachment(attachment: TransactionAttachment) {
     if (!supabase) return;
 
+    setDownloadingAttachmentId(attachment.id);
     setError("");
-    const { data, error: downloadError } = await supabase.storage
-      .from("transaction-attachments")
-      .download(attachment.file_path);
 
-    if (downloadError || !data) {
-      setError(downloadError?.message || "Não foi possível baixar o arquivo.");
+    const { data, error: signedUrlError } = await supabase.storage
+      .from("transaction-attachments")
+      .createSignedUrl(attachment.file_path, 120);
+
+    if (signedUrlError || !data?.signedUrl) {
+      setError(signedUrlError?.message || "Não foi possível preparar o download do arquivo.");
+      setDownloadingAttachmentId(null);
       return;
     }
 
-    const url = URL.createObjectURL(data);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = attachment.file_name;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+    try {
+      await invoke<string | null>("save_attachment_file", {
+        url: data.signedUrl,
+        fileName: attachment.file_name,
+      });
+    } catch (downloadError) {
+      setError(
+        downloadError instanceof Error
+          ? downloadError.message
+          : String(downloadError || "Não foi possível salvar o arquivo."),
+      );
+    } finally {
+      setDownloadingAttachmentId(null);
+    }
   }
 
   async function removeAttachment(attachment: TransactionAttachment) {
@@ -553,8 +564,9 @@ export function TransactionOrganizerDialog({
                           type="button"
                           className="table-action"
                           onClick={() => void downloadAttachment(attachment)}
+                          disabled={downloadingAttachmentId === attachment.id}
                         >
-                          Baixar
+                          {downloadingAttachmentId === attachment.id ? "Salvando..." : "Baixar"}
                         </button>
                         {canManage && (
                           <button
