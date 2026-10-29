@@ -6232,21 +6232,55 @@ tr:last-child td { border-bottom: 0; }
 
 .transaction-organizer-close {
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  border: 1px solid #e0e5eb;
-  border-radius: 9px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #dbe3eb;
+  border-radius: 12px;
   display: grid;
   place-items: center;
+  align-self: flex-start;
   background: #fff;
-  color: #798598;
-  font-size: 20px;
-  line-height: 1;
+  color: #7b8798;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .05);
+  cursor: pointer;
+  transition:
+    background-color .18s ease,
+    border-color .18s ease,
+    color .18s ease,
+    box-shadow .18s ease,
+    transform .12s ease;
+}
+
+.transaction-organizer-close svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
 }
 
 .transaction-organizer-close:hover {
-  background: #f6f8fa;
-  color: #455268;
+  border-color: #cfd8e3;
+  background: #f7fafc;
+  color: #334155;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, .08);
+}
+
+.transaction-organizer-close:active {
+  transform: scale(.97);
+  background: #eef3f7;
+}
+
+.transaction-organizer-close:focus-visible {
+  outline: none;
+  border-color: #46bf91;
+  box-shadow:
+    0 0 0 4px rgba(70, 191, 145, .16),
+    0 4px 14px rgba(15, 23, 42, .08);
 }
 
 .transaction-organizer-body {

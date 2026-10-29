@@ -442,8 +442,12 @@ export function TransactionOrganizerDialog({
             className="transaction-organizer-close"
             onClick={onClose}
             aria-label="Fechar"
+            title="Fechar"
           >
-            ×
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6 18 18" />
+              <path d="M18 6 6 18" />
+            </svg>
           </button>
         </header>
 
