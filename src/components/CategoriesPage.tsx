@@ -20,7 +20,7 @@ type Category = {
   type: CategoryType;
   active: boolean;
   parent_id: string | null;
-  dre_group: DreGroup;
+  dre_group: DreGroup | null;
 };
 
 const typeLabels: Record<CategoryType, string> = {
@@ -136,7 +136,7 @@ export function CategoriesPage() {
       name: category.name,
       type: category.type,
       parent_id: category.parent_id ?? "",
-      dre_group: category.dre_group,
+      dre_group: category.dre_group ?? defaultDreGroup(category.type),
     });
     setError("");
     setShowForm(true);
@@ -337,7 +337,7 @@ export function CategoriesPage() {
                       {category.parent_id && <small className="cell-subtitle">Dentro de {parentMap.get(category.parent_id) ?? "Categoria"}</small>}
                     </td>
                     <td><span className={"pill " + category.type}>{typeLabels[category.type]}</span></td>
-                    <td>{dreGroupLabels[category.dre_group]}</td>
+                    <td>{dreGroupLabels[category.dre_group ?? defaultDreGroup(category.type)]}</td>
                     <td>{category.parent_id ? "Subcategoria" : "Principal"}</td>
                     <td>{category.active ? "Ativa" : "Inativa"}</td>
                     <td className="right">
