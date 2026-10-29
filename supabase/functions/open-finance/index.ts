@@ -23,6 +23,13 @@ function cleanText(value: unknown, max = 500) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
+function maskAccountNumber(value: unknown) {
+  const clean = cleanText(value, 100);
+  if (!clean) return "";
+  if (clean.length <= 4) return clean;
+  return `•••• ${clean.slice(-4)}`;
+}
+
 function statusFromItem(item: Record<string, any>) {
   const status = String(item.status ?? item.executionStatus ?? "").toUpperCase();
   const hasError = Boolean(item.error) || status.includes("ERROR");
@@ -260,7 +267,7 @@ async function saveExternalAccount(
       "Conta financeira",
     account_type: accountType,
     subtype: cleanText(account.subtype, 100) || null,
-    number_masked: cleanText(account.number, 100) || null,
+    number_masked: maskAccountNumber(account.number) || null,
     currency_code: cleanText(account.currencyCode, 8) || "BRL",
     balance: Number.isFinite(Number(account.balance)) ? Number(account.balance) : null,
     available_balance: Number.isFinite(Number(account?.bankData?.availableBalance))
