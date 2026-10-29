@@ -111,6 +111,14 @@ function formatDate(value: string) {
   return new Date(value + "T12:00:00").toLocaleDateString("pt-BR");
 }
 
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 export function BankReconciliationPage() {
   const { activeCompany, activeRole } = useCompany();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -128,6 +136,14 @@ export function BankReconciliationPage() {
   const [loadingOpenFinance, setLoadingOpenFinance] = useState(false);
   const [saving, setSaving] = useState(false);
   const [schemaReady, setSchemaReady] = useState<boolean | null>(null);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
+  const [periodFilter, setPeriodFilter] = useState<"all" | "30" | "60" | "90">("all");
+  const [situationFilter, setSituationFilter] = useState<
+    "all" | "done" | "match" | "new" | "skip"
+  >("all");
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -403,6 +419,81 @@ export function BankReconciliationPage() {
   const hasTransactionConflict = Array.from(selectedTransactionIds.values()).some(
     (count) => count > 1,
   );
+
+  const selectedAccount = useMemo(
+    () => accounts.find((account) => account.id === accountId) ?? null,
+    [accounts, accountId],
+  );
+
+  const activeSource = useMemo<"open-finance" | "file" | "none">(() => {
+    if (parsed?.format === "Open Finance") return "open-finance";
+    if (parsed) return "file";
+    return "none";
+  }, [parsed]);
+
+  const filteredRecommendations = useMemo(() => {
+    const normalizedQuery = normalizeSearch(search);
+    const now = Date.now();
+
+    return recommendations.filter((recommendation) => {
+      const row = recommendation.row;
+      const choice = effectiveChoices[row.id];
+
+      if (typeFilter !== "all" && row.type !== typeFilter) return false;
+
+      if (periodFilter !== "all") {
+        const rowDate = new Date(row.date + "T12:00:00").getTime();
+        const days = Number(periodFilter);
+        if (!Number.isFinite(rowDate) || now - rowDate > days * 86400000) return false;
+      }
+
+      if (situationFilter !== "all") {
+        const situation =
+          recommendation.alreadyReconciled || choice === "__done__"
+            ? "done"
+            : choice === "__skip__"
+              ? "skip"
+              : choice === "__new__"
+                ? "new"
+                : "match";
+
+        if (situation !== situationFilter) return false;
+      }
+
+      if (normalizedQuery) {
+        const searchable = normalizeSearch(
+          [
+            row.description,
+            row.sourceId ?? "",
+            row.date,
+            money.format(row.amount),
+            row.type === "income" ? "receita" : "despesa",
+          ].join(" "),
+        );
+
+        if (!searchable.includes(normalizedQuery)) return false;
+      }
+
+      return true;
+    });
+  }, [
+    recommendations,
+    effectiveChoices,
+    search,
+    typeFilter,
+    periodFilter,
+    situationFilter,
+  ]);
+
+  const reconciledPercent = summary.total
+    ? Math.round((summary.already / summary.total) * 1000) / 10
+    : 0;
+  const matchPercent = summary.total
+    ? Math.round((summary.match / summary.total) * 1000) / 10
+    : 0;
+  const createPercent = summary.total
+    ? Math.round((summary.create / summary.total) * 1000) / 10
+    : 0;
 
   async function loadOpenFinanceFeed() {
     if (!supabase || !activeCompany || !accountId || loadingOpenFinance) return;
