@@ -119,6 +119,83 @@ function normalizeSearch(value: string) {
     .trim();
 }
 
+function BankSourceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3.5 9.25h17" />
+      <path d="M5.5 9.25v8.5M9.75 9.25v8.5M14.25 9.25v8.5M18.5 9.25v8.5" />
+      <path d="M3.5 19.5h17" />
+      <path d="M12 3.5 3.75 7.5h16.5L12 3.5Z" />
+    </svg>
+  );
+}
+
+function UploadSourceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.5 3.75h7.25l3.75 3.75v12.75H6.5Z" />
+      <path d="M13.75 3.75V7.5h3.75" />
+      <path d="M12 16.5V10.5" />
+      <path d="m9.75 12.75 2.25-2.25 2.25 2.25" />
+    </svg>
+  );
+}
+
+function SyncSourceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M19.25 8.25A7.5 7.5 0 0 0 6.1 6.1L4.5 7.75" />
+      <path d="M4.5 4.75v3h3" />
+      <path d="M4.75 15.75A7.5 7.5 0 0 0 17.9 17.9l1.6-1.65" />
+      <path d="M19.5 19.25v-3h-3" />
+    </svg>
+  );
+}
+
+function LedgerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="5" y="3.75" width="14" height="16.5" rx="2" />
+      <path d="M8.5 8h7M8.5 11.75h7M8.5 15.5h5" />
+    </svg>
+  );
+}
+
+function CheckCircleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.25" />
+      <path d="m8.5 12.2 2.25 2.25 4.75-5" />
+    </svg>
+  );
+}
+
+function TrendUpIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 17 16.5 5.5" />
+      <path d="M10.75 5.5h5.75v5.75" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function MovementIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="6" y="4" width="12" height="16" rx="2" />
+      <path d="M9 8h6M9 11.75h6M9 15.5h4" />
+    </svg>
+  );
+}
+
 export function BankReconciliationPage() {
   const { activeCompany, activeRole } = useCompany();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -813,7 +890,9 @@ export function BankReconciliationPage() {
                 : "reconciliation-link-state"
             }
           >
-            <span aria-hidden="true">{linkedBankAccounts.length ? "✓" : "!"}</span>
+            <span aria-hidden="true">
+              {linkedBankAccounts.length ? <CheckCircleIcon /> : "!"}
+            </span>
             <div>
               <strong>
                 {linkedBankAccounts.length
@@ -848,7 +927,9 @@ export function BankReconciliationPage() {
                 saving
               }
             >
-              <span className="source-tab-icon" aria-hidden="true">↻</span>
+              <span className="source-tab-icon" aria-hidden="true">
+                <BankSourceIcon />
+              </span>
               <span>
                 <strong>Open Finance</strong>
                 <small>{linkedBankAccounts.length ? "Feed bancário conectado" : "Sem conta vinculada"}</small>
@@ -864,7 +945,9 @@ export function BankReconciliationPage() {
               onClick={() => fileInputRef.current?.click()}
               disabled={!accountId || parsing || saving}
             >
-              <span className="source-tab-icon" aria-hidden="true">⇧</span>
+              <span className="source-tab-icon" aria-hidden="true">
+                <UploadSourceIcon />
+              </span>
               <span>
                 <strong>{activeSource === "file" ? "Trocar extrato" : "Importar arquivo"}</strong>
                 <small>CSV, Excel, ODS, OFX ou QFX</small>
@@ -884,7 +967,7 @@ export function BankReconciliationPage() {
 
           <div className={"reconciliation-source-detail " + activeSource}>
             <span className="source-detail-icon" aria-hidden="true">
-              {activeSource === "file" ? "⇧" : "↻"}
+              {activeSource === "file" ? <UploadSourceIcon /> : <SyncSourceIcon />}
             </span>
             <div>
               <strong>
@@ -927,7 +1010,9 @@ export function BankReconciliationPage() {
         <>
           <section className="reconciliation-premium-summary">
             <article className="total">
-              <span className="summary-icon" aria-hidden="true">▤</span>
+              <span className="summary-icon" aria-hidden="true">
+                <LedgerIcon />
+              </span>
               <div>
                 <span>Movimentações lidas</span>
                 <strong>{summary.total}</strong>
@@ -936,7 +1021,9 @@ export function BankReconciliationPage() {
             </article>
 
             <article className="done">
-              <span className="summary-icon" aria-hidden="true">✓</span>
+              <span className="summary-icon" aria-hidden="true">
+                <CheckCircleIcon />
+              </span>
               <div>
                 <span>Já conciliadas</span>
                 <strong>{summary.already}</strong>
@@ -946,7 +1033,9 @@ export function BankReconciliationPage() {
             </article>
 
             <article className="match">
-              <span className="summary-icon" aria-hidden="true">↗</span>
+              <span className="summary-icon" aria-hidden="true">
+                <TrendUpIcon />
+              </span>
               <div>
                 <span>Sugestões pendentes</span>
                 <strong>{summary.match}</strong>
@@ -956,7 +1045,9 @@ export function BankReconciliationPage() {
             </article>
 
             <article className="create">
-              <span className="summary-icon" aria-hidden="true">+</span>
+              <span className="summary-icon" aria-hidden="true">
+                <PlusIcon />
+              </span>
               <div>
                 <span>A criar no Valora</span>
                 <strong>{summary.create}</strong>
@@ -1078,9 +1169,9 @@ export function BankReconciliationPage() {
                   <tr>
                     <th>Data</th>
                     <th>Descrição</th>
-                    <th>Tipo</th>
+                    <th className="center">Tipo</th>
                     <th className="right">Valor</th>
-                    <th>Situação</th>
+                    <th className="center">Situação</th>
                     <th>Ação</th>
                   </tr>
                 </thead>
@@ -1114,7 +1205,7 @@ export function BankReconciliationPage() {
                         <td>
                           <div className="reconciliation-description-cell">
                             <span className="reconciliation-row-icon" aria-hidden="true">
-                              {row.type === "income" ? "↑" : "↓"}
+                              <MovementIcon />
                             </span>
                             <div>
                               <strong>{row.description}</strong>
@@ -1128,7 +1219,7 @@ export function BankReconciliationPage() {
                             </div>
                           </div>
                         </td>
-                        <td>
+                        <td className="center">
                           <span className={`pill ${row.type}`}>
                             {row.type === "income" ? "Receita" : "Despesa"}
                           </span>
@@ -1136,7 +1227,7 @@ export function BankReconciliationPage() {
                         <td className={`right amount ${row.type}`}>
                           {row.type === "income" ? "+" : "−"} {money.format(row.amount)}
                         </td>
-                        <td>
+                        <td className="center">
                           <span className={`reconciliation-premium-status ${situation}`}>
                             <i aria-hidden="true" />
                             {situation === "done"
