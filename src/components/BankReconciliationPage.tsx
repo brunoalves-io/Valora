@@ -278,6 +278,11 @@ export function BankReconciliationPage() {
     setParsed(null);
     setFileName("");
     setChoices({});
+    setSearch("");
+    setTypeFilter("all");
+    setPeriodFilter("all");
+    setSituationFilter("all");
+    setShowMoreFilters(false);
     setSuccess("");
   }, [accountId]);
 
@@ -420,16 +425,12 @@ export function BankReconciliationPage() {
     (count) => count > 1,
   );
 
-  const selectedAccount = useMemo(
-    () => accounts.find((account) => account.id === accountId) ?? null,
-    [accounts, accountId],
-  );
-
   const activeSource = useMemo<"open-finance" | "file" | "none">(() => {
     if (parsed?.format === "Open Finance") return "open-finance";
     if (parsed) return "file";
+    if (linkedBankAccounts.length) return "open-finance";
     return "none";
-  }, [parsed]);
+  }, [parsed, linkedBankAccounts.length]);
 
   const filteredRecommendations = useMemo(() => {
     const normalizedQuery = normalizeSearch(search);
@@ -895,7 +896,7 @@ export function BankReconciliationPage() {
               </strong>
               <small>
                 {activeSource === "open-finance"
-                  ? `Carregando o feed de ${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} bancária${linkedBankAccounts.length === 1 ? "" : "s"} vinculada${linkedBankAccounts.length === 1 ? "" : "s"}.`
+                  ? `Carrega automaticamente o feed de ${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} bancária${linkedBankAccounts.length === 1 ? "" : "s"} vinculada${linkedBankAccounts.length === 1 ? "" : "s"}.`
                   : activeSource === "file" && parsed
                     ? `${parsed.format} • ${parsed.rows.length} movimentação${parsed.rows.length === 1 ? "" : "ões"} lida${parsed.rows.length === 1 ? "" : "s"}`
                     : "O Valora compara automaticamente os dados carregados com seus lançamentos."}
