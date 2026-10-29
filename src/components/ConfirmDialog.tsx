@@ -78,7 +78,12 @@ export function ConfirmDialog({
 
         {warning && (
           <div className="confirm-dialog-warning">
-            <span aria-hidden="true">!</span>
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 8v4" />
+                <path d="M12 16h.01" />
+              </svg>
+            </span>
             <p>{warning}</p>
           </div>
         )}
