@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { AITransactionDialog } from "./AITransactionDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { StatementImportDialog } from "./StatementImportDialog";
 import {
@@ -66,6 +67,7 @@ export function TransactionsPage() {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showAITransaction, setShowAITransaction] = useState(false);
   const [form, setForm] = useState({
     type: "expense" as "income" | "expense",
     description: "",
@@ -467,6 +469,16 @@ export function TransactionsPage() {
           >
             Importar extrato
           </button>
+          {canManage && (
+            <button
+              type="button"
+              className="ghost ai-create-transaction-button"
+              onClick={() => setShowAITransaction(true)}
+            >
+              <span aria-hidden="true">✦</span>
+              Criar com IA
+            </button>
+          )}
           <button
             className="primary"
             onClick={() => {
@@ -761,6 +773,18 @@ export function TransactionsPage() {
         )}
       </section>
 
+      <AITransactionDialog
+        open={showAITransaction}
+        companyId={activeCompany?.id ?? ""}
+        canManage={canManage}
+        accounts={accounts}
+        categories={categories}
+        costCenters={costCenters}
+        partners={partners}
+        tags={transactionTags}
+        onClose={() => setShowAITransaction(false)}
+        onCreated={load}
+      />
       <TransactionOrganizerDialog
         open={Boolean(organizingTransaction)}
         companyId={activeCompany?.id ?? ""}

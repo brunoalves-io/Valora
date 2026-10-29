@@ -9,6 +9,13 @@ type ChatMessage = {
   content: string;
 };
 
+type AIContextItem = {
+  id?: string;
+  name?: string;
+  type?: string;
+  kind?: string;
+};
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -34,6 +41,166 @@ function sanitizeMessages(value: unknown): ChatMessage[] {
     }))
     .filter((item) => item.content.length > 0)
     .slice(-12);
+}
+
+function sanitizeDraftText(value: unknown) {
+  return typeof value === "string" ? value.trim().slice(0, 2000) : "";
+}
+
+function sanitizeToday(value: unknown) {
+  if (typeof value !== "string") return "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
+
+function extractJsonObject(value: string) {
+  const clean = value
+    .trim()
+    .replace(/^\`\`\`(?:json)?\s*/i, "")
+    .replace(/\s*\`\`\`$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(clean) as Record<string, unknown>;
+  } catch {
+    const start = clean.indexOf("{");
+    const end = clean.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      return JSON.parse(clean.slice(start, end + 1)) as Record<string, unknown>;
+    }
+    throw new Error("Invalid JSON");
+  }
+}
+
+function contextList(context: Record<string, unknown>, key: string): AIContextItem[] {
+  const value = context[key];
+  return Array.isArray(value)
+    ? value.filter((item): item is AIContextItem =>
+      Boolean(item && typeof item === "object"),
+    )
+    : [];
+}
+
+function validContextId(
+  context: Record<string, unknown>,
+  key: string,
+  value: unknown,
+) {
+  if (typeof value !== "string" || !value) return null;
+  const exists = contextList(context, key).some((item) => item.id === value);
+  return exists ? value : null;
+}
+
+function normalizedDraft(
+  raw: Record<string, unknown>,
+  context: Record<string, unknown>,
+  today: string,
+) {
+  const warnings = Array.isArray(raw.warnings)
+    ? raw.warnings
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 5)
+    : [];
+
+  const type =
+    raw.type === "income" || raw.type === "expense" ? raw.type : null;
+
+  const numericAmount =
+    typeof raw.amount === "number"
+      ? raw.amount
+      : typeof raw.amount === "string"
+        ? Number(raw.amount.replace(",", "."))
+        : NaN;
+  const amount =
+    Number.isFinite(numericAmount) && numericAmount > 0 ? numericAmount : null;
+
+  const description =
+    typeof raw.description === "string"
+      ? raw.description.trim().slice(0, 180)
+      : "";
+
+  const dueDate =
+    typeof raw.due_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.due_date)
+      ? raw.due_date
+      : today;
+
+  const status =
+    raw.status === "paid" || raw.status === "pending" ? raw.status : "pending";
+
+  let categoryId = validContextId(context, "categories", raw.category_id);
+  if (categoryId && type) {
+    const category = contextList(context, "categories").find(
+      (item) => item.id === categoryId,
+    );
+    if (category?.type !== type && category?.type !== "both") {
+      categoryId = null;
+      warnings.push("A categoria sugerida não era compatível com o tipo do lançamento.");
+    }
+  }
+
+  let partnerId = validContextId(context, "partners", raw.partner_id);
+  if (partnerId && type) {
+    const partner = contextList(context, "partners").find(
+      (item) => item.id === partnerId,
+    );
+    const compatible =
+      partner?.kind === "both" ||
+      (type === "income" && partner?.kind === "customer") ||
+      (type === "expense" && partner?.kind === "supplier");
+
+    if (!compatible) {
+      partnerId = null;
+      warnings.push("O cliente/fornecedor sugerido não era compatível com o tipo do lançamento.");
+    }
+  }
+
+  const validTagIds = new Set(
+    contextList(context, "tags")
+      .map((item) => item.id)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  const tagIds = Array.isArray(raw.tag_ids)
+    ? Array.from(
+        new Set(
+          raw.tag_ids.filter(
+            (item): item is string =>
+              typeof item === "string" && validTagIds.has(item),
+          ),
+        ),
+      ).slice(0, 8)
+    : [];
+
+  const confidence =
+    raw.confidence === "high" ||
+      raw.confidence === "medium" ||
+      raw.confidence === "low"
+      ? raw.confidence
+      : "medium";
+
+  const summary =
+    typeof raw.summary === "string" ? raw.summary.trim().slice(0, 280) : "";
+
+  if (!type) warnings.push("Revise se o lançamento é uma receita ou despesa.");
+  if (!amount) warnings.push("Informe o valor antes de criar o lançamento.");
+  if (!description) warnings.push("Informe uma descrição antes de criar o lançamento.");
+
+  return {
+    type,
+    description,
+    amount,
+    due_date: dueDate,
+    status,
+    account_id: validContextId(context, "accounts", raw.account_id),
+    category_id: categoryId,
+    cost_center_id: validContextId(context, "cost_centers", raw.cost_center_id),
+    partner_id: partnerId,
+    tag_ids: tagIds,
+    confidence,
+    summary,
+    warnings: Array.from(new Set(warnings)).slice(0, 5),
+  };
 }
 
 Deno.serve(async (request) => {
@@ -77,18 +244,35 @@ Deno.serve(async (request) => {
 
   const companyId =
     typeof payload.companyId === "string" ? payload.companyId.trim() : "";
-  const messages = sanitizeMessages(payload.messages);
+  const mode =
+    payload.mode === "transaction_draft" ? "transaction_draft" : "chat";
 
   if (!companyId) {
     return jsonResponse({ error: "companyId is required" }, 400);
   }
 
-  if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
+  const messages = sanitizeMessages(payload.messages);
+  const draftText = sanitizeDraftText(payload.text);
+  const today = sanitizeToday(payload.today) || new Date().toISOString().slice(0, 10);
+
+  if (
+    mode === "chat" &&
+    (messages.length === 0 || messages[messages.length - 1].role !== "user")
+  ) {
     return jsonResponse({ error: "A user message is required" }, 400);
   }
 
+  if (mode === "transaction_draft" && !draftText) {
+    return jsonResponse({ error: "text is required" }, 400);
+  }
+
+  const contextRpc =
+    mode === "transaction_draft"
+      ? "get_ai_transaction_context"
+      : "get_ai_financial_context";
+
   const contextResponse = await fetch(
-    `${supabaseUrl}/rest/v1/rpc/get_ai_financial_context`,
+    `${supabaseUrl}/rest/v1/rpc/${contextRpc}`,
     {
       method: "POST",
       headers: {
@@ -110,43 +294,88 @@ Deno.serve(async (request) => {
 
     return jsonResponse({
       error: status === 403
-        ? "Você não tem acesso aos dados desta empresa."
+        ? "Você não tem permissão para usar este recurso nesta empresa."
         : "Não foi possível preparar o contexto financeiro.",
       detail: detail.slice(0, 800),
     }, status);
   }
 
-  const financialContext = await contextResponse.json();
+  const financialContext = await contextResponse.json() as Record<string, unknown>;
 
-  const systemInstruction = [
-    "Você é o Valora IA, assistente de gestão financeira empresarial do aplicativo Valora.",
-    "Responda sempre em português do Brasil, de forma clara, objetiva e útil para um gestor.",
-    "Use SOMENTE o contexto financeiro fornecido abaixo para afirmar números específicos da empresa.",
-    "Nunca invente valores, datas, clientes, despesas, saldos ou tendências.",
-    "Diferencie explicitamente valores realizados, pendentes, vencidos e projetados quando isso for relevante.",
-    "Se a pergunta exigir dados que não estão no contexto, diga que o Valora ainda não possui dados suficientes para concluir.",
-    "Você está em modo somente consulta. Pode sugerir próximos passos, mas nunca diga que criou, pagou, alterou ou excluiu registros.",
-    "Não apresente a resposta como contabilidade oficial, parecer jurídico, fiscal ou tributário.",
-    "Formate valores em reais (R$) e datas no padrão brasileiro quando possível.",
-    "Prefira respostas curtas, com diagnóstico e próximos passos. Use listas apenas quando ajudarem.",
-    "",
-    "CONTEXTO FINANCEIRO ATUAL DA EMPRESA:",
-    JSON.stringify(financialContext),
-  ].join("\n");
+  const systemInstruction =
+    mode === "transaction_draft"
+      ? [
+          "Você é o Valora IA em modo de preparação de lançamento financeiro.",
+          "Interprete o texto do usuário em português do Brasil e devolva SOMENTE um objeto JSON válido, sem markdown.",
+          "Você nunca cria o lançamento. Apenas prepara um rascunho para revisão humana.",
+          `A data local informada pelo aplicativo é ${today}.`,
+          "Use somente IDs que existam no CONTEXTO DA EMPRESA. Quando não houver correspondência segura, use null ou [] em vez de inventar.",
+          "Use o histórico recente apenas para reconhecer padrões reais da empresa, como categoria, conta, fornecedor/cliente, centro de custo e tags usados em descrições parecidas.",
+          "Para frases no passado concluído como 'paguei', 'comprei', 'recebi' ou 'vendi', normalmente use status 'paid'. Para obrigações futuras ou ainda não quitadas, use 'pending'.",
+          "Se a data não for citada e a ação já ocorreu, use a data local de hoje.",
+          "A descrição deve ser curta, profissional e sem repetir valor ou data.",
+          "Uma categoria deve aceitar o tipo do lançamento: income, expense ou both.",
+          "Para income, parceiro deve ser customer ou both. Para expense, parceiro deve ser supplier ou both.",
+          "Não invente parcelamentos, recorrências nem registros que não estejam no pedido.",
+          "Campos obrigatórios para o usuário revisar: type, description, amount, due_date e status.",
+          "Formato JSON obrigatório:",
+          JSON.stringify({
+            type: "expense | income | null",
+            description: "string",
+            amount: "number | null",
+            due_date: "YYYY-MM-DD",
+            status: "paid | pending",
+            account_id: "uuid | null",
+            category_id: "uuid | null",
+            cost_center_id: "uuid | null",
+            partner_id: "uuid | null",
+            tag_ids: ["uuid"],
+            confidence: "high | medium | low",
+            summary: "frase curta explicando o rascunho",
+            warnings: ["aviso curto se houver ambiguidade"],
+          }),
+          "",
+          "CONTEXTO DA EMPRESA:",
+          JSON.stringify(financialContext),
+        ].join("\n")
+      : [
+          "Você é o Valora IA, assistente de gestão financeira empresarial do aplicativo Valora.",
+          "Responda sempre em português do Brasil, de forma clara, objetiva e útil para um gestor.",
+          "Use SOMENTE o contexto financeiro fornecido abaixo para afirmar números específicos da empresa.",
+          "Nunca invente valores, datas, clientes, despesas, saldos ou tendências.",
+          "Diferencie explicitamente valores realizados, pendentes, vencidos e projetados quando isso for relevante.",
+          "Se a pergunta exigir dados que não estão no contexto, diga que o Valora ainda não possui dados suficientes para concluir.",
+          "Você está em modo somente consulta. Pode sugerir próximos passos, mas nunca diga que criou, pagou, alterou ou excluiu registros.",
+          "Não apresente a resposta como contabilidade oficial, parecer jurídico, fiscal ou tributário.",
+          "Formate valores em reais (R$) e datas no padrão brasileiro quando possível.",
+          "Prefira respostas curtas, com diagnóstico e próximos passos. Use listas apenas quando ajudarem.",
+          "",
+          "CONTEXTO FINANCEIRO ATUAL DA EMPRESA:",
+          JSON.stringify(financialContext),
+        ].join("\n");
 
-  const contents = messages.map((message) => ({
-    role: message.role === "assistant" ? "model" : "user",
-    parts: [{ text: message.content }],
-  }));
+  const contents =
+    mode === "transaction_draft"
+      ? [{ role: "user", parts: [{ text: draftText }] }]
+      : messages.map((message) => ({
+          role: message.role === "assistant" ? "model" : "user",
+          parts: [{ text: message.content }],
+        }));
+
+  const generationConfig: Record<string, unknown> = {
+    maxOutputTokens: mode === "transaction_draft" ? 1000 : 1400,
+  };
+
+  if (mode === "transaction_draft") {
+    generationConfig.responseMimeType = "application/json";
+  }
 
   const requestBody = JSON.stringify({
     system_instruction: {
       parts: [{ text: systemInstruction }],
     },
     contents,
-    generationConfig: {
-      maxOutputTokens: 1400,
-    },
+    generationConfig,
   });
 
   const sleep = (ms: number) =>
@@ -251,6 +480,7 @@ Deno.serve(async (request) => {
       status: geminiResponse.status,
       model: usedModel,
       message: providerDetail,
+      mode,
     });
 
     let publicMessage =
@@ -260,7 +490,7 @@ Deno.serve(async (request) => {
 
     if (geminiResponse.status === 400) {
       publicMessage =
-        "A solicitação não pôde ser processada pela IA. Tente reformular a pergunta.";
+        "A solicitação não pôde ser processada pela IA. Tente reformular o texto.";
       code = "AI_BAD_REQUEST";
     } else if (geminiResponse.status === 401 || geminiResponse.status === 403) {
       publicMessage =
@@ -307,9 +537,34 @@ Deno.serve(async (request) => {
 
   if (!answer) {
     return jsonResponse({
-      error: "A IA não retornou texto para esta pergunta. Tente reformular.",
+      error: mode === "transaction_draft"
+        ? "A IA não conseguiu montar um rascunho. Tente descrever o lançamento com mais detalhes."
+        : "A IA não retornou texto para esta pergunta. Tente reformular.",
       code: "AI_EMPTY_RESPONSE",
     }, 502);
+  }
+
+  if (mode === "transaction_draft") {
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = extractJsonObject(answer);
+    } catch {
+      console.error("Valora AI invalid draft JSON", {
+        model: usedModel,
+        answer: answer.slice(0, 1200),
+      });
+      return jsonResponse({
+        error: "A IA retornou um rascunho inválido. Tente novamente.",
+        code: "AI_INVALID_DRAFT",
+      }, 502);
+    }
+
+    return jsonResponse({
+      draft: normalizedDraft(parsed, financialContext, today),
+      model: usedModel,
+      fallbackUsed: usedModel !== geminiModel,
+      generatedAt: new Date().toISOString(),
+    });
   }
 
   return jsonResponse({
