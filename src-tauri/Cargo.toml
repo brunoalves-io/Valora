@@ -1,6 +1,6 @@
 [package]
 name = "valora"
-version = "1.0.20"
+version = "1.0.21"
 description = "Valora desktop application"
 authors = ["Valora"]
 edition = "2021"
@@ -17,4 +17,6 @@ tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-updater = "2"
+tauri-plugin-dialog = "2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 url = "2"
