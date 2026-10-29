@@ -8574,3 +8574,178 @@ tr:last-child td { border-bottom: 0; }
     width: 100%;
   }
 }
+
+
+/* Valora v1.0.30 - reconciliation legibility pass */
+.reconciliation-section-heading strong {
+  font-size: 11.5px;
+}
+
+.reconciliation-section-heading span {
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.reconciliation-account-select select {
+  font-size: 11px;
+}
+
+.reconciliation-link-state strong {
+  font-size: 10px;
+}
+
+.reconciliation-link-state small {
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.reconciliation-source-tabs strong {
+  font-size: 10.5px;
+}
+
+.reconciliation-source-tabs small {
+  font-size: 9px;
+}
+
+.reconciliation-source-or {
+  font-size: 8.5px;
+}
+
+.reconciliation-source-detail strong {
+  font-size: 10px;
+}
+
+.reconciliation-source-detail small {
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.reconciliation-source-detail .primary {
+  font-size: 9.5px;
+}
+
+.reconciliation-premium-summary article span:not(.summary-icon) {
+  font-size: 9px;
+}
+
+.reconciliation-premium-summary article strong {
+  font-size: 22px;
+}
+
+.reconciliation-premium-summary article small {
+  font-size: 9px;
+}
+
+.reconciliation-search input {
+  font-size: 10px;
+}
+
+.reconciliation-type-filters button,
+.reconciliation-advanced-filters button {
+  font-size: 9.5px;
+}
+
+.reconciliation-period-filter {
+  font-size: 9.5px;
+}
+
+.reconciliation-more-filters {
+  font-size: 9.5px;
+}
+
+.reconciliation-advanced-filters > span {
+  font-size: 9px;
+}
+
+.reconciliation-advanced-filters button {
+  font-size: 9px;
+}
+
+.reconciliation-table-heading h2 {
+  font-size: 13.5px;
+}
+
+.reconciliation-table-heading p {
+  font-size: 9.5px;
+}
+
+.reconciliation-source-badge {
+  font-size: 9px;
+}
+
+.reconciliation-premium-table th {
+  padding-block: 11px;
+  font-size: 9.5px;
+}
+
+.reconciliation-premium-table td {
+  padding-block: 12px;
+  font-size: 10px;
+}
+
+.reconciliation-date-cell strong {
+  font-size: 10px;
+}
+
+.reconciliation-date-cell small {
+  font-size: 8.5px;
+}
+
+.reconciliation-description-cell strong {
+  font-size: 10.5px;
+}
+
+.reconciliation-description-cell small {
+  font-size: 8.5px;
+}
+
+.reconciliation-premium-table .amount {
+  font-size: 10.5px;
+}
+
+.reconciliation-premium-status {
+  min-height: 27px;
+  font-size: 9px;
+}
+
+.reconciliation-match-cell.premium select {
+  min-height: 36px;
+  font-size: 9.5px;
+}
+
+.reconciliation-match-cell.premium small {
+  font-size: 8.5px;
+  line-height: 1.45;
+}
+
+.reconciliation-done-action strong {
+  font-size: 9.5px;
+}
+
+.reconciliation-done-action small {
+  font-size: 8.5px;
+}
+
+.reconciliation-filter-empty strong {
+  font-size: 11px;
+}
+
+.reconciliation-filter-empty span {
+  font-size: 9px;
+}
+
+.reconciliation-actions.premium > span {
+  font-size: 9.5px;
+}
+
+.reconciliation-actions.premium .primary {
+  font-size: 9.5px;
+}
+
+.reconciliation-premium-empty strong {
+  font-size: 12px;
+}
+
+.reconciliation-premium-empty p {
+  font-size: 9.5px;
+}
