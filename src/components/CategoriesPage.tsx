@@ -86,7 +86,7 @@ export function CategoriesPage() {
 
     const { data, error: queryError } = await supabase
       .from("categories")
-      .select("id, name, type, active, parent_id, dre_group")
+      .select("*")
       .eq("company_id", activeCompany.id)
       .order("name");
 
@@ -173,8 +173,14 @@ export function CategoriesPage() {
     const { error: mutationError } = await mutation;
 
     if (mutationError) {
+      const missingDreField =
+        mutationError.message.toLowerCase().includes("dre_group");
       setError(
-        editingId ? "Não foi possível atualizar esta categoria." : mutationError.message,
+        missingDreField
+          ? "Aplique a migration 20261029_014_professional_dre.sql no Supabase antes de salvar a classificação DRE."
+          : editingId
+            ? "Não foi possível atualizar esta categoria."
+            : mutationError.message,
       );
       setSaving(false);
       return;
