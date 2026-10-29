@@ -62,7 +62,15 @@ export function ConfirmDialog({
         aria-describedby="confirm-dialog-description"
       >
         <div className="confirm-dialog-content">
+          <div className="confirm-dialog-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 8.25v4.5" />
+              <path d="M12 16.25h.01" />
+              <path d="M10.3 3.84 2.82 17a2 2 0 0 0 1.74 3h14.88a2 2 0 0 0 1.74-3L13.7 3.84a2 2 0 0 0-3.4 0Z" />
+            </svg>
+          </div>
           <div className="confirm-dialog-copy">
+            <span className="confirm-dialog-eyebrow">ATENÇÃO</span>
             <h2 id="confirm-dialog-title">{title}</h2>
             <p id="confirm-dialog-description">{description}</p>
           </div>
@@ -70,7 +78,12 @@ export function ConfirmDialog({
 
         {warning && (
           <div className="confirm-dialog-warning">
-            <span aria-hidden="true">!</span>
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 8v4" />
+                <path d="M12 16h.01" />
+              </svg>
+            </span>
             <p>{warning}</p>
           </div>
         )}
