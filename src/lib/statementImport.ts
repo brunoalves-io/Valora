@@ -12,7 +12,7 @@ export type StatementImportRow = {
 };
 
 export type StatementParseResult = {
-  format: "CSV" | "Excel" | "OFX";
+  format: "CSV" | "Excel" | "OFX" | "Open Finance";
   rows: StatementImportRow[];
   skipped: number;
 };
