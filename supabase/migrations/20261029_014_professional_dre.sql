@@ -12,12 +12,6 @@ end
 where dre_group is null;
 
 alter table public.categories
-  alter column dre_group set default 'operating_expense';
-
-alter table public.categories
-  alter column dre_group set not null;
-
-alter table public.categories
   drop constraint if exists categories_dre_group_check;
 
 alter table public.categories
