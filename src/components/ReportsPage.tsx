@@ -4,7 +4,15 @@ import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 
 type ReportBasis = "realized" | "scheduled";
+type ReportView = "cashflow" | "dre";
 type TransactionType = "income" | "expense";
+type DreGroup =
+  | "revenue"
+  | "other_income"
+  | "cost"
+  | "operating_expense"
+  | "tax"
+  | "other_expense";
 
 type Transaction = {
   id: string;
@@ -21,6 +29,23 @@ type Transaction = {
 };
 
 type NamedItem = { id: string; name: string };
+type Category = NamedItem & { dre_group: DreGroup | null };
+
+type DreSummary = {
+  revenue: number;
+  taxes: number;
+  netRevenue: number;
+  costs: number;
+  grossProfit: number;
+  operatingExpenses: number;
+  operatingResult: number;
+  otherIncome: number;
+  otherExpenses: number;
+  netResult: number;
+  grossMargin: number;
+  operatingMargin: number;
+  netMargin: number;
+};
 
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -39,11 +64,18 @@ function firstDayOfCurrentMonth() {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  return localIso(now);
 }
 
 function startOfYear() {
   return `${new Date().getFullYear()}-01-01`;
+}
+
+function localIso(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
 }
 
 function dateForTransaction(item: Transaction, basis: ReportBasis) {
@@ -57,10 +89,13 @@ function monthKey(date: string) {
 
 function monthLabel(key: string) {
   const [year, month] = key.split("-").map(Number);
-  return new Date(year, month - 1, 1).toLocaleDateString("pt-BR", {
-    month: "short",
-    year: "2-digit",
-  }).replace(".", "");
+  return new Date(year, month - 1, 1)
+    .toLocaleDateString("pt-BR", { month: "short", year: "2-digit" })
+    .replace(".", "");
+}
+
+function formatDate(value: string) {
+  return new Date(value + "T12:00:00").toLocaleDateString("pt-BR");
 }
 
 function csvCell(value: string | number) {
@@ -68,13 +103,97 @@ function csvCell(value: string | number) {
   return '"' + text.replace(/"/g, '""') + '"';
 }
 
+function previousPeriod(startDate: string, endDate: string) {
+  const start = new Date(startDate + "T12:00:00");
+  const end = new Date(endDate + "T12:00:00");
+  const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+
+  const previousEnd = new Date(start);
+  previousEnd.setDate(previousEnd.getDate() - 1);
+  const previousStart = new Date(previousEnd);
+  previousStart.setDate(previousStart.getDate() - days + 1);
+
+  return {
+    start: localIso(previousStart),
+    end: localIso(previousEnd),
+  };
+}
+
+function variation(current: number, previous: number) {
+  if (Math.abs(previous) < 0.009) return null;
+  return (current - previous) / Math.abs(previous);
+}
+
+function variationText(current: number, previous: number) {
+  const value = variation(current, previous);
+  if (value === null) return "—";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${percent.format(value)}`;
+}
+
+function defaultDreGroup(type: TransactionType): DreGroup {
+  return type === "income" ? "revenue" : "operating_expense";
+}
+
+function calculateDre(
+  items: Transaction[],
+  categoryMap: Map<string, Category>,
+): DreSummary {
+  let revenue = 0;
+  let taxes = 0;
+  let costs = 0;
+  let operatingExpenses = 0;
+  let otherIncome = 0;
+  let otherExpenses = 0;
+
+  for (const item of items) {
+    const amount = Number(item.amount);
+    const group =
+      (item.category_id ? categoryMap.get(item.category_id)?.dre_group : null) ??
+      defaultDreGroup(item.type);
+
+    if (item.type === "income") {
+      if (group === "other_income") otherIncome += amount;
+      else revenue += amount;
+      continue;
+    }
+
+    if (group === "tax") taxes += amount;
+    else if (group === "cost") costs += amount;
+    else if (group === "other_expense") otherExpenses += amount;
+    else operatingExpenses += amount;
+  }
+
+  const netRevenue = revenue - taxes;
+  const grossProfit = netRevenue - costs;
+  const operatingResult = grossProfit - operatingExpenses;
+  const netResult = operatingResult + otherIncome - otherExpenses;
+
+  return {
+    revenue,
+    taxes,
+    netRevenue,
+    costs,
+    grossProfit,
+    operatingExpenses,
+    operatingResult,
+    otherIncome,
+    otherExpenses,
+    netResult,
+    grossMargin: netRevenue > 0 ? grossProfit / netRevenue : 0,
+    operatingMargin: netRevenue > 0 ? operatingResult / netRevenue : 0,
+    netMargin: revenue > 0 ? netResult / revenue : 0,
+  };
+}
+
 export function ReportsPage() {
   const { activeCompany } = useCompany();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<NamedItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [costCenters, setCostCenters] = useState<NamedItem[]>([]);
   const [accounts, setAccounts] = useState<NamedItem[]>([]);
   const [partners, setPartners] = useState<NamedItem[]>([]);
+  const [view, setView] = useState<ReportView>("cashflow");
   const [basis, setBasis] = useState<ReportBasis>("realized");
   const [startDate, setStartDate] = useState(firstDayOfCurrentMonth());
   const [endDate, setEndDate] = useState(todayIso());
@@ -103,7 +222,7 @@ export function ReportsPage() {
           .order("due_date", { ascending: true }),
         supabase
           .from("categories")
-          .select("id, name")
+          .select("*")
           .eq("company_id", activeCompany.id)
           .order("name"),
         supabase
@@ -134,7 +253,7 @@ export function ReportsPage() {
       setError(firstError.message);
     } else {
       setTransactions((txResult.data ?? []) as Transaction[]);
-      setCategories((categoryResult.data ?? []) as NamedItem[]);
+      setCategories((categoryResult.data ?? []) as Category[]);
       setCostCenters((costCenterResult.data ?? []) as NamedItem[]);
       setAccounts((accountResult.data ?? []) as NamedItem[]);
       setPartners((partnerResult.data ?? []) as NamedItem[]);
@@ -147,6 +266,10 @@ export function ReportsPage() {
     void load();
   }, [activeCompany?.id]);
 
+  const categoryMap = useMemo(
+    () => new Map(categories.map((item) => [item.id, item])),
+    [categories],
+  );
   const categoryNames = useMemo(
     () => new Map(categories.map((item) => [item.id, item.name])),
     [categories],
@@ -164,30 +287,81 @@ export function ReportsPage() {
     [partners],
   );
 
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((item) => {
-      if (basis === "realized" && item.status !== "paid") return false;
+  const period = useMemo(
+    () => previousPeriod(startDate, endDate),
+    [startDate, endDate],
+  );
 
-      const referenceDate = dateForTransaction(item, basis);
-      if (!referenceDate) return false;
-      if (referenceDate < startDate || referenceDate > endDate) return false;
-      if (typeFilter !== "all" && item.type !== typeFilter) return false;
-      if (categoryFilter && item.category_id !== categoryFilter) return false;
-      if (costCenterFilter && item.cost_center_id !== costCenterFilter) return false;
-      if (accountFilter && item.account_id !== accountFilter) return false;
+  const dreSchemaReady =
+    categories.length === 0 || categories.every((item) => Boolean(item.dre_group));
 
-      return true;
-    });
-  }, [
-    transactions,
-    basis,
-    startDate,
-    endDate,
-    typeFilter,
-    categoryFilter,
-    costCenterFilter,
-    accountFilter,
-  ]);
+  function matchesSharedFilters(
+    item: Transaction,
+    periodStart: string,
+    periodEnd: string,
+    includeType: boolean,
+  ) {
+    if (basis === "realized" && item.status !== "paid") return false;
+
+    const referenceDate = dateForTransaction(item, basis);
+    if (!referenceDate) return false;
+    if (referenceDate < periodStart || referenceDate > periodEnd) return false;
+    if (includeType && typeFilter !== "all" && item.type !== typeFilter) return false;
+    if (categoryFilter && item.category_id !== categoryFilter) return false;
+    if (costCenterFilter && item.cost_center_id !== costCenterFilter) return false;
+    if (accountFilter && item.account_id !== accountFilter) return false;
+
+    return true;
+  }
+
+  const filteredTransactions = useMemo(
+    () =>
+      transactions.filter((item) =>
+        matchesSharedFilters(item, startDate, endDate, true),
+      ),
+    [
+      transactions,
+      basis,
+      startDate,
+      endDate,
+      typeFilter,
+      categoryFilter,
+      costCenterFilter,
+      accountFilter,
+    ],
+  );
+
+  const dreTransactions = useMemo(
+    () =>
+      transactions.filter((item) =>
+        matchesSharedFilters(item, startDate, endDate, false),
+      ),
+    [
+      transactions,
+      basis,
+      startDate,
+      endDate,
+      categoryFilter,
+      costCenterFilter,
+      accountFilter,
+    ],
+  );
+
+  const previousDreTransactions = useMemo(
+    () =>
+      transactions.filter((item) =>
+        matchesSharedFilters(item, period.start, period.end, false),
+      ),
+    [
+      transactions,
+      basis,
+      period.start,
+      period.end,
+      categoryFilter,
+      costCenterFilter,
+      accountFilter,
+    ],
+  );
 
   const summary = useMemo(() => {
     const income = filteredTransactions
@@ -199,13 +373,12 @@ export function ReportsPage() {
       .reduce((sum, item) => sum + Number(item.amount), 0);
 
     const result = income - expense;
-    const margin = income > 0 ? result / income : 0;
 
     return {
       income,
       expense,
       result,
-      margin,
+      margin: income > 0 ? result / income : 0,
       count: filteredTransactions.length,
     };
   }, [filteredTransactions]);
@@ -285,9 +458,74 @@ export function ReportsPage() {
       .sort((a, b) => Math.abs(b.result) - Math.abs(a.result));
   }, [filteredTransactions, costCenterNames]);
 
-  const expenseCategories = categoryBreakdown
-    .filter((item) => item.expense > 0)
-    .sort((a, b) => b.expense - a.expense);
+  const dre = useMemo(
+    () => calculateDre(dreTransactions, categoryMap),
+    [dreTransactions, categoryMap],
+  );
+
+  const previousDre = useMemo(
+    () => calculateDre(previousDreTransactions, categoryMap),
+    [previousDreTransactions, categoryMap],
+  );
+
+  const dreRows = useMemo(
+    () => [
+      { key: "revenue", label: "(+) Receita bruta", current: dre.revenue, previous: previousDre.revenue, kind: "line" },
+      { key: "taxes", label: "(−) Impostos e deduções", current: dre.taxes, previous: previousDre.taxes, kind: "line" },
+      { key: "netRevenue", label: "Receita líquida", current: dre.netRevenue, previous: previousDre.netRevenue, kind: "subtotal" },
+      { key: "costs", label: "(−) Custos diretos", current: dre.costs, previous: previousDre.costs, kind: "line" },
+      { key: "grossProfit", label: "Lucro bruto", current: dre.grossProfit, previous: previousDre.grossProfit, kind: "subtotal" },
+      { key: "operatingExpenses", label: "(−) Despesas operacionais", current: dre.operatingExpenses, previous: previousDre.operatingExpenses, kind: "line" },
+      { key: "operatingResult", label: "Resultado operacional", current: dre.operatingResult, previous: previousDre.operatingResult, kind: "subtotal" },
+      { key: "otherIncome", label: "(+) Outras receitas", current: dre.otherIncome, previous: previousDre.otherIncome, kind: "line" },
+      { key: "otherExpenses", label: "(−) Outras despesas", current: dre.otherExpenses, previous: previousDre.otherExpenses, kind: "line" },
+      { key: "netResult", label: "Resultado líquido", current: dre.netResult, previous: previousDre.netResult, kind: "total" },
+    ],
+    [dre, previousDre],
+  );
+
+  const topExpense = useMemo(() => {
+    const map = new Map<string, number>();
+
+    for (const item of dreTransactions) {
+      if (item.type !== "expense") continue;
+      const key = item.category_id ?? "__uncategorized__";
+      map.set(key, (map.get(key) ?? 0) + Number(item.amount));
+    }
+
+    const sorted = Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+    if (!sorted.length) return null;
+
+    const [id, amount] = sorted[0];
+    return {
+      name:
+        id === "__uncategorized__"
+          ? "Sem categoria"
+          : categoryNames.get(id) ?? "Categoria removida",
+      amount,
+    };
+  }, [dreTransactions, categoryNames]);
+
+  const monthlyDre = useMemo(() => {
+    const map = new Map<string, Transaction[]>();
+
+    for (const item of dreTransactions) {
+      const referenceDate = dateForTransaction(item, basis);
+      if (!referenceDate) continue;
+      const key = monthKey(referenceDate);
+      const current = map.get(key) ?? [];
+      current.push(item);
+      map.set(key, current);
+    }
+
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, items]) => ({
+        key,
+        label: monthLabel(key),
+        ...calculateDre(items, categoryMap),
+      }));
+  }, [dreTransactions, basis, categoryMap]);
 
   function applyPreset(preset: "month" | "90days" | "year") {
     const now = new Date();
@@ -306,11 +544,36 @@ export function ReportsPage() {
 
     const start = new Date(now);
     start.setDate(start.getDate() - 89);
-    setStartDate(start.toISOString().slice(0, 10));
+    setStartDate(localIso(start));
     setEndDate(todayIso());
   }
 
   function exportCsv() {
+    if (view === "dre") {
+      const header = ["Linha", "Período atual", "Período anterior", "Variação"];
+      const rows = dreRows.map((row) => [
+        row.label,
+        row.current.toFixed(2).replace(".", ","),
+        row.previous.toFixed(2).replace(".", ","),
+        variationText(row.current, row.previous),
+      ]);
+
+      const csv = [header, ...rows]
+        .map((row) => row.map((cell) => csvCell(cell)).join(";"))
+        .join("\r\n");
+
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `valora-dre-${startDate}-a-${endDate}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
     const header = [
       "Data",
       "Descrição",
@@ -346,7 +609,7 @@ export function ReportsPage() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `valora-relatorio-${startDate}-a-${endDate}.csv`;
+    anchor.download = `valora-fluxo-${startDate}-a-${endDate}.csv`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -359,16 +622,40 @@ export function ReportsPage() {
         <div>
           <p className="eyebrow">ANÁLISE</p>
           <h1>Relatórios</h1>
-          <p>Fluxo de caixa, DRE gerencial e composição dos resultados em um só lugar.</p>
+          <p>Fluxo de caixa e DRE gerencial com leitura comparativa do negócio.</p>
         </div>
         <button
           className="ghost"
           onClick={exportCsv}
-          disabled={filteredTransactions.length === 0}
+          disabled={
+            view === "dre"
+              ? dreTransactions.length === 0
+              : filteredTransactions.length === 0
+          }
         >
           Exportar CSV
         </button>
       </header>
+
+      <div className="report-mode-tabs" role="tablist" aria-label="Tipo de relatório">
+        <button
+          type="button"
+          className={view === "cashflow" ? "active" : ""}
+          onClick={() => setView("cashflow")}
+        >
+          Fluxo de caixa
+        </button>
+        <button
+          type="button"
+          className={view === "dre" ? "active" : ""}
+          onClick={() => {
+            setView("dre");
+            setTypeFilter("all");
+          }}
+        >
+          DRE
+        </button>
+      </div>
 
       <section className="panel report-filters">
         <div className="report-basis">
@@ -410,19 +697,21 @@ export function ReportsPage() {
           />
         </label>
 
-        <label>
-          Tipo
-          <select
-            value={typeFilter}
-            onChange={(event) =>
-              setTypeFilter(event.target.value as "all" | TransactionType)
-            }
-          >
-            <option value="all">Receitas e despesas</option>
-            <option value="income">Somente receitas</option>
-            <option value="expense">Somente despesas</option>
-          </select>
-        </label>
+        {view === "cashflow" && (
+          <label>
+            Tipo
+            <select
+              value={typeFilter}
+              onChange={(event) =>
+                setTypeFilter(event.target.value as "all" | TransactionType)
+              }
+            >
+              <option value="all">Receitas e despesas</option>
+              <option value="income">Somente receitas</option>
+              <option value="expense">Somente despesas</option>
+            </select>
+          </label>
+        )}
 
         <label>
           Categoria
@@ -480,7 +769,7 @@ export function ReportsPage() {
 
       {loading ? (
         <section className="panel empty-state">Montando relatórios...</section>
-      ) : (
+      ) : view === "cashflow" ? (
         <>
           <section className="metrics report-metrics">
             <article className="metric-card">
@@ -556,54 +845,29 @@ export function ReportsPage() {
               )}
             </article>
 
-            <article className="panel dre-panel">
+            <article className="panel report-spend-panel">
               <div className="panel-title">
                 <div>
-                  <h2>DRE gerencial simplificada</h2>
-                  <p>
-                    {basis === "realized"
-                      ? "Visão por caixa, baseada em baixas realizadas"
-                      : "Visão prevista, baseada nos vencimentos"}
-                  </p>
+                  <h2>Maiores despesas</h2>
+                  <p>Categorias que mais consumiram caixa no período</p>
                 </div>
               </div>
-
-              <div className="dre-table">
-                <div className="dre-row strong">
-                  <span>(+) Receitas</span>
-                  <strong>{money.format(summary.income)}</strong>
-                </div>
-
-                {expenseCategories.slice(0, 8).map((category) => (
-                  <div className="dre-row sub" key={category.id}>
-                    <span>(−) {category.name}</span>
-                    <strong>{money.format(category.expense)}</strong>
-                  </div>
-                ))}
-
-                {summary.expense > 0 && expenseCategories.length === 0 && (
-                  <div className="dre-row sub">
-                    <span>(−) Despesas</span>
-                    <strong>{money.format(summary.expense)}</strong>
-                  </div>
+              <div className="report-ranking">
+                {categoryBreakdown
+                  .filter((item) => item.expense > 0)
+                  .sort((a, b) => b.expense - a.expense)
+                  .slice(0, 6)
+                  .map((item, index) => (
+                    <div className="report-ranking-row" key={item.id}>
+                      <span>{index + 1}</span>
+                      <strong>{item.name}</strong>
+                      <b>{money.format(item.expense)}</b>
+                    </div>
+                  ))}
+                {categoryBreakdown.every((item) => item.expense <= 0) && (
+                  <div className="empty-inline">Nenhuma despesa no período.</div>
                 )}
-
-                <div className="dre-row total">
-                  <span>(=) Resultado</span>
-                  <strong className={summary.result < 0 ? "negative-value" : "positive-value"}>
-                    {money.format(summary.result)}
-                  </strong>
-                </div>
-
-                <div className="dre-row">
-                  <span>Margem</span>
-                  <strong>{summary.income > 0 ? percent.format(summary.margin) : "—"}</strong>
-                </div>
               </div>
-
-              <p className="report-note">
-                Esta é uma visão gerencial. Não substitui a DRE contábil elaborada pelo contador.
-              </p>
             </article>
           </section>
 
@@ -612,7 +876,7 @@ export function ReportsPage() {
               <div className="panel-title report-panel-title">
                 <div>
                   <h2>Por categoria</h2>
-                  <p>Composição das receitas e despesas</p>
+                  <p>Composição de receitas e despesas</p>
                 </div>
               </div>
               <div className="table-scroll">
@@ -622,7 +886,7 @@ export function ReportsPage() {
                       <th>Categoria</th>
                       <th className="right">Receitas</th>
                       <th className="right">Despesas</th>
-                      <th className="right">Resultado</th>
+                      <th className="right">Total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -631,9 +895,7 @@ export function ReportsPage() {
                         <td><strong>{item.name}</strong></td>
                         <td className="right amount income">{money.format(item.income)}</td>
                         <td className="right amount expense">{money.format(item.expense)}</td>
-                        <td className={"right " + (item.income - item.expense < 0 ? "negative-value" : "positive-value")}>
-                          {money.format(item.income - item.expense)}
-                        </td>
+                        <td className="right">{money.format(item.total)}</td>
                       </tr>
                     ))}
                     {categoryBreakdown.length === 0 && (
@@ -689,7 +951,7 @@ export function ReportsPage() {
             <div className="panel-title report-panel-title">
               <div>
                 <h2>Detalhamento</h2>
-                <p>Lançamentos que compõem o relatório atual</p>
+                <p>Lançamentos que compõem o fluxo de caixa atual</p>
               </div>
               <span className="report-count">{filteredTransactions.length} registro(s)</span>
             </div>
@@ -712,11 +974,7 @@ export function ReportsPage() {
                     const referenceDate = dateForTransaction(item, basis);
                     return (
                       <tr key={item.id}>
-                        <td>
-                          {referenceDate
-                            ? new Date(referenceDate + "T12:00:00").toLocaleDateString("pt-BR")
-                            : "—"}
-                        </td>
+                        <td>{referenceDate ? formatDate(referenceDate) : "—"}</td>
                         <td>
                           <strong>{item.description}</strong>
                           {item.partner_id && (
@@ -742,6 +1000,179 @@ export function ReportsPage() {
                   {filteredTransactions.length === 0 && (
                     <tr>
                       <td colSpan={7} className="report-empty-cell">Nenhum lançamento corresponde aos filtros.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      ) : (
+        <>
+          {!dreSchemaReady && (
+            <div className="reconciliation-schema-warning">
+              <strong>Ativação da DRE profissional pendente</strong>
+              <span>
+                Aplique a migration <code>20261029_014_professional_dre.sql</code> no Supabase.
+                Enquanto isso, o Valora usa uma classificação padrão por tipo de lançamento.
+              </span>
+            </div>
+          )}
+
+          <div className="dre-period-note">
+            <strong>Comparação automática</strong>
+            <span>
+              Atual: {formatDate(startDate)} a {formatDate(endDate)} · anterior: {formatDate(period.start)} a {formatDate(period.end)}
+            </span>
+          </div>
+
+          <section className="metrics report-metrics dre-metrics">
+            <article className="metric-card">
+              <span>Receita líquida</span>
+              <strong>{money.format(dre.netRevenue)}</strong>
+              <small>{variationText(dre.netRevenue, previousDre.netRevenue)} vs. período anterior</small>
+            </article>
+            <article className="metric-card">
+              <span>Lucro bruto</span>
+              <strong className={dre.grossProfit < 0 ? "negative-value" : "positive-value"}>
+                {money.format(dre.grossProfit)}
+              </strong>
+              <small>Margem bruta {dre.netRevenue > 0 ? percent.format(dre.grossMargin) : "—"}</small>
+            </article>
+            <article className="metric-card">
+              <span>Resultado operacional</span>
+              <strong className={dre.operatingResult < 0 ? "negative-value" : "positive-value"}>
+                {money.format(dre.operatingResult)}
+              </strong>
+              <small>Margem operacional {dre.netRevenue > 0 ? percent.format(dre.operatingMargin) : "—"}</small>
+            </article>
+            <article className="metric-card">
+              <span>Resultado líquido</span>
+              <strong className={dre.netResult < 0 ? "negative-value" : "positive-value"}>
+                {money.format(dre.netResult)}
+              </strong>
+              <small>Margem líquida {dre.revenue > 0 ? percent.format(dre.netMargin) : "—"}</small>
+            </article>
+          </section>
+
+          <section className="report-grid dre-professional-grid">
+            <article className="panel dre-professional-panel">
+              <div className="panel-title">
+                <div>
+                  <h2>DRE gerencial</h2>
+                  <p>
+                    {basis === "realized"
+                      ? "Regime gerencial por caixa, usando lançamentos baixados"
+                      : "Visão prevista, usando datas de vencimento"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="dre-professional-table">
+                <div className="dre-professional-head">
+                  <span>Linha</span>
+                  <span>Atual</span>
+                  <span>Anterior</span>
+                  <span>Variação</span>
+                </div>
+                {dreRows.map((row) => (
+                  <div className={"dre-professional-row " + row.kind} key={row.key}>
+                    <span>{row.label}</span>
+                    <strong className={row.current < 0 ? "negative-value" : ""}>
+                      {money.format(row.current)}
+                    </strong>
+                    <span>{money.format(row.previous)}</span>
+                    <span className={
+                      variation(row.current, row.previous) !== null &&
+                      (variation(row.current, row.previous) ?? 0) < 0
+                        ? "negative-value"
+                        : "positive-value"
+                    }>
+                      {variationText(row.current, row.previous)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <p className="report-note">
+                A DRE usa o campo <strong>Grupo na DRE</strong> de cada categoria. Ajuste a classificação em Categorias quando necessário.
+              </p>
+            </article>
+
+            <article className="panel dre-insights-panel">
+              <div className="panel-title">
+                <div>
+                  <h2>Leitura do período</h2>
+                  <p>Indicadores para encontrar rapidamente onde o resultado está sendo formado</p>
+                </div>
+              </div>
+
+              <div className="dre-insight-list">
+                <div>
+                  <span>Margem bruta</span>
+                  <strong>{dre.netRevenue > 0 ? percent.format(dre.grossMargin) : "—"}</strong>
+                  <small>Lucro bruto ÷ receita líquida</small>
+                </div>
+                <div>
+                  <span>Margem operacional</span>
+                  <strong>{dre.netRevenue > 0 ? percent.format(dre.operatingMargin) : "—"}</strong>
+                  <small>Resultado operacional ÷ receita líquida</small>
+                </div>
+                <div>
+                  <span>Margem líquida</span>
+                  <strong>{dre.revenue > 0 ? percent.format(dre.netMargin) : "—"}</strong>
+                  <small>Resultado líquido ÷ receita bruta</small>
+                </div>
+                <div>
+                  <span>Maior gasto</span>
+                  <strong>{topExpense ? topExpense.name : "—"}</strong>
+                  <small>{topExpense ? money.format(topExpense.amount) : "Nenhuma despesa no período"}</small>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section className="panel table-panel dre-monthly-panel">
+            <div className="panel-title report-panel-title">
+              <div>
+                <h2>Evolução mensal da DRE</h2>
+                <p>Receita líquida, lucro bruto e resultado líquido mês a mês</p>
+              </div>
+            </div>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mês</th>
+                    <th className="right">Receita líquida</th>
+                    <th className="right">Lucro bruto</th>
+                    <th className="right">Resultado operacional</th>
+                    <th className="right">Resultado líquido</th>
+                    <th className="right">Margem líquida</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyDre.map((month) => (
+                    <tr key={month.key}>
+                      <td><strong>{month.label}</strong></td>
+                      <td className="right">{money.format(month.netRevenue)}</td>
+                      <td className={"right " + (month.grossProfit < 0 ? "negative-value" : "positive-value")}>
+                        {money.format(month.grossProfit)}
+                      </td>
+                      <td className={"right " + (month.operatingResult < 0 ? "negative-value" : "positive-value")}>
+                        {money.format(month.operatingResult)}
+                      </td>
+                      <td className={"right " + (month.netResult < 0 ? "negative-value" : "positive-value")}>
+                        {money.format(month.netResult)}
+                      </td>
+                      <td className="right">
+                        {month.revenue > 0 ? percent.format(month.netMargin) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  {monthlyDre.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="report-empty-cell">Sem dados no período.</td>
                     </tr>
                   )}
                 </tbody>
