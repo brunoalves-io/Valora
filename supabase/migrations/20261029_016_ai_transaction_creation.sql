@@ -293,8 +293,8 @@ begin
       and tag.id = any(p_tag_ids);
 
     if v_tag_count <> (
-      select count(distinct tag_id)
-      from unnest(p_tag_ids) as tag_id
+      select count(distinct selected_tag_id)
+      from unnest(p_tag_ids) as selected_tag_id
     ) then
       raise exception 'Invalid tag';
     end if;
@@ -339,8 +339,8 @@ begin
       v_transaction_id,
       selected.tag_id
     from (
-      select distinct tag_id
-      from unnest(p_tag_ids) as tag_id
+      select distinct selected_tag_id as tag_id
+      from unnest(p_tag_ids) as selected_tag_id
     ) selected;
   end if;
 
