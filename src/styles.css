@@ -8749,3 +8749,100 @@ tr:last-child td { border-bottom: 0; }
 .reconciliation-premium-empty p {
   font-size: 9.5px;
 }
+
+
+/* Valora v1.0.31 - professional reconciliation icon system and table alignment */
+.reconciliation-source-tabs .source-tab-icon svg,
+.source-detail-icon svg,
+.reconciliation-premium-summary .summary-icon svg,
+.reconciliation-row-icon svg,
+.reconciliation-link-state > span svg {
+  width: 19px;
+  height: 19px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.reconciliation-source-tabs .source-tab-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.source-detail-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.reconciliation-premium-summary .summary-icon svg {
+  width: 21px;
+  height: 21px;
+  stroke-width: 1.9;
+}
+
+.reconciliation-row-icon svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.85;
+}
+
+.reconciliation-link-state > span svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+}
+
+.reconciliation-row-icon {
+  background: #edf5ff;
+  color: #2685e4;
+}
+
+.reconciliation-premium-table {
+  table-layout: fixed;
+}
+
+.reconciliation-premium-table .center {
+  text-align: center;
+}
+
+.reconciliation-premium-table th:nth-child(3),
+.reconciliation-premium-table td:nth-child(3),
+.reconciliation-premium-table th:nth-child(5),
+.reconciliation-premium-table td:nth-child(5) {
+  text-align: center;
+}
+
+.reconciliation-premium-table th:nth-child(4),
+.reconciliation-premium-table td:nth-child(4) {
+  text-align: right;
+}
+
+.reconciliation-premium-table td:nth-child(3) .pill,
+.reconciliation-premium-table td:nth-child(5) .reconciliation-premium-status {
+  margin-inline: auto;
+}
+
+.reconciliation-premium-table th:nth-child(3) {
+  width: 96px;
+}
+
+.reconciliation-premium-table th:nth-child(4) {
+  width: 125px;
+}
+
+.reconciliation-premium-table th:nth-child(5) {
+  width: 118px;
+}
+
+.reconciliation-premium-table th:nth-child(6) {
+  width: 31%;
+}
+
+.reconciliation-premium-table td:nth-child(3),
+.reconciliation-premium-table td:nth-child(4),
+.reconciliation-premium-table td:nth-child(5) {
+  vertical-align: middle;
+}
