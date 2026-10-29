@@ -294,7 +294,7 @@ begin
 
     if v_tag_count <> (
       select count(distinct selected_tag_id)
-      from unnest(p_tag_ids) as selected_tag_id
+      from unnest(p_tag_ids) as tag_values(selected_tag_id)
     ) then
       raise exception 'Invalid tag';
     end if;
@@ -340,7 +340,7 @@ begin
       selected.tag_id
     from (
       select distinct selected_tag_id as tag_id
-      from unnest(p_tag_ids) as selected_tag_id
+      from unnest(p_tag_ids) as tag_values(selected_tag_id)
     ) selected;
   end if;
 
