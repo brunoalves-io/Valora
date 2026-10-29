@@ -29,7 +29,7 @@ type Transaction = {
 };
 
 type NamedItem = { id: string; name: string };
-type Category = NamedItem & { dre_group: DreGroup };
+type Category = NamedItem & { dre_group: DreGroup | null };
 
 type DreSummary = {
   revenue: number;
