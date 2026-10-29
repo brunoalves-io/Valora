@@ -1,6 +1,6 @@
 [package]
 name = "valora"
-version = "1.0.24"
+version = "1.0.25"
 description = "Valora desktop application"
 authors = ["Valora"]
 edition = "2021"
