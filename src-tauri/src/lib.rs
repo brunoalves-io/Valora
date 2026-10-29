@@ -5,6 +5,9 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_updater::UpdaterExt;
 use url::Url;
 
+#[cfg(target_os = "windows")]
+use std::process::Command;
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct UpdateCheckResult {
@@ -160,6 +163,33 @@ async fn save_attachment_file(
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    let parsed = Url::parse(&url)
+        .map_err(|_| "O endereço de autorização bancária é inválido.".to_string())?;
+
+    if parsed.scheme() != "https" {
+        return Err("A autorização bancária só pode abrir endereços HTTPS.".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("rundll32.exe")
+            .arg("url.dll,FileProtocolHandler")
+            .arg(parsed.as_str())
+            .spawn()
+            .map_err(|error| format!("Não foi possível abrir o navegador padrão: {error}"))?;
+
+        return Ok(());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = parsed;
+        Err("A abertura externa está disponível somente no aplicativo Windows.".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -168,7 +198,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             check_for_update,
             install_update,
-            save_attachment_file
+            save_attachment_file,
+            open_external_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running Valora");
