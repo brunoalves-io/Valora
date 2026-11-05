@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { CategorizationRulesDialog } from "./CategorizationRulesDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import {
@@ -6,6 +7,14 @@ import {
   type StatementImportRow,
   type StatementParseResult,
 } from "../lib/statementImport";
+import {
+  rulePatternFromDescription,
+  suggestCategory,
+  type CategoryOption,
+  type CategorizationRule,
+  type CategorizedHistoryItem,
+  type CategorySuggestion,
+} from "../lib/categorization";
 
 type Account = {
   id: string;
@@ -23,6 +32,7 @@ type Transaction = {
   due_date: string;
   paid_at: string | null;
   account_id: string | null;
+  category_id: string | null;
 };
 
 type Reconciliation = {
@@ -204,9 +214,19 @@ export function BankReconciliationPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
   const [linkedBankAccounts, setLinkedBankAccounts] = useState<LinkedBankAccount[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [categorizationRules, setCategorizationRules] = useState<CategorizationRule[]>([]);
+  const [categorizedHistory, setCategorizedHistory] = useState<CategorizedHistoryItem[]>([]);
   const [parsed, setParsed] = useState<StatementParseResult | null>(null);
   const [fileName, setFileName] = useState("");
   const [choices, setChoices] = useState<Record<string, string>>({});
+  const [categoryChoices, setCategoryChoices] = useState<Record<string, string>>({});
+  const [showRules, setShowRules] = useState(false);
+  const [ruleDraft, setRuleDraft] = useState<{
+    pattern: string;
+    transactionType: "income" | "expense";
+    categoryId: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingAccount, setLoadingAccount] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -225,6 +245,51 @@ export function BankReconciliationPage() {
   const [success, setSuccess] = useState("");
 
   const canManage = activeRole !== "viewer";
+  const canManageRules = activeRole === "owner" || activeRole === "admin";
+
+  async function loadCategorizationData() {
+    if (!supabase || !activeCompany) return;
+
+    const companyId = activeCompany.id;
+    const [categoryResult, ruleResult, historyResult] = await Promise.all([
+      supabase
+        .from("categories")
+        .select("id, name, type, active")
+        .eq("company_id", companyId)
+        .eq("active", true)
+        .order("name"),
+      supabase
+        .from("bank_categorization_rules")
+        .select("id, company_id, pattern, match_mode, transaction_type, category_id, priority, active, created_at, updated_at")
+        .eq("company_id", companyId)
+        .order("priority", { ascending: false })
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("transactions")
+        .select("description, type, category_id")
+        .eq("company_id", companyId)
+        .eq("status", "paid")
+        .not("category_id", "is", null)
+        .order("paid_at", { ascending: false, nullsFirst: false })
+        .limit(5000),
+    ]);
+
+    if (!categoryResult.error) {
+      setCategories((categoryResult.data ?? []) as CategoryOption[]);
+    }
+
+    if (!ruleResult.error) {
+      setCategorizationRules((ruleResult.data ?? []) as CategorizationRule[]);
+    }
+
+    if (!historyResult.error) {
+      setCategorizedHistory((historyResult.data ?? []) as CategorizedHistoryItem[]);
+    }
+  }
+
+  useEffect(() => {
+    void loadCategorizationData();
+  }, [activeCompany?.id]);
 
   useEffect(() => {
     if (!supabase || !activeCompany) return;
@@ -288,7 +353,7 @@ export function BankReconciliationPage() {
       const [transactionResult, reconciliationResult, linkedAccountResult] = await Promise.all([
         client
           .from("transactions")
-          .select("id, description, amount, type, status, due_date, paid_at, account_id")
+          .select("id, description, amount, type, status, due_date, paid_at, account_id, category_id")
           .eq("company_id", companyId)
           .eq("account_id", accountId)
           .eq("status", "paid")
@@ -355,6 +420,7 @@ export function BankReconciliationPage() {
     setParsed(null);
     setFileName("");
     setChoices({});
+    setCategoryChoices({});
     setSearch("");
     setTypeFilter("all");
     setPeriodFilter("all");
@@ -466,6 +532,96 @@ export function BankReconciliationPage() {
     return result;
   }, [choices, recommendations]);
 
+  const transactionById = useMemo(
+    () => new Map(transactions.map((transaction) => [transaction.id, transaction])),
+    [transactions],
+  );
+
+  const reconciliationByReference = useMemo(
+    () =>
+      new Map(
+        reconciliations
+          .filter(
+            (item): item is Reconciliation & { statement_reference: string } =>
+              Boolean(item.statement_reference),
+          )
+          .map((item) => [item.statement_reference, item]),
+      ),
+    [reconciliations],
+  );
+
+  const categorySuggestions = useMemo(() => {
+    const result: Record<string, CategorySuggestion | null> = {};
+
+    for (const recommendation of recommendations) {
+      result[recommendation.row.id] = suggestCategory({
+        description: recommendation.row.description,
+        type: recommendation.row.type,
+        categories,
+        rules: categorizationRules,
+        history: categorizedHistory,
+      });
+    }
+
+    return result;
+  }, [recommendations, categories, categorizationRules, categorizedHistory]);
+
+  const effectiveCategoryChoices = useMemo(() => {
+    const result: Record<string, string> = {};
+
+    for (const recommendation of recommendations) {
+      const rowId = recommendation.row.id;
+      const reconciliation = reconciliationByReference.get(
+        recommendation.reference,
+      );
+      const transactionChoice = effectiveChoices[rowId];
+      const targetTransactionId = recommendation.alreadyReconciled
+        ? reconciliation?.transaction_id
+        : transactionChoice && !transactionChoice.startsWith("__")
+          ? transactionChoice
+          : null;
+      const existingCategoryId = targetTransactionId
+        ? transactionById.get(targetTransactionId)?.category_id ?? ""
+        : "";
+      const suggestedCategoryId =
+        categorySuggestions[rowId]?.categoryId ?? "";
+
+      result[rowId] =
+        Object.prototype.hasOwnProperty.call(categoryChoices, rowId)
+          ? categoryChoices[rowId]
+          : existingCategoryId || suggestedCategoryId;
+    }
+
+    return result;
+  }, [
+    recommendations,
+    reconciliationByReference,
+    effectiveChoices,
+    transactionById,
+    categorySuggestions,
+    categoryChoices,
+  ]);
+
+  const categoryOnlyUpdates = useMemo(() => {
+    return recommendations.filter((recommendation) => {
+      if (!recommendation.alreadyReconciled) return false;
+      const reconciliation = reconciliationByReference.get(
+        recommendation.reference,
+      );
+      if (!reconciliation) return false;
+
+      const existing =
+        transactionById.get(reconciliation.transaction_id)?.category_id ?? "";
+      const selected = effectiveCategoryChoices[recommendation.row.id] ?? "";
+      return existing !== selected;
+    });
+  }, [
+    recommendations,
+    reconciliationByReference,
+    transactionById,
+    effectiveCategoryChoices,
+  ]);
+
   const summary = useMemo(() => {
     const result = {
       total: recommendations.length,
@@ -573,6 +729,41 @@ export function BankReconciliationPage() {
     ? Math.round((summary.create / summary.total) * 1000) / 10
     : 0;
 
+  const reconciliationActionCount = summary.match + summary.create;
+  const totalActionCount =
+    reconciliationActionCount + categoryOnlyUpdates.length;
+
+  function openRulesManager() {
+    setRuleDraft(null);
+    setShowRules(true);
+  }
+
+  function createRuleFromRow(recommendation: Recommendation) {
+    const pattern = rulePatternFromDescription(recommendation.row.description);
+    const categoryId =
+      effectiveCategoryChoices[recommendation.row.id] ?? "";
+
+    if (!categoryId) {
+      setError("Escolha uma categoria antes de criar uma regra.");
+      return;
+    }
+
+    if (!pattern) {
+      setError(
+        "Esta descrição é genérica demais para virar regra automaticamente. Abra “Regras” e informe um padrão mais específico.",
+      );
+      return;
+    }
+
+    setRuleDraft({
+      pattern,
+      transactionType: recommendation.row.type,
+      categoryId,
+    });
+    setShowRules(true);
+    setError("");
+  }
+
   async function loadOpenFinanceFeed() {
     if (!supabase || !activeCompany || !accountId || loadingOpenFinance) return;
 
@@ -627,6 +818,7 @@ export function BankReconciliationPage() {
       setParsed(null);
       setFileName("");
       setChoices({});
+      setCategoryChoices({});
       setError(
         "Nenhuma movimentação confirmada foi encontrada no feed Open Finance desta conta.",
       );
@@ -643,6 +835,7 @@ export function BankReconciliationPage() {
       `Open Finance · ${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} vinculada${linkedBankAccounts.length === 1 ? "" : "s"}`,
     );
     setChoices({});
+    setCategoryChoices({});
     setLoadingOpenFinance(false);
   }
 
@@ -660,10 +853,12 @@ export function BankReconciliationPage() {
       setParsed(result);
       setFileName(file.name);
       setChoices({});
+      setCategoryChoices({});
     } catch (parseError) {
       setParsed(null);
       setFileName("");
       setChoices({});
+      setCategoryChoices({});
       setError(
         parseError instanceof Error
           ? parseError.message
@@ -683,7 +878,7 @@ export function BankReconciliationPage() {
     const [transactionResult, reconciliationResult] = await Promise.all([
       client
         .from("transactions")
-        .select("id, description, amount, type, status, due_date, paid_at, account_id")
+        .select("id, description, amount, type, status, due_date, paid_at, account_id, category_id")
         .eq("company_id", companyId)
         .eq("account_id", accountId)
         .eq("status", "paid")
@@ -735,11 +930,15 @@ export function BankReconciliationPage() {
 
     const pending = recommendations.filter((recommendation) => {
       const choice = effectiveChoices[recommendation.row.id];
-      return !recommendation.alreadyReconciled && choice !== "__skip__" && choice !== "__done__";
+      return (
+        !recommendation.alreadyReconciled &&
+        choice !== "__skip__" &&
+        choice !== "__done__"
+      );
     });
 
-    if (!pending.length) {
-      setError("Não há itens novos para conciliar.");
+    if (!pending.length && !categoryOnlyUpdates.length) {
+      setError("Não há novas conciliações ou categorias para salvar.");
       return;
     }
 
@@ -748,13 +947,16 @@ export function BankReconciliationPage() {
     setSuccess("");
 
     let completed = 0;
+    let categoriesUpdated = 0;
 
     for (const recommendation of pending) {
       const choice = effectiveChoices[recommendation.row.id];
       const transactionId = choice === "__new__" ? null : choice;
+      const categoryId =
+        effectiveCategoryChoices[recommendation.row.id] || null;
 
       const { error: reconcileError } = await client.rpc(
-        "reconcile_bank_statement_entry",
+        "reconcile_bank_statement_entry_v2",
         {
           p_company_id: companyId,
           p_account_id: accountId,
@@ -765,6 +967,7 @@ export function BankReconciliationPage() {
           p_statement_description: recommendation.row.description,
           p_statement_amount: recommendation.row.amount,
           p_statement_type: recommendation.row.type,
+          p_category_id: categoryId,
         },
       );
 
@@ -780,11 +983,55 @@ export function BankReconciliationPage() {
       completed += 1;
     }
 
+    for (const recommendation of categoryOnlyUpdates) {
+      const reconciliation = reconciliationByReference.get(
+        recommendation.reference,
+      );
+      if (!reconciliation) continue;
+
+      const categoryId =
+        effectiveCategoryChoices[recommendation.row.id] || null;
+
+      const { error: categoryError } = await client
+        .from("transactions")
+        .update({
+          category_id: categoryId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", reconciliation.transaction_id)
+        .eq("company_id", companyId);
+
+      if (categoryError) {
+        setError(
+          `As conciliações foram preservadas, mas a atualização de categorias parou após ${categoriesUpdated} item${categoriesUpdated === 1 ? "" : "s"}.`,
+        );
+        setSaving(false);
+        await reloadReconciliations();
+        await loadCategorizationData();
+        return;
+      }
+
+      categoriesUpdated += 1;
+    }
+
     await reloadReconciliations();
+    await loadCategorizationData();
     setChoices({});
-    setSuccess(
-      `${completed} movimentação${completed === 1 ? "" : "ões"} conciliada${completed === 1 ? "" : "s"} com sucesso.`,
-    );
+    setCategoryChoices({});
+
+    const messages = [];
+    if (completed) {
+      messages.push(
+        `${completed} movimentação${completed === 1 ? "" : "ões"} conciliada${completed === 1 ? "" : "s"}`,
+      );
+    }
+    if (categoriesUpdated) {
+      messages.push(
+        `${categoriesUpdated} categoria${categoriesUpdated === 1 ? "" : "s"} atualizada${categoriesUpdated === 1 ? "" : "s"}`,
+      );
+    }
+
+    setSuccess(`${messages.join(" e ")} com sucesso.`);
     setSaving(false);
   }
 
@@ -812,14 +1059,32 @@ export function BankReconciliationPage() {
             (CSV, Excel ou OFX) com os lançamentos já registrados no Valora.
           </p>
         </div>
-        <button
-          type="button"
-          className="ghost reconciliation-help-button"
-          onClick={() => setShowHelp((current) => !current)}
-        >
-          <span aria-hidden="true">?</span>
-          Como funciona?
-        </button>
+        <div className="reconciliation-header-actions">
+          <button
+            type="button"
+            className="ghost reconciliation-rules-button"
+            onClick={openRulesManager}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h10M18 7h2M4 12h3M11 12h9M4 17h8M16 17h4" />
+              <circle cx="16" cy="7" r="2" />
+              <circle cx="9" cy="12" r="2" />
+              <circle cx="14" cy="17" r="2" />
+            </svg>
+            Regras
+            {categorizationRules.length > 0 && (
+              <span>{categorizationRules.length}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            className="ghost reconciliation-help-button"
+            onClick={() => setShowHelp((current) => !current)}
+          >
+            <span aria-hidden="true">?</span>
+            Como funciona?
+          </button>
+        </div>
       </header>
 
       {showHelp && (
@@ -830,7 +1095,7 @@ export function BankReconciliationPage() {
           </div>
           <div>
             <strong>2. Revise as sugestões</strong>
-            <span>O Valora compara valor, data e descrição com seus lançamentos.</span>
+            <span>O Valora compara lançamentos e também sugere categorias por regras e histórico.</span>
           </div>
           <div>
             <strong>3. Confirme</strong>
@@ -1170,6 +1435,7 @@ export function BankReconciliationPage() {
                     <th>Data</th>
                     <th>Descrição</th>
                     <th className="center">Tipo</th>
+                    <th>Categoria</th>
                     <th className="right">Valor</th>
                     <th className="center">Situação</th>
                     <th>Ação</th>
@@ -1190,6 +1456,17 @@ export function BankReconciliationPage() {
                           : choice === "__new__"
                             ? "new"
                             : "match";
+                    const selectedCategoryId =
+                      effectiveCategoryChoices[row.id] ?? "";
+                    const categorySuggestion =
+                      categorySuggestions[row.id] ?? null;
+                    const categoryOptions = categories.filter(
+                      (category) =>
+                        category.type === row.type ||
+                        category.type === "both",
+                    );
+                    const safeRulePattern =
+                      rulePatternFromDescription(row.description);
 
                     return (
                       <tr
@@ -1223,6 +1500,60 @@ export function BankReconciliationPage() {
                           <span className={`pill ${row.type}`}>
                             {row.type === "income" ? "Receita" : "Despesa"}
                           </span>
+                        </td>
+                        <td>
+                          <div className="reconciliation-category-cell">
+                            <select
+                              value={selectedCategoryId}
+                              onChange={(event) =>
+                                setCategoryChoices((current) => ({
+                                  ...current,
+                                  [row.id]: event.target.value,
+                                }))
+                              }
+                              disabled={saving || !canManage}
+                            >
+                              <option value="">Sem categoria</option>
+                              {categoryOptions.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                  {category.name}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="reconciliation-category-meta">
+                              {categorySuggestion &&
+                                selectedCategoryId ===
+                                  categorySuggestion.categoryId && (
+                                  <span
+                                    className={
+                                      "category-suggestion-badge " +
+                                      categorySuggestion.source
+                                    }
+                                    title={categorySuggestion.reason}
+                                  >
+                                    {categorySuggestion.source === "rule"
+                                      ? "Regra"
+                                      : categorySuggestion.confidence === "strong"
+                                        ? `Histórico ${categorySuggestion.score}%`
+                                        : `Sugestão ${categorySuggestion.score}%`}
+                                  </span>
+                                )}
+                              {canManageRules &&
+                                selectedCategoryId &&
+                                categorySuggestion?.source !== "rule" &&
+                                safeRulePattern && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      createRuleFromRow(recommendation)
+                                    }
+                                    disabled={saving}
+                                  >
+                                    Criar regra
+                                  </button>
+                                )}
+                            </div>
+                          </div>
                         </td>
                         <td className={`right amount ${row.type}`}>
                           {row.type === "income" ? "+" : "−"} {money.format(row.amount)}
@@ -1290,7 +1621,7 @@ export function BankReconciliationPage() {
 
                   {filteredRecommendations.length === 0 && (
                     <tr>
-                      <td colSpan={6}>
+                      <td colSpan={7}>
                         <div className="reconciliation-filter-empty">
                           <strong>Nenhuma movimentação encontrada</strong>
                           <span>Ajuste a busca ou os filtros para ver outros resultados.</span>
@@ -1317,14 +1648,18 @@ export function BankReconciliationPage() {
                   !canManage ||
                   schemaReady !== true ||
                   hasTransactionConflict ||
-                  summary.match + summary.create === 0
+                  totalActionCount === 0
                 }
               >
                 {saving
-                  ? "Conciliando..."
-                  : summary.match + summary.create === 0 && summary.already === summary.total
+                  ? "Salvando..."
+                  : totalActionCount === 0
                     ? "Tudo conciliado"
-                    : `Confirmar ${summary.match + summary.create} item${summary.match + summary.create === 1 ? "" : "s"}`}
+                    : reconciliationActionCount === 0
+                      ? `Salvar ${categoryOnlyUpdates.length} categoria${categoryOnlyUpdates.length === 1 ? "" : "s"}`
+                      : categoryOnlyUpdates.length > 0
+                        ? `Confirmar ${totalActionCount} alterações`
+                        : `Confirmar ${reconciliationActionCount} item${reconciliationActionCount === 1 ? "" : "s"}`}
               </button>
             </div>
           </section>
@@ -1336,6 +1671,19 @@ export function BankReconciliationPage() {
           )}
         </>
       )}
+
+      <CategorizationRulesDialog
+        open={showRules}
+        categories={categories}
+        rules={categorizationRules}
+        canManage={canManageRules}
+        initialDraft={ruleDraft}
+        onClose={() => {
+          setShowRules(false);
+          setRuleDraft(null);
+        }}
+        onChanged={() => loadCategorizationData()}
+      />
 
       {!parsed && (
         <section className="panel reconciliation-premium-empty">
