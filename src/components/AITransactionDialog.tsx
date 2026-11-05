@@ -112,6 +112,20 @@ export function AITransactionDialog({
 
   useEffect(() => {
     if (!open) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !analyzing && !saving) {
+        event.preventDefault();
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [open, analyzing, saving, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
     setText("");
     setDraft(null);
     setAmountText("");
