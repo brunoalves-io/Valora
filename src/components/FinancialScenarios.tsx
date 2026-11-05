@@ -82,7 +82,13 @@ function compactDate(value: string) {
 }
 
 function parseNumber(value: string) {
-  const normalized = value.trim().replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  const clean = value.trim().replace(/\s/g, "");
+  if (!clean) return 0;
+
+  const normalized = clean.includes(",")
+    ? clean.replace(/\./g, "").replace(",", ".")
+    : clean;
+
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -242,16 +248,20 @@ export function FinancialScenarios() {
     const incomeFactor = Math.max(0, 1 + incomeChangePct / 100);
     const expenseFactor = Math.max(0, 1 + expenseChangePct / 100);
 
-    const scenarioFlows = pending.map((item) => ({
-      date:
-        item.type === "income"
-          ? addDaysIso(item.due_date, Math.max(0, incomeDelayDays))
-          : item.due_date,
-      type: item.type,
-      amount:
-        Number(item.amount) *
-        (item.type === "income" ? incomeFactor : expenseFactor),
-    }));
+    const scenarioFlows = pending.map((item) => {
+      const incomeBaseDate = item.due_date < today ? today : item.due_date;
+
+      return {
+        date:
+          item.type === "income"
+            ? addDaysIso(incomeBaseDate, Math.max(0, incomeDelayDays))
+            : item.due_date,
+        type: item.type,
+        amount:
+          Number(item.amount) *
+          (item.type === "income" ? incomeFactor : expenseFactor),
+      };
+    });
 
     const extraMonthly = Math.max(0, parseNumber(monthlyExpense));
     if (extraMonthly > 0) {
