@@ -112,6 +112,35 @@ export function TransactionOrganizerDialog({
   const [schemaReady, setSchemaReady] = useState<boolean | null>(null);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    if (!open) return;
+
+    const busy =
+      loading ||
+      savingTag ||
+      uploading ||
+      Boolean(downloadingAttachmentId) ||
+      Boolean(removingAttachmentId);
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) {
+        event.preventDefault();
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [
+    open,
+    loading,
+    savingTag,
+    uploading,
+    downloadingAttachmentId,
+    removingAttachmentId,
+    onClose,
+  ]);
+
   const selectedTags = useMemo(
     () => tags.filter((tag) => selectedTagIds.has(tag.id)),
     [tags, selectedTagIds],
