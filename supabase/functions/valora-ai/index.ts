@@ -52,6 +52,14 @@ function sanitizeToday(value: unknown) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
 }
 
+function sanitizeConversationId(value: unknown) {
+  if (typeof value !== "string") return "";
+  const clean = value.trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clean)
+    ? clean
+    : "";
+}
+
 function extractJsonObject(value: string) {
   const clean = value
     .trim()
@@ -203,6 +211,126 @@ function normalizedDraft(
   };
 }
 
+function normalizedRecurrenceDraft(
+  raw: Record<string, unknown>,
+  context: Record<string, unknown>,
+  today: string,
+) {
+  const warnings = Array.isArray(raw.warnings)
+    ? raw.warnings
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 5)
+    : [];
+
+  const type =
+    raw.type === "income" || raw.type === "expense" ? raw.type : null;
+
+  const numericAmount =
+    typeof raw.amount === "number"
+      ? raw.amount
+      : typeof raw.amount === "string"
+        ? Number(raw.amount.replace(",", "."))
+        : NaN;
+
+  const amount =
+    Number.isFinite(numericAmount) && numericAmount > 0 ? numericAmount : null;
+
+  const description =
+    typeof raw.description === "string"
+      ? raw.description.trim().slice(0, 180)
+      : "";
+
+  const frequency =
+    raw.frequency === "weekly" ||
+      raw.frequency === "monthly" ||
+      raw.frequency === "yearly"
+      ? raw.frequency
+      : "monthly";
+
+  const rawInterval =
+    typeof raw.interval_count === "number"
+      ? raw.interval_count
+      : typeof raw.interval_count === "string"
+        ? Number(raw.interval_count)
+        : 1;
+  const intervalCount =
+    Number.isInteger(rawInterval) && rawInterval >= 1 && rawInterval <= 24
+      ? rawInterval
+      : 1;
+
+  const startDate =
+    typeof raw.start_date === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(raw.start_date)
+      ? raw.start_date
+      : today;
+
+  const endDate =
+    typeof raw.end_date === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(raw.end_date)
+      ? raw.end_date
+      : null;
+
+  let categoryId = validContextId(context, "categories", raw.category_id);
+  if (categoryId && type) {
+    const category = contextList(context, "categories").find(
+      (item) => item.id === categoryId,
+    );
+    if (category?.type !== type && category?.type !== "both") {
+      categoryId = null;
+      warnings.push("A categoria sugerida não era compatível com a recorrência.");
+    }
+  }
+
+  let partnerId = validContextId(context, "partners", raw.partner_id);
+  if (partnerId && type) {
+    const partner = contextList(context, "partners").find(
+      (item) => item.id === partnerId,
+    );
+    const compatible =
+      partner?.kind === "both" ||
+      (type === "income" && partner?.kind === "customer") ||
+      (type === "expense" && partner?.kind === "supplier");
+
+    if (!compatible) {
+      partnerId = null;
+      warnings.push("O cliente/fornecedor sugerido não era compatível com a recorrência.");
+    }
+  }
+
+  const confidence =
+    raw.confidence === "high" ||
+      raw.confidence === "medium" ||
+      raw.confidence === "low"
+      ? raw.confidence
+      : "medium";
+
+  const summary =
+    typeof raw.summary === "string" ? raw.summary.trim().slice(0, 280) : "";
+
+  if (!type) warnings.push("Revise se a recorrência é uma receita ou despesa.");
+  if (!amount) warnings.push("Informe o valor antes de criar a recorrência.");
+  if (!description) warnings.push("Informe uma descrição antes de criar a recorrência.");
+
+  return {
+    type,
+    description,
+    amount,
+    frequency,
+    interval_count: intervalCount,
+    start_date: startDate,
+    end_date: endDate,
+    account_id: validContextId(context, "accounts", raw.account_id),
+    category_id: categoryId,
+    cost_center_id: validContextId(context, "cost_centers", raw.cost_center_id),
+    partner_id: partnerId,
+    confidence,
+    summary,
+    warnings: Array.from(new Set(warnings)).slice(0, 5),
+  };
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -254,6 +382,7 @@ Deno.serve(async (request) => {
   const messages = sanitizeMessages(payload.messages);
   const draftText = sanitizeDraftText(payload.text);
   const today = sanitizeToday(payload.today) || new Date().toISOString().slice(0, 10);
+  const conversationId = sanitizeConversationId(payload.conversationId);
 
   if (
     mode === "chat" &&
@@ -266,13 +395,13 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: "text is required" }, 400);
   }
 
-  const contextRpc =
+  const baseContextRpc =
     mode === "transaction_draft"
       ? "get_ai_transaction_context"
-      : "get_ai_financial_context";
+      : "get_ai_operational_context";
 
   const contextResponse = await fetch(
-    `${supabaseUrl}/rest/v1/rpc/${contextRpc}`,
+    `${supabaseUrl}/rest/v1/rpc/${baseContextRpc}`,
     {
       method: "POST",
       headers: {
@@ -280,9 +409,7 @@ Deno.serve(async (request) => {
         apikey: supabaseAnonKey,
         Authorization: authorization,
       },
-      body: JSON.stringify({
-        p_company_id: companyId,
-      }),
+      body: JSON.stringify({ p_company_id: companyId }),
     },
   );
 
@@ -300,7 +427,41 @@ Deno.serve(async (request) => {
     }, status);
   }
 
-  const financialContext = await contextResponse.json() as Record<string, unknown>;
+  const financialContext =
+    await contextResponse.json() as Record<string, unknown>;
+
+  let actionContext: Record<string, unknown> | null =
+    mode === "transaction_draft" ? financialContext : null;
+
+  if (mode === "chat") {
+    const company =
+      financialContext.company &&
+      typeof financialContext.company === "object"
+        ? financialContext.company as Record<string, unknown>
+        : {};
+    const role = typeof company.user_role === "string" ? company.user_role : "";
+    const canOperate = role === "owner" || role === "admin";
+
+    if (canOperate) {
+      const actionContextResponse = await fetch(
+        `${supabaseUrl}/rest/v1/rpc/get_ai_transaction_context`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: supabaseAnonKey,
+            Authorization: authorization,
+          },
+          body: JSON.stringify({ p_company_id: companyId }),
+        },
+      );
+
+      if (actionContextResponse.ok) {
+        actionContext =
+          await actionContextResponse.json() as Record<string, unknown>;
+      }
+    }
+  }
 
   const systemInstruction =
     mode === "transaction_draft"
@@ -339,19 +500,69 @@ Deno.serve(async (request) => {
           JSON.stringify(financialContext),
         ].join("\n")
       : [
-          "Você é o Valora IA, assistente de gestão financeira empresarial do aplicativo Valora.",
-          "Responda sempre em português do Brasil, de forma clara, objetiva e útil para um gestor.",
-          "Use SOMENTE o contexto financeiro fornecido abaixo para afirmar números específicos da empresa.",
-          "Nunca invente valores, datas, clientes, despesas, saldos ou tendências.",
-          "Diferencie explicitamente valores realizados, pendentes, vencidos e projetados quando isso for relevante.",
-          "Se a pergunta exigir dados que não estão no contexto, diga que o Valora ainda não possui dados suficientes para concluir.",
-          "Você está em modo somente consulta. Pode sugerir próximos passos, mas nunca diga que criou, pagou, alterou ou excluiu registros.",
-          "Não apresente a resposta como contabilidade oficial, parecer jurídico, fiscal ou tributário.",
-          "Formate valores em reais (R$) e datas no padrão brasileiro quando possível.",
-          "Prefira respostas curtas, com diagnóstico e próximos passos. Use listas apenas quando ajudarem.",
+          "Você é o Valora IA operacional, assistente de gestão financeira empresarial do aplicativo Valora.",
+          "Responda sempre em português do Brasil, com linguagem clara, objetiva e útil para um gestor.",
+          "Você deve devolver SOMENTE um objeto JSON válido, sem markdown.",
+          `A data local informada pelo aplicativo é ${today}.`,
+          "Use SOMENTE o contexto financeiro fornecido para afirmar números específicos da empresa.",
+          "Nunca invente valores, datas, clientes, despesas, saldos, tendências ou IDs.",
+          "Diferencie valores realizados, pendentes, vencidos e projetados quando isso for relevante.",
+          "Se a pergunta exigir dados ausentes, diga claramente que o Valora ainda não possui dados suficientes.",
+          "A IA NUNCA executa uma alteração por conta própria. Ela apenas responde ou prepara uma proposta para confirmação humana.",
+          "As únicas ações mutáveis suportadas aqui são create_transaction e create_recurrence.",
+          "Pedidos de editar, excluir, pagar/baixar registros existentes ou outras mutações devem receber intent=query e uma resposta explicando que essa ação ainda exige a tela específica.",
+          "Conta a pagar ou conta a receber futura é create_transaction com status pending.",
+          "Frases concluídas como paguei, comprei, recebi ou vendi normalmente são create_transaction com status paid.",
+          "Quando o usuário pedir explicitamente algo semanal, mensal, anual ou repetitivo, use create_recurrence.",
+          "Use IDs somente do CONTEXTO PARA AÇÕES. Quando não houver correspondência segura, use null.",
+          "Se CONTEXTO PARA AÇÕES estiver indisponível, não proponha ações e explique que o perfil não permite alterações.",
+          "Não apresente respostas como contabilidade oficial, parecer jurídico, fiscal ou tributário.",
+          "Formate valores em reais e datas no padrão brasileiro dentro do texto de answer.",
+          "Formato JSON obrigatório:",
+          JSON.stringify({
+            answer: "resposta curta para o usuário",
+            intent: "query | create_transaction | create_recurrence",
+            transaction_draft: {
+              type: "expense | income | null",
+              description: "string",
+              amount: "number | null",
+              due_date: "YYYY-MM-DD",
+              status: "paid | pending",
+              account_id: "uuid | null",
+              category_id: "uuid | null",
+              cost_center_id: "uuid | null",
+              partner_id: "uuid | null",
+              tag_ids: ["uuid"],
+              confidence: "high | medium | low",
+              summary: "resumo curto",
+              warnings: ["aviso curto"],
+            },
+            recurrence_draft: {
+              type: "expense | income | null",
+              description: "string",
+              amount: "number | null",
+              frequency: "weekly | monthly | yearly",
+              interval_count: 1,
+              start_date: "YYYY-MM-DD",
+              end_date: "YYYY-MM-DD | null",
+              account_id: "uuid | null",
+              category_id: "uuid | null",
+              cost_center_id: "uuid | null",
+              partner_id: "uuid | null",
+              confidence: "high | medium | low",
+              summary: "resumo curto",
+              warnings: ["aviso curto"],
+            },
+          }),
+          "Para intent=query, transaction_draft e recurrence_draft devem ser null.",
+          "Para create_transaction, recurrence_draft deve ser null.",
+          "Para create_recurrence, transaction_draft deve ser null.",
           "",
-          "CONTEXTO FINANCEIRO ATUAL DA EMPRESA:",
+          "CONTEXTO FINANCEIRO ATUAL:",
           JSON.stringify(financialContext),
+          "",
+          "CONTEXTO PARA AÇÕES:",
+          actionContext ? JSON.stringify(actionContext) : "INDISPONÍVEL PARA ESTE PERFIL",
         ].join("\n");
 
   const contents =
@@ -363,12 +574,9 @@ Deno.serve(async (request) => {
         }));
 
   const generationConfig: Record<string, unknown> = {
-    maxOutputTokens: mode === "transaction_draft" ? 1000 : 1400,
+    maxOutputTokens: mode === "transaction_draft" ? 1000 : 1800,
+    responseMimeType: "application/json",
   };
-
-  if (mode === "transaction_draft") {
-    generationConfig.responseMimeType = "application/json";
-  }
 
   const requestBody = JSON.stringify({
     system_instruction: {
@@ -567,8 +775,125 @@ Deno.serve(async (request) => {
     });
   }
 
+  let envelope: Record<string, unknown>;
+  try {
+    envelope = extractJsonObject(answer);
+  } catch {
+    return jsonResponse({
+      answer,
+      action: null,
+      actionId: null,
+      model: usedModel,
+      fallbackUsed: usedModel !== geminiModel,
+      generatedAt: new Date().toISOString(),
+    });
+  }
+
+  const answerText =
+    typeof envelope.answer === "string" && envelope.answer.trim()
+      ? envelope.answer.trim().slice(0, 6000)
+      : "Analisei sua solicitação.";
+
+  const intent =
+    envelope.intent === "create_transaction" ||
+      envelope.intent === "create_recurrence"
+      ? envelope.intent
+      : "query";
+
+  let action: Record<string, unknown> | null = null;
+  let actionId: string | null = null;
+  let actionError: string | null = null;
+
+  if (intent !== "query" && actionContext) {
+    const rawDraft =
+      intent === "create_transaction"
+        ? envelope.transaction_draft
+        : envelope.recurrence_draft;
+
+    if (rawDraft && typeof rawDraft === "object") {
+      const draft =
+        intent === "create_transaction"
+          ? normalizedDraft(
+              rawDraft as Record<string, unknown>,
+              actionContext,
+              today,
+            )
+          : normalizedRecurrenceDraft(
+              rawDraft as Record<string, unknown>,
+              actionContext,
+              today,
+            );
+
+      const complete =
+        Boolean(draft.type) &&
+        Boolean(draft.description) &&
+        Boolean(draft.amount) &&
+        (intent === "create_transaction"
+          ? Boolean((draft as Record<string, unknown>).due_date)
+          : Boolean((draft as Record<string, unknown>).start_date));
+
+      if (complete) {
+        const actionType = intent;
+        const proposalResponse = await fetch(
+          `${supabaseUrl}/rest/v1/rpc/propose_ai_action`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: supabaseAnonKey,
+              Authorization: authorization,
+            },
+            body: JSON.stringify({
+              p_company_id: companyId,
+              p_conversation_id: conversationId || null,
+              p_action_type: actionType,
+              p_payload: draft,
+              p_summary:
+                typeof draft.summary === "string" && draft.summary
+                  ? draft.summary
+                  : answerText.slice(0, 280),
+              p_request_text:
+                messages[messages.length - 1]?.content ?? "",
+            }),
+          },
+        );
+
+        if (proposalResponse.ok) {
+          const proposalData = await proposalResponse.json().catch(() => null);
+          actionId =
+            typeof proposalData === "string"
+              ? proposalData
+              : typeof proposalData === "object" &&
+                  proposalData &&
+                  typeof (proposalData as Record<string, unknown>).id === "string"
+                ? String((proposalData as Record<string, unknown>).id)
+                : null;
+
+          action = {
+            type: actionType,
+            draft,
+          };
+        } else {
+          const detail = await proposalResponse.text();
+          actionError =
+            proposalResponse.status === 401 || proposalResponse.status === 403
+              ? "Seu perfil não permite confirmar ações financeiras pela Valora IA."
+              : "A proposta foi interpretada, mas não pôde ser preparada para confirmação.";
+          console.error("Valora AI proposal error", {
+            status: proposalResponse.status,
+            detail: detail.slice(0, 800),
+          });
+        }
+      }
+    }
+  }
+
   return jsonResponse({
-    answer,
+    answer: answerText,
+    intent,
+    action,
+    actionId,
+    actionError,
     model: usedModel,
     fallbackUsed: usedModel !== geminiModel,
     generatedAt: new Date().toISOString(),
