@@ -532,6 +532,96 @@ export function BankReconciliationPage() {
     return result;
   }, [choices, recommendations]);
 
+  const transactionById = useMemo(
+    () => new Map(transactions.map((transaction) => [transaction.id, transaction])),
+    [transactions],
+  );
+
+  const reconciliationByReference = useMemo(
+    () =>
+      new Map(
+        reconciliations
+          .filter(
+            (item): item is Reconciliation & { statement_reference: string } =>
+              Boolean(item.statement_reference),
+          )
+          .map((item) => [item.statement_reference, item]),
+      ),
+    [reconciliations],
+  );
+
+  const categorySuggestions = useMemo(() => {
+    const result: Record<string, CategorySuggestion | null> = {};
+
+    for (const recommendation of recommendations) {
+      result[recommendation.row.id] = suggestCategory({
+        description: recommendation.row.description,
+        type: recommendation.row.type,
+        categories,
+        rules: categorizationRules,
+        history: categorizedHistory,
+      });
+    }
+
+    return result;
+  }, [recommendations, categories, categorizationRules, categorizedHistory]);
+
+  const effectiveCategoryChoices = useMemo(() => {
+    const result: Record<string, string> = {};
+
+    for (const recommendation of recommendations) {
+      const rowId = recommendation.row.id;
+      const reconciliation = reconciliationByReference.get(
+        recommendation.reference,
+      );
+      const transactionChoice = effectiveChoices[rowId];
+      const targetTransactionId = recommendation.alreadyReconciled
+        ? reconciliation?.transaction_id
+        : transactionChoice && !transactionChoice.startsWith("__")
+          ? transactionChoice
+          : null;
+      const existingCategoryId = targetTransactionId
+        ? transactionById.get(targetTransactionId)?.category_id ?? ""
+        : "";
+      const suggestedCategoryId =
+        categorySuggestions[rowId]?.categoryId ?? "";
+
+      result[rowId] =
+        Object.prototype.hasOwnProperty.call(categoryChoices, rowId)
+          ? categoryChoices[rowId]
+          : existingCategoryId || suggestedCategoryId;
+    }
+
+    return result;
+  }, [
+    recommendations,
+    reconciliationByReference,
+    effectiveChoices,
+    transactionById,
+    categorySuggestions,
+    categoryChoices,
+  ]);
+
+  const categoryOnlyUpdates = useMemo(() => {
+    return recommendations.filter((recommendation) => {
+      if (!recommendation.alreadyReconciled) return false;
+      const reconciliation = reconciliationByReference.get(
+        recommendation.reference,
+      );
+      if (!reconciliation) return false;
+
+      const existing =
+        transactionById.get(reconciliation.transaction_id)?.category_id ?? "";
+      const selected = effectiveCategoryChoices[recommendation.row.id] ?? "";
+      return existing !== selected;
+    });
+  }, [
+    recommendations,
+    reconciliationByReference,
+    transactionById,
+    effectiveCategoryChoices,
+  ]);
+
   const summary = useMemo(() => {
     const result = {
       total: recommendations.length,
@@ -693,6 +783,7 @@ export function BankReconciliationPage() {
       setParsed(null);
       setFileName("");
       setChoices({});
+      setCategoryChoices({});
       setError(
         "Nenhuma movimentação confirmada foi encontrada no feed Open Finance desta conta.",
       );
@@ -709,6 +800,7 @@ export function BankReconciliationPage() {
       `Open Finance · ${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} vinculada${linkedBankAccounts.length === 1 ? "" : "s"}`,
     );
     setChoices({});
+    setCategoryChoices({});
     setLoadingOpenFinance(false);
   }
 
@@ -726,6 +818,7 @@ export function BankReconciliationPage() {
       setParsed(result);
       setFileName(file.name);
       setChoices({});
+      setCategoryChoices({});
     } catch (parseError) {
       setParsed(null);
       setFileName("");
