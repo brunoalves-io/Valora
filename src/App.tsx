@@ -24,6 +24,7 @@ import { AuditPage } from "./components/AuditPage";
 import { AlertsPage } from "./components/AlertsPage";
 import { ValoraAIPage } from "./components/ValoraAIPage";
 import { CompanySettingsPage } from "./components/CompanySettingsPage";
+import { CommandPalette } from "./components/CommandPalette";
 import { TransactionsPage } from "./components/TransactionsPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
@@ -53,32 +54,65 @@ type Page =
   | "ai"
   | "settings";
 
-const activeNav: Array<[string, Page]> = [
-  ["Início", "dashboard"],
-  ["Lançamentos", "transactions"],
-  ["Contas a pagar", "payables"],
-  ["Contas a receber", "receivables"],
-  ["Contas e caixas", "accounts"],
-  ["Conexões bancárias", "bank-connections"],
-  ["Conciliação bancária", "reconciliation"],
-  ["Categorias", "categories"],
-  ["Centros de custo", "cost-centers"],
-  ["Clientes", "customers"],
-  ["Fornecedores", "suppliers"],
-  ["Propostas", "proposals"],
-  ["Planejamento", "planning"],
-  ["Fechamento mensal", "closing"],
-  ["Relatórios", "reports"],
-  ["Cartões", "cards"],
-  ["Recorrências", "recurrences"],
-  ["Alertas", "alerts"],
-  ["Valora IA", "ai"],
+type NavSection = {
+  label: string;
+  items: Array<[string, Page]>;
+};
+
+const activeNavSections: NavSection[] = [
+  {
+    label: "Visão geral",
+    items: [
+      ["Início", "dashboard"],
+      ["Alertas", "alerts"],
+      ["Valora IA", "ai"],
+    ],
+  },
+  {
+    label: "Financeiro",
+    items: [
+      ["Lançamentos", "transactions"],
+      ["Contas a pagar", "payables"],
+      ["Contas a receber", "receivables"],
+      ["Contas e caixas", "accounts"],
+      ["Cartões", "cards"],
+      ["Recorrências", "recurrences"],
+    ],
+  },
+  {
+    label: "Bancos",
+    items: [
+      ["Conexões bancárias", "bank-connections"],
+      ["Conciliação bancária", "reconciliation"],
+    ],
+  },
+  {
+    label: "Gestão",
+    items: [
+      ["Planejamento", "planning"],
+      ["Fechamento mensal", "closing"],
+      ["Relatórios", "reports"],
+      ["Propostas", "proposals"],
+    ],
+  },
+  {
+    label: "Cadastros",
+    items: [
+      ["Categorias", "categories"],
+      ["Centros de custo", "cost-centers"],
+      ["Clientes", "customers"],
+      ["Fornecedores", "suppliers"],
+    ],
+  },
 ];
 
-const adminNav: Array<[string, Page]> = [
-  ["Equipe", "team"],
-  ["Auditoria", "audit"],
-];
+const adminNavSection: NavSection = {
+  label: "Administração",
+  items: [
+    ["Equipe", "team"],
+    ["Auditoria", "audit"],
+  ],
+};
 
 function CompanyAvatar({
   company,
@@ -421,6 +455,7 @@ function Workspace() {
   const [creatingCompany, setCreatingCompany] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState("");
   const [companyMenuError, setCompanyMenuError] = useState("");
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const { companies, activeCompany, activeRole, selectCompany, createCompany } = useCompany();
   const { user, signOut } = useAuth();
 
@@ -469,10 +504,44 @@ function Workspace() {
     void refreshAlertCount();
   }, [page, refreshAlertCount]);
 
-  const navigation =
+  const navigationSections =
     activeRole === "owner" || activeRole === "admin"
-      ? [...activeNav, ...adminNav]
-      : activeNav;
+      ? [...activeNavSections, adminNavSection]
+      : activeNavSections;
+
+  const commandItems = navigationSections.flatMap((section) =>
+    section.items.map(([label, target]) => ({
+      id: target,
+      label,
+      group: section.label,
+      keywords:
+        target === "dashboard"
+          ? "painel resumo visão"
+          : target === "accounts"
+            ? "saldo caixa banco conta"
+            : target === "reconciliation"
+              ? "extrato conciliar banco"
+              : target === "closing"
+                ? "mês mensal desempenho performance"
+                : target === "ai"
+                  ? "inteligência assistente pergunta"
+                  : target === "reports"
+                    ? "dre fluxo projeção cenários"
+                    : "",
+    })),
+  );
+
+  useEffect(() => {
+    function handleGlobalShortcut(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandPaletteOpen((open) => !open);
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalShortcut);
+    return () => window.removeEventListener("keydown", handleGlobalShortcut);
+  }, []);
 
   function roleLabel(role: "owner" | "admin" | "member" | "viewer") {
     if (role === "owner") return "Líder";
@@ -517,9 +586,12 @@ function Workspace() {
     <div className={activeRole === "viewer" ? "shell role-viewer" : "shell"}>
       <aside className="sidebar">
         <div className="brand sidebar-wordmark">
+          <div className="sidebar-logo-mark">
+            <img src={valoraLogo} alt="" aria-hidden="true" />
+          </div>
           <div>
             <strong>Valora</strong>
-            <span>Gestão inteligente</span>
+            <span>Gestão financeira</span>
           </div>
         </div>
 
@@ -695,23 +767,45 @@ function Workspace() {
 
         </div>
 
-        <nav>
-          {navigation.map(([label, target]) => (
-            <button
-              className={page === target ? "nav-item active" : "nav-item"}
-              key={target}
-              onClick={() => setPage(target)}
-            >
-              <span className="nav-icon">
-                <SidebarIcon name={target} />
-              </span>
-              <span className="nav-label">{label}</span>
-              {target === "alerts" && unreadAlerts > 0 && (
-                <b className="nav-alert-badge">{unreadAlerts > 99 ? "99+" : unreadAlerts}</b>
-              )}
-            </button>
-          ))}
+        <button
+          type="button"
+          className="sidebar-command-trigger"
+          onClick={() => setCommandPaletteOpen(true)}
+          aria-label="Buscar módulos do Valora"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="m16 16 4 4" />
+          </svg>
+          <span>Buscar no Valora</span>
+          <kbd>Ctrl K</kbd>
+        </button>
 
+        <nav aria-label="Navegação principal">
+          {navigationSections.map((section) => (
+            <div className="nav-section" key={section.label}>
+              <span className="nav-section-label">{section.label}</span>
+              <div className="nav-section-items">
+                {section.items.map(([label, target]) => (
+                  <button
+                    className={page === target ? "nav-item active" : "nav-item"}
+                    key={target}
+                    onClick={() => setPage(target)}
+                    aria-current={page === target ? "page" : undefined}
+                    title={label}
+                  >
+                    <span className="nav-icon">
+                      <SidebarIcon name={target} />
+                    </span>
+                    <span className="nav-label">{label}</span>
+                    {target === "alerts" && unreadAlerts > 0 && (
+                      <b className="nav-alert-badge">{unreadAlerts > 99 ? "99+" : unreadAlerts}</b>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar-footer">
@@ -753,6 +847,13 @@ function Workspace() {
           />
         </RecurringSyncGate>
       </main>
+
+      <CommandPalette
+        open={commandPaletteOpen}
+        items={commandItems}
+        onClose={() => setCommandPaletteOpen(false)}
+        onSelect={(target) => setPage(target as Page)}
+      />
     </div>
   );
 }
