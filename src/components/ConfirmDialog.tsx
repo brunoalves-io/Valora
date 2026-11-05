@@ -7,7 +7,9 @@ type ConfirmDialogProps = {
   warning?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  busyLabel?: string;
   busy?: boolean;
+  tone?: "danger" | "primary";
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -19,7 +21,9 @@ export function ConfirmDialog({
   warning,
   confirmLabel = "Confirmar",
   cancelLabel = "Cancelar",
+  busyLabel = "Processando...",
   busy = false,
+  tone = "danger",
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -53,24 +57,36 @@ export function ConfirmDialog({
   if (!open) return null;
 
   return (
-    <div className="confirm-dialog-backdrop" role="presentation">
+    <div
+      className="confirm-dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !busy) onCancel();
+      }}
+    >
       <section
-        className="confirm-dialog"
+        className={"confirm-dialog " + tone}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-description"
       >
         <div className="confirm-dialog-content">
+          <div className={"confirm-dialog-icon " + tone} aria-hidden="true">
+            {tone === "danger" ? "!" : "✓"}
+          </div>
           <div className="confirm-dialog-copy">
+            <span className="confirm-dialog-kicker">
+              {tone === "danger" ? "CONFIRMAÇÃO NECESSÁRIA" : "REVISAR E CONFIRMAR"}
+            </span>
             <h2 id="confirm-dialog-title">{title}</h2>
             <p id="confirm-dialog-description">{description}</p>
           </div>
         </div>
 
         {warning && (
-          <div className="confirm-dialog-warning">
-            <span aria-hidden="true">!</span>
+          <div className={"confirm-dialog-warning " + tone}>
+            <span aria-hidden="true">i</span>
             <p>{warning}</p>
           </div>
         )}
@@ -87,11 +103,11 @@ export function ConfirmDialog({
           </button>
           <button
             type="button"
-            className="confirm-dialog-danger"
+            className={"confirm-dialog-confirm " + tone}
             onClick={onConfirm}
             disabled={busy}
           >
-            {busy ? "Excluindo..." : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </section>
