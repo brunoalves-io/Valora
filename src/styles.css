@@ -10101,3 +10101,397 @@ tr:last-child td { border-bottom: 0; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+
+/* Valora v1.0.35 cash flow projection */
+.cash-projection {
+  display: grid;
+  gap: 16px;
+}
+
+.projection-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.projection-toolbar h2 {
+  margin: 3px 0 5px;
+  font-size: 19px;
+}
+
+.projection-toolbar p {
+  max-width: 680px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.projection-kicker {
+  color: #25845f;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.projection-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.projection-controls label {
+  display: grid;
+  gap: 5px;
+  color: #6d798d;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.projection-controls select {
+  min-width: 180px;
+  min-height: 36px;
+  border: 1px solid #d9e0e9;
+  border-radius: 9px;
+  padding: 7px 30px 7px 10px;
+  background: #fff;
+  color: #253248;
+  outline: none;
+}
+
+.projection-controls select:focus {
+  border-color: #46bf91;
+  box-shadow: 0 0 0 3px rgba(70, 191, 145, .12);
+}
+
+.projection-horizons {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #dfe5ec;
+  border-radius: 9px;
+  background: #f5f7f9;
+}
+
+.projection-horizons button {
+  min-width: 38px;
+  min-height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #778397;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.projection-horizons button:hover {
+  background: #fff;
+  color: #405068;
+}
+
+.projection-horizons button.active {
+  background: #fff;
+  color: #21825e;
+  box-shadow: 0 2px 7px rgba(32, 50, 72, .08);
+}
+
+.projection-refresh {
+  min-height: 36px;
+  padding: 8px 11px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.projection-metrics {
+  margin-bottom: 0;
+}
+
+.projection-risk {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 13px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid #d8ebe3;
+  border-radius: 14px;
+  background: #f5fbf8;
+}
+
+.projection-risk.warning {
+  border-color: #f0dfba;
+  background: #fffaf0;
+}
+
+.projection-risk.danger {
+  border-color: #f0cfd3;
+  background: #fff6f7;
+}
+
+.projection-risk-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #e5f5ee;
+  color: #25845f;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.projection-risk.warning .projection-risk-icon {
+  background: #fff0cb;
+  color: #9a6a12;
+}
+
+.projection-risk.danger .projection-risk-icon {
+  background: #fde8eb;
+  color: #b43e49;
+}
+
+.projection-risk strong,
+.projection-risk span {
+  display: block;
+}
+
+.projection-risk strong {
+  margin-bottom: 3px;
+  color: #324156;
+  font-size: 11px;
+}
+
+.projection-risk > div > span {
+  color: #768397;
+  font-size: 10px;
+}
+
+.projection-risk-meta {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.projection-risk-meta span {
+  color: #69768a !important;
+  font-size: 9px !important;
+  font-weight: 800;
+}
+
+.projection-grid {
+  grid-template-columns: minmax(0, 1.65fr) minmax(260px, .75fr);
+  margin-bottom: 0;
+}
+
+.projection-chart-panel,
+.projection-insights-panel {
+  min-width: 0;
+}
+
+.projection-title {
+  gap: 16px;
+}
+
+.projection-title p {
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.projection-legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  color: #778397;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.projection-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.projection-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: #aeb8c7;
+}
+
+.projection-legend i.income {
+  background: #2ab67f;
+}
+
+.projection-legend i.expense {
+  background: #dc6a72;
+}
+
+.projection-legend i.balance {
+  width: 14px;
+  height: 3px;
+  border-radius: 999px;
+  background: #3d5872;
+}
+
+.projection-chart-scroll {
+  width: 100%;
+  margin-top: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.projection-chart {
+  width: 100%;
+  min-width: 620px;
+  height: auto;
+  display: block;
+}
+
+.projection-axis {
+  stroke: #e4e9ef;
+  stroke-width: 1;
+}
+
+.projection-zero-line {
+  stroke: #e7b2b7;
+  stroke-width: 1;
+  stroke-dasharray: 5 5;
+}
+
+.projection-bar-income {
+  fill: #2ab67f;
+  opacity: .88;
+}
+
+.projection-bar-expense {
+  fill: #dc6a72;
+  opacity: .86;
+}
+
+.projection-balance-line {
+  stroke: #3d5872;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.projection-point {
+  fill: #fff;
+  stroke: #3d5872;
+  stroke-width: 2;
+}
+
+.projection-point.negative {
+  fill: #fff3f4;
+  stroke: #c54954;
+}
+
+.projection-chart-label {
+  fill: #8994a6;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.projection-insight-list {
+  display: grid;
+  gap: 0;
+  margin-top: 11px;
+}
+
+.projection-insight-list > div {
+  display: grid;
+  gap: 3px;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.projection-insight-list > div:last-child {
+  border-bottom: 0;
+}
+
+.projection-insight-list span {
+  color: #818da0;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.projection-insight-list strong {
+  color: #36455b;
+  font-size: 14px;
+}
+
+.projection-insight-list small {
+  color: #929cad;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.projection-upcoming {
+  padding: 0;
+  overflow: hidden;
+}
+
+.projection-upcoming table {
+  min-width: 820px;
+}
+
+.projection-overdue {
+  color: #c14d57 !important;
+  font-weight: 800;
+}
+
+.projection-table-foot {
+  padding: 10px 18px;
+  border-top: 1px solid #edf0f4;
+  background: #fafbfc;
+  color: #8792a4;
+  font-size: 9px;
+  text-align: right;
+}
+
+@media (max-width: 1180px) {
+  .projection-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .projection-controls {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .projection-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 780px) {
+  .projection-risk {
+    grid-template-columns: 38px 1fr;
+  }
+
+  .projection-risk-meta {
+    grid-column: 2;
+    text-align: left;
+  }
+
+  .projection-controls label,
+  .projection-controls select {
+    width: 100%;
+  }
+
+  .projection-horizons {
+    flex: 1;
+  }
+
+  .projection-horizons button {
+    flex: 1;
+  }
+
+  .projection-refresh {
+    width: 100%;
+  }
+}
