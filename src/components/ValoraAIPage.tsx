@@ -776,6 +776,11 @@ export function ValoraAIPage() {
                 const actionStatus =
                   actionLog?.status ??
                   (actionId ? "proposed" : null);
+                const actionErrorText =
+                  message.role === "assistant" &&
+                  typeof message.metadata?.action_error === "string"
+                    ? message.metadata.action_error
+                    : "";
 
                 return (
                   <article className={"ai-message " + message.role} key={message.id}>
@@ -785,13 +790,11 @@ export function ValoraAIPage() {
                     </div>
                     <div className="ai-message-content">{message.content}</div>
 
-                    {message.role === "assistant" &&
-                      message.metadata?.action_error &&
-                      typeof message.metadata.action_error === "string" && (
-                        <div className="ai-message-action-error">
-                          {message.metadata.action_error}
-                        </div>
-                      )}
+                    {actionErrorText && (
+                      <div className="ai-message-action-error">
+                        {actionErrorText}
+                      </div>
+                    )}
 
                     {action && actionId && actionStatus && (
                       <AIOperationCard
