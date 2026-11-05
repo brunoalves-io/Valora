@@ -104,7 +104,11 @@ export function AIOperationCard({
   onCancel,
 }: Props) {
   const draft = action.draft;
-  const isTransaction = action.type === "create_transaction";
+  const transactionDraft =
+    action.type === "create_transaction" ? action.draft : null;
+  const recurrenceDraft =
+    action.type === "create_recurrence" ? action.draft : null;
+  const isTransaction = Boolean(transactionDraft);
   const title = isTransaction
     ? draft.type === "income"
       ? "Nova receita"
@@ -160,31 +164,33 @@ export function AIOperationCard({
               : "Revisar"}
         </Field>
 
-        {isTransaction ? (
+        {transactionDraft ? (
           <>
-            <Field label="Data">{formatDate(draft.due_date)}</Field>
+            <Field label="Data">{formatDate(transactionDraft.due_date)}</Field>
             <Field label="Status">
-              {draft.status === "paid" ? "Pago / recebido" : "Pendente"}
+              {transactionDraft.status === "paid" ? "Pago / recebido" : "Pendente"}
             </Field>
           </>
-        ) : (
+        ) : recurrenceDraft ? (
           <>
-            <Field label="Início">{formatDate(draft.start_date)}</Field>
+            <Field label="Início">{formatDate(recurrenceDraft.start_date)}</Field>
             <Field label="Frequência">
-              {draft.frequency === "weekly"
+              {recurrenceDraft.frequency === "weekly"
                 ? "Semanal"
-                : draft.frequency === "monthly"
+                : recurrenceDraft.frequency === "monthly"
                   ? "Mensal"
                   : "Anual"}
-              {draft.interval_count > 1
-                ? ` · a cada ${draft.interval_count}`
+              {recurrenceDraft.interval_count > 1
+                ? ` · a cada ${recurrenceDraft.interval_count} ${recurrenceDraft.frequency === "weekly" ? "semanas" : recurrenceDraft.frequency === "monthly" ? "meses" : "anos"}`
                 : ""}
             </Field>
             <Field label="Término">
-              {draft.end_date ? formatDate(draft.end_date) : "Sem término"}
+              {recurrenceDraft.end_date
+                ? formatDate(recurrenceDraft.end_date)
+                : "Sem término"}
             </Field>
           </>
-        )}
+        ) : null}
 
         <Field label="Conta">
           {nameOrFallback(names.accounts, draft.account_id, "Sem conta definida")}
@@ -203,9 +209,9 @@ export function AIOperationCard({
           {nameOrFallback(names.partners, draft.partner_id, "Sem vínculo")}
         </Field>
 
-        {isTransaction && draft.tag_ids.length > 0 && (
+        {transactionDraft && transactionDraft.tag_ids.length > 0 && (
           <Field label="Tags">
-            {draft.tag_ids
+            {transactionDraft.tag_ids
               .map((id) => names.tags.get(id) ?? "Tag")
               .join(", ")}
           </Field>
