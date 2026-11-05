@@ -404,10 +404,11 @@ export function FinancialScenarios() {
     return <div className="form-alert error page-alert">{error}</div>;
   }
 
+  const scenarioNegativeDate = model.scenario.firstNegativeDate;
+  const baselineNegativeDate = model.baseline.firstNegativeDate;
   const riskWorsened =
-    Boolean(model.scenario.firstNegativeDate) &&
-    (!model.baseline.firstNegativeDate ||
-      model.scenario.firstNegativeDate < model.baseline.firstNegativeDate);
+    scenarioNegativeDate !== null &&
+    (baselineNegativeDate === null || scenarioNegativeDate < baselineNegativeDate);
 
   const scenarioIsNeutral =
     incomeChangePct === 0 &&
