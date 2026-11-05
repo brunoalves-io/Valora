@@ -50,6 +50,20 @@ export function CategorizationRulesDialog({
   const [saving, setSaving] = useState(false);
   const [busyRuleId, setBusyRuleId] = useState("");
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (!open || pendingDelete) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !saving && !busyRuleId) {
+        event.preventDefault();
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [open, pendingDelete, saving, busyRuleId, onClose]);
+
   const [form, setForm] = useState({
     pattern: "",
     match_mode: "contains" as CategorizationRule["match_mode"],
