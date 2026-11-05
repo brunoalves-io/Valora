@@ -2,9 +2,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { CashFlowProjection } from "./CashFlowProjection";
 
 type ReportBasis = "realized" | "scheduled";
-type ReportView = "cashflow" | "dre";
+type ReportView = "cashflow" | "projection" | "dre";
 type TransactionType = "income" | "expense";
 type DreGroup =
   | "revenue"
@@ -624,17 +625,19 @@ export function ReportsPage() {
           <h1>Relatórios</h1>
           <p>Fluxo de caixa e DRE gerencial com leitura comparativa do negócio.</p>
         </div>
-        <button
-          className="ghost"
-          onClick={exportCsv}
-          disabled={
-            view === "dre"
-              ? dreTransactions.length === 0
-              : filteredTransactions.length === 0
-          }
-        >
-          Exportar CSV
-        </button>
+        {view !== "projection" && (
+          <button
+            className="ghost"
+            onClick={exportCsv}
+            disabled={
+              view === "dre"
+                ? dreTransactions.length === 0
+                : filteredTransactions.length === 0
+            }
+          >
+            Exportar CSV
+          </button>
+        )}
       </header>
 
       <div className="report-mode-tabs" role="tablist" aria-label="Tipo de relatório">
@@ -644,6 +647,16 @@ export function ReportsPage() {
           onClick={() => setView("cashflow")}
         >
           Fluxo de caixa
+        </button>
+        <button
+          type="button"
+          className={view === "projection" ? "active" : ""}
+          onClick={() => {
+            setView("projection");
+            setTypeFilter("all");
+          }}
+        >
+          Projeção
         </button>
         <button
           type="button"
@@ -657,6 +670,7 @@ export function ReportsPage() {
         </button>
       </div>
 
+      {view !== "projection" && (
       <section className="panel report-filters">
         <div className="report-basis">
           <span>Visão</span>
@@ -764,11 +778,14 @@ export function ReportsPage() {
           </button>
         </div>
       </section>
+      )}
 
       {error && <div className="form-alert error page-alert">{error}</div>}
 
       {loading ? (
         <section className="panel empty-state">Montando relatórios...</section>
+      ) : view === "projection" ? (
+        <CashFlowProjection />
       ) : view === "cashflow" ? (
         <>
           <section className="metrics report-metrics">
