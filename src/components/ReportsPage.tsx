@@ -624,7 +624,7 @@ export function ReportsPage() {
         <div>
           <p className="eyebrow">ANÁLISE</p>
           <h1>Relatórios</h1>
-          <p>Fluxo de caixa e DRE gerencial com leitura comparativa do negócio.</p>
+          <p>Fluxo de caixa, projeções, cenários e DRE gerencial em uma visão integrada.</p>
         </div>
         {view !== "projection" && view !== "scenarios" && (
           <button
