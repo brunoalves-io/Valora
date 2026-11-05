@@ -594,49 +594,121 @@ export function ValoraAIPage() {
             + Nova conversa
           </button>
 
-          <div className="ai-history-heading">
-            <strong>Histórico</strong>
-            <span>Suas conversas nesta empresa</span>
+          <div className="ai-history-tabs">
+            <button
+              type="button"
+              className={historyView === "conversations" ? "active" : ""}
+              onClick={() => setHistoryView("conversations")}
+            >
+              Conversas
+            </button>
+            <button
+              type="button"
+              className={historyView === "actions" ? "active" : ""}
+              onClick={() => setHistoryView("actions")}
+            >
+              Ações IA
+              {actionLogs.some((item) => item.status === "proposed") && (
+                <span>
+                  {actionLogs.filter((item) => item.status === "proposed").length}
+                </span>
+              )}
+            </button>
           </div>
 
-          <div className="ai-conversation-list">
-            {loadingConversations ? (
-              <div className="ai-history-empty">Carregando...</div>
-            ) : conversations.length === 0 ? (
-              <div className="ai-history-empty">
-                Suas conversas aparecerão aqui.
+          {historyView === "conversations" ? (
+            <>
+              <div className="ai-history-heading">
+                <strong>Histórico</strong>
+                <span>Suas conversas nesta empresa</span>
               </div>
-            ) : (
-              conversations.map((conversation) => (
-                <div
-                  className={
-                    activeConversationId === conversation.id
-                      ? "ai-conversation-item active"
-                      : "ai-conversation-item"
-                  }
-                  key={conversation.id}
-                >
-                  <button
-                    className="ai-conversation-open"
-                    onClick={() => setActiveConversationId(conversation.id)}
-                    title={conversation.title}
-                  >
-                    <strong>{conversation.title}</strong>
-                    <span>
-                      {new Date(conversation.updated_at).toLocaleDateString("pt-BR")}
-                    </span>
-                  </button>
-                  <button
-                    className="ai-conversation-delete"
-                    onClick={() => requestRemoveConversation(conversation)}
-                    title="Excluir conversa"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
+
+              <div className="ai-conversation-list">
+                {loadingConversations ? (
+                  <div className="ai-history-empty">Carregando...</div>
+                ) : conversations.length === 0 ? (
+                  <div className="ai-history-empty">
+                    Suas conversas aparecerão aqui.
+                  </div>
+                ) : (
+                  conversations.map((conversation) => (
+                    <div
+                      className={
+                        activeConversationId === conversation.id
+                          ? "ai-conversation-item active"
+                          : "ai-conversation-item"
+                      }
+                      key={conversation.id}
+                    >
+                      <button
+                        className="ai-conversation-open"
+                        onClick={() => setActiveConversationId(conversation.id)}
+                        title={conversation.title}
+                      >
+                        <strong>{conversation.title}</strong>
+                        <span>
+                          {new Date(conversation.updated_at).toLocaleDateString("pt-BR")}
+                        </span>
+                      </button>
+                      <button
+                        className="ai-conversation-delete"
+                        onClick={() => requestRemoveConversation(conversation)}
+                        title="Excluir conversa"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="ai-history-heading">
+                <strong>Ações da Valora IA</strong>
+                <span>Propostas e confirmações financeiras</span>
+              </div>
+
+              <div className="ai-action-history-list">
+                {actionLogs.length === 0 ? (
+                  <div className="ai-history-empty">
+                    As ações propostas pela IA aparecerão aqui.
+                  </div>
+                ) : (
+                  actionLogs.map((action) => (
+                    <button
+                      type="button"
+                      className={"ai-action-history-item " + action.status}
+                      key={action.id}
+                      onClick={() => {
+                        if (action.conversation_id) {
+                          setActiveConversationId(action.conversation_id);
+                          setHistoryView("conversations");
+                        }
+                      }}
+                    >
+                      <span className="ai-action-history-icon" aria-hidden="true">
+                        {action.action_type === "create_recurrence" ? "↻" : "+"}
+                      </span>
+                      <span className="ai-action-history-copy">
+                        <strong>
+                          {action.summary ||
+                            (action.action_type === "create_recurrence"
+                              ? "Recorrência"
+                              : "Lançamento")}
+                        </strong>
+                        <small>
+                          {actionStatusLabel(action.status)} ·{" "}
+                          {new Date(action.created_at).toLocaleDateString("pt-BR")}
+                        </small>
+                      </span>
+                      <i className={"ai-action-history-status " + action.status} />
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </aside>
 
         <section className="panel ai-chat">
@@ -647,7 +719,7 @@ export function ValoraAIPage() {
                   ? conversationMap.get(activeConversationId)?.title ?? "Conversa"
                   : "Nova análise"}
               </strong>
-              <span>Baseado nos dados atuais do Valora</span>
+              <span>Consulta financeira + ações com confirmação</span>
             </div>
             <span className="ai-online-dot">Dados da empresa</span>
           </div>
@@ -658,10 +730,10 @@ export function ValoraAIPage() {
             ) : !hasMessages ? (
               <div className="ai-welcome">
                 <div className="ai-welcome-mark">✦</div>
-                <h2>O que você quer entender sobre sua empresa?</h2>
+                <h2>Consulte, planeje ou prepare uma ação financeira</h2>
                 <p>
-                  Posso analisar caixa, vencimentos, despesas, recebimentos,
-                  cartões, propostas e alertas usando os números registrados no Valora.
+                  Posso analisar os números da empresa e também preparar lançamentos,
+                  contas a pagar/receber e recorrências. Toda alteração exige sua confirmação.
                 </p>
 
                 <div className="ai-suggestions">
@@ -677,15 +749,55 @@ export function ValoraAIPage() {
                 </div>
               </div>
             ) : (
-              messages.map((message) => (
-                <article className={"ai-message " + message.role} key={message.id}>
-                  <div className="ai-message-author">
-                    <strong>{message.role === "user" ? "Você" : "Valora IA"}</strong>
-                    <time>{formatTime(message.created_at)}</time>
-                  </div>
-                  <div className="ai-message-content">{message.content}</div>
-                </article>
-              ))
+              messages.map((message) => {
+                const actionId =
+                  message.role === "assistant" &&
+                  typeof message.metadata?.ai_action_id === "string"
+                    ? message.metadata.ai_action_id
+                    : "";
+                const action =
+                  message.role === "assistant" &&
+                  message.metadata?.action &&
+                  typeof message.metadata.action === "object"
+                    ? (message.metadata.action as AIOperationAction)
+                    : null;
+                const actionLog = actionId ? actionLogMap.get(actionId) : null;
+                const actionStatus =
+                  actionLog?.status ??
+                  (actionId ? "proposed" : null);
+
+                return (
+                  <article className={"ai-message " + message.role} key={message.id}>
+                    <div className="ai-message-author">
+                      <strong>{message.role === "user" ? "Você" : "Valora IA"}</strong>
+                      <time>{formatTime(message.created_at)}</time>
+                    </div>
+                    <div className="ai-message-content">{message.content}</div>
+
+                    {message.role === "assistant" &&
+                      message.metadata?.action_error &&
+                      typeof message.metadata.action_error === "string" && (
+                        <div className="ai-message-action-error">
+                          {message.metadata.action_error}
+                        </div>
+                      )}
+
+                    {action && actionId && actionStatus && (
+                      <AIOperationCard
+                        action={action}
+                        actionId={actionId}
+                        status={actionStatus}
+                        errorMessage={actionLog?.error_message}
+                        names={actionNames}
+                        canManage={canManage}
+                        busy={actionBusyId === actionId}
+                        onConfirm={() => void confirmAIAction(actionId)}
+                        onCancel={() => void cancelAIAction(actionId)}
+                      />
+                    )}
+                  </article>
+                );
+              })
             )}
 
             {sending && (
@@ -725,7 +837,7 @@ export function ValoraAIPage() {
             <textarea
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
-              placeholder='Ex.: "Quanto tenho para pagar nos próximos 7 dias?"'
+              placeholder='Ex.: "Crie uma conta a pagar de R$ 780 para sexta-feira"'
               maxLength={5000}
               rows={2}
               disabled={sending}
@@ -746,8 +858,8 @@ export function ValoraAIPage() {
           </form>
 
           <p className="ai-disclaimer">
-            O Valora IA interpreta os dados registrados no sistema e pode cometer
-            erros. Não substitui orientação contábil, fiscal ou jurídica.
+            O Valora IA pode interpretar dados incorretamente. Ações financeiras só são
+            executadas após sua confirmação e não substituem orientação contábil, fiscal ou jurídica.
           </p>
         </section>
       </section>
