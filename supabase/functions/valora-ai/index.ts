@@ -331,6 +331,145 @@ function normalizedRecurrenceDraft(
   };
 }
 
+
+function numericValue(value: unknown) {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : NaN;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function addIsoDays(value: string, days: number) {
+  const date = new Date(value + "T12:00:00Z");
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+async function buildCashFlowForecast(
+  supabaseUrl: string,
+  supabaseAnonKey: string,
+  authorization: string,
+  companyId: string,
+  today: string,
+  financialContext: Record<string, unknown>,
+) {
+  const cash =
+    financialContext.cash && typeof financialContext.cash === "object"
+      ? financialContext.cash as Record<string, unknown>
+      : {};
+  const currentBalance = numericValue(cash.current_balance);
+  const throughDate = addIsoDays(today, 89);
+
+  const query = new URLSearchParams({
+    select: "type,amount,due_date,status,account_id",
+    company_id: `eq.${companyId}`,
+    status: "eq.pending",
+    due_date: `lte.${throughDate}`,
+    order: "due_date.asc",
+  });
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/transactions?${query.toString()}`,
+    {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: authorization,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    console.error("Valora AI forecast context error", {
+      status: response.status,
+      detail: (await response.text()).slice(0, 500),
+    });
+    return null;
+  }
+
+  const rows = await response.json() as Array<Record<string, unknown>>;
+
+  function summarize(days: 7 | 30 | 60 | 90) {
+    const endDate = addIsoDays(today, days - 1);
+    const scoped = rows.filter((item) => {
+      const dueDate = typeof item.due_date === "string" ? item.due_date : "";
+      return Boolean(dueDate) && dueDate <= endDate;
+    });
+
+    let receivable = 0;
+    let payable = 0;
+    let overdueReceivable = 0;
+    let overduePayable = 0;
+    const daily = new Map<string, number>();
+
+    for (const item of scoped) {
+      const amount = numericValue(item.amount);
+      const type = item.type === "income" ? "income" : "expense";
+      const dueDate = typeof item.due_date === "string" ? item.due_date : today;
+      const effectiveDate = dueDate < today ? today : dueDate;
+      const signed = type === "income" ? amount : -amount;
+
+      if (type === "income") {
+        receivable += amount;
+        if (dueDate < today) overdueReceivable += amount;
+      } else {
+        payable += amount;
+        if (dueDate < today) overduePayable += amount;
+      }
+
+      daily.set(effectiveDate, (daily.get(effectiveDate) ?? 0) + signed);
+    }
+
+    let balance = currentBalance;
+    let minimumBalance = currentBalance;
+    let minimumBalanceDate = today;
+    let firstNegativeDate: string | null = currentBalance < 0 ? today : null;
+
+    for (let index = 0; index < days; index += 1) {
+      const date = addIsoDays(today, index);
+      balance += daily.get(date) ?? 0;
+
+      if (balance < minimumBalance) {
+        minimumBalance = balance;
+        minimumBalanceDate = date;
+      }
+
+      if (!firstNegativeDate && balance < 0) {
+        firstNegativeDate = date;
+      }
+    }
+
+    return {
+      days,
+      through_date: endDate,
+      current_balance: currentBalance,
+      receivable,
+      payable,
+      net: receivable - payable,
+      projected_balance: balance,
+      minimum_balance: minimumBalance,
+      minimum_balance_date: minimumBalanceDate,
+      first_negative_date: firstNegativeDate,
+      overdue_receivable: overdueReceivable,
+      overdue_payable: overduePayable,
+      pending_items: scoped.length,
+    };
+  }
+
+  return {
+    as_of: today,
+    source: "pending transactions, including recurring transactions already materialized by Valora",
+    horizons: {
+      "7_days": summarize(7),
+      "30_days": summarize(30),
+      "60_days": summarize(60),
+      "90_days": summarize(90),
+    },
+  };
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -450,6 +589,21 @@ Deno.serve(async (request) => {
   const financialContext =
     await contextResponse.json() as Record<string, unknown>;
 
+  if (mode === "chat") {
+    const cashFlowForecast = await buildCashFlowForecast(
+      supabaseUrl,
+      supabaseAnonKey,
+      authorization,
+      companyId,
+      today,
+      financialContext,
+    );
+
+    if (cashFlowForecast) {
+      financialContext.cash_flow_forecast = cashFlowForecast;
+    }
+  }
+
   let actionContext: Record<string, unknown> | null =
     mode === "transaction_draft" ? financialContext : null;
 
@@ -527,6 +681,7 @@ Deno.serve(async (request) => {
           "Use SOMENTE o contexto financeiro fornecido para afirmar números específicos da empresa.",
           "Nunca invente valores, datas, clientes, despesas, saldos, tendências ou IDs.",
           "Diferencie valores realizados, pendentes, vencidos e projetados quando isso for relevante.",
+          "Para perguntas sobre caixa futuro, saldo projetado ou risco de ficar negativo em 7, 30, 60 ou 90 dias, use cash_flow_forecast.horizons. Quando existir first_negative_date, informe a data e o minimum_balance; quando não existir, deixe claro que não há saldo negativo projetado no horizonte consultado.",
           "Se a pergunta exigir dados ausentes, diga claramente que o Valora ainda não possui dados suficientes.",
           "A IA NUNCA executa uma alteração por conta própria. Ela apenas responde ou prepara uma proposta para confirmação humana.",
           "As únicas ações mutáveis suportadas aqui são create_transaction e create_recurrence.",
