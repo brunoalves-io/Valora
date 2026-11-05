@@ -1204,6 +1204,123 @@ export function BankReconciliationPage() {
     }
   }
 
+  async function runSafeAutomation() {
+    if (
+      !supabase ||
+      !activeCompany ||
+      !accountId ||
+      !parsed ||
+      parsed.format !== "Open Finance" ||
+      !automationSettings.safe_auto_reconcile_enabled ||
+      automationRunning ||
+      schemaReady !== true ||
+      !canManage
+    ) {
+      return;
+    }
+
+    const eligible = autoEligibleRecommendations;
+    if (!eligible.length) return;
+
+    setAutomationRunning(true);
+    setError("");
+
+    let completed = 0;
+    let firstError = "";
+
+    for (const recommendation of eligible) {
+      const analysis = automationAnalysis[recommendation.row.id];
+      const transactionId = analysis?.autoTransactionId;
+      if (!analysis?.autoEligible || !transactionId) continue;
+
+      const transaction = transactionById.get(transactionId);
+      const categorySuggestion = categorySuggestions[recommendation.row.id];
+      const categoryId =
+        !transaction?.category_id && categorySuggestion?.source === "rule"
+          ? categorySuggestion.categoryId
+          : null;
+
+      const { error: reconcileError } = await supabase.rpc(
+        "reconcile_bank_statement_entry_v3",
+        {
+          p_company_id: activeCompany.id,
+          p_account_id: accountId,
+          p_transaction_id: transactionId,
+          p_source_format: parsed.format,
+          p_statement_reference: recommendation.reference,
+          p_statement_date: recommendation.row.date,
+          p_statement_description: recommendation.row.description,
+          p_statement_amount: recommendation.row.amount,
+          p_statement_type: recommendation.row.type,
+          p_category_id: categoryId,
+          p_reconciliation_mode: "automatic",
+          p_automation_score: analysis.autoScore,
+          p_automation_reason: analysis.reason,
+        },
+      );
+
+      if (reconcileError) {
+        firstError = reconcileError.message;
+        break;
+      }
+
+      completed += 1;
+    }
+
+    await reloadReconciliations();
+    await loadCategorizationData();
+
+    if (completed > 0) {
+      setSuccess(
+        `${completed} movimentação${completed === 1 ? "" : "ões"} conciliada${completed === 1 ? "" : "s"} automaticamente com segurança.`,
+      );
+    }
+
+    if (firstError) {
+      setError(
+        `A automação segura parou após ${completed} item${completed === 1 ? "" : "s"}. ${firstError}`,
+      );
+    }
+
+    setAutomationRunning(false);
+  }
+
+  useEffect(() => {
+    if (
+      parsed?.format !== "Open Finance" ||
+      !automationSettings.safe_auto_reconcile_enabled ||
+      schemaReady !== true ||
+      automationRunning ||
+      saving ||
+      !canManage ||
+      autoEligibleRecommendations.length === 0
+    ) {
+      return;
+    }
+
+    const key = [
+      accountId,
+      automationSettings.minimum_auto_score,
+      ...autoEligibleRecommendations.map(
+        (recommendation) => recommendation.reference,
+      ),
+    ].join("|");
+
+    if (autoRunKeyRef.current === key) return;
+    autoRunKeyRef.current = key;
+    void runSafeAutomation();
+  }, [
+    parsed?.format,
+    automationSettings.safe_auto_reconcile_enabled,
+    automationSettings.minimum_auto_score,
+    schemaReady,
+    automationRunning,
+    saving,
+    canManage,
+    accountId,
+    autoEligibleRecommendations,
+  ]);
+
   async function confirmReconciliation() {
     if (!supabase || !activeCompany || !accountId || !parsed) return;
 
@@ -1234,6 +1351,7 @@ export function BankReconciliationPage() {
       return (
         !recommendation.alreadyReconciled &&
         choice !== "__skip__" &&
+        choice !== "__review__" &&
         choice !== "__done__"
       );
     });
@@ -1257,7 +1375,7 @@ export function BankReconciliationPage() {
         effectiveCategoryChoices[recommendation.row.id] || null;
 
       const { error: reconcileError } = await client.rpc(
-        "reconcile_bank_statement_entry_v2",
+        "reconcile_bank_statement_entry_v3",
         {
           p_company_id: companyId,
           p_account_id: accountId,
@@ -1269,6 +1387,9 @@ export function BankReconciliationPage() {
           p_statement_amount: recommendation.row.amount,
           p_statement_type: recommendation.row.type,
           p_category_id: categoryId,
+          p_reconciliation_mode: "manual",
+          p_automation_score: null,
+          p_automation_reason: null,
         },
       );
 
