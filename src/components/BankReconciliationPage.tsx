@@ -15,6 +15,14 @@ import {
   type CategorizedHistoryItem,
   type CategorySuggestion,
 } from "../lib/categorization";
+import {
+  detectOwnAccountTransfer,
+  detectPotentialDuplicate,
+  evaluateSafeAutoMatch,
+  type AutomationReconciliationRecord,
+  type CompanyBankMovement,
+  type CompanyLinkedBankAccount,
+} from "../lib/reconciliationAutomation";
 
 type Account = {
   id: string;
@@ -35,16 +43,19 @@ type Transaction = {
   category_id: string | null;
 };
 
-type Reconciliation = {
-  transaction_id: string;
-  statement_reference: string | null;
-  statement_date: string;
-};
+type Reconciliation = AutomationReconciliationRecord;
 
 type LinkedBankAccount = {
   id: string;
   name: string;
   provider_account_id: string;
+};
+
+type AutomationSettings = {
+  safe_auto_reconcile_enabled: boolean;
+  minimum_auto_score: number;
+  detect_duplicates: boolean;
+  detect_transfers: boolean;
 };
 
 type OpenFinanceTransaction = {
@@ -209,11 +220,23 @@ function MovementIcon() {
 export function BankReconciliationPage() {
   const { activeCompany, activeRole } = useCompany();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const autoRunKeyRef = useRef("");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
   const [linkedBankAccounts, setLinkedBankAccounts] = useState<LinkedBankAccount[]>([]);
+  const [companyLinkedBankAccounts, setCompanyLinkedBankAccounts] = useState<CompanyLinkedBankAccount[]>([]);
+  const [companyOpenFinanceFeed, setCompanyOpenFinanceFeed] = useState<CompanyBankMovement[]>([]);
+  const [automationSettings, setAutomationSettings] = useState<AutomationSettings>({
+    safe_auto_reconcile_enabled: false,
+    minimum_auto_score: 92,
+    detect_duplicates: true,
+    detect_transfers: true,
+  });
+  const [automationRunning, setAutomationRunning] = useState(false);
+  const [automationSavingSettings, setAutomationSavingSettings] = useState(false);
+  const [exceptionsOnly, setExceptionsOnly] = useState(false);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [categorizationRules, setCategorizationRules] = useState<CategorizationRule[]>([]);
   const [categorizedHistory, setCategorizedHistory] = useState<CategorizedHistoryItem[]>([]);
@@ -237,7 +260,7 @@ export function BankReconciliationPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
   const [periodFilter, setPeriodFilter] = useState<"all" | "30" | "60" | "90">("all");
   const [situationFilter, setSituationFilter] = useState<
-    "all" | "done" | "match" | "new" | "skip"
+    "all" | "done" | "match" | "new" | "review" | "skip"
   >("all");
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -289,6 +312,39 @@ export function BankReconciliationPage() {
 
   useEffect(() => {
     void loadCategorizationData();
+  }, [activeCompany?.id]);
+
+  async function loadAutomationSettings() {
+    if (!supabase || !activeCompany) return;
+
+    const { data, error: settingsError } = await supabase
+      .from("bank_reconciliation_settings")
+      .select("safe_auto_reconcile_enabled, minimum_auto_score, detect_duplicates, detect_transfers")
+      .eq("company_id", activeCompany.id)
+      .maybeSingle();
+
+    if (settingsError) return;
+
+    if (!data) {
+      setAutomationSettings({
+        safe_auto_reconcile_enabled: false,
+        minimum_auto_score: 92,
+        detect_duplicates: true,
+        detect_transfers: true,
+      });
+      return;
+    }
+
+    setAutomationSettings({
+      safe_auto_reconcile_enabled: Boolean(data.safe_auto_reconcile_enabled),
+      minimum_auto_score: Number(data.minimum_auto_score) || 92,
+      detect_duplicates: data.detect_duplicates !== false,
+      detect_transfers: data.detect_transfers !== false,
+    });
+  }
+
+  useEffect(() => {
+    void loadAutomationSettings();
   }, [activeCompany?.id]);
 
   useEffect(() => {
@@ -361,7 +417,7 @@ export function BankReconciliationPage() {
           .limit(2500),
         client
           .from("bank_reconciliations")
-          .select("transaction_id, statement_reference, statement_date")
+          .select("transaction_id, statement_reference, statement_date, statement_description, statement_amount, statement_type, reconciliation_mode, automation_score, automation_reason")
           .eq("company_id", companyId)
           .eq("account_id", accountId)
           .order("statement_date", { ascending: false })
@@ -426,6 +482,9 @@ export function BankReconciliationPage() {
     setPeriodFilter("all");
     setSituationFilter("all");
     setShowMoreFilters(false);
+    setExceptionsOnly(false);
+    autoRunKeyRef.current = "";
+    setCompanyOpenFinanceFeed([]);
     setSuccess("");
   }, [accountId]);
 
@@ -886,7 +945,7 @@ export function BankReconciliationPage() {
         .limit(2500),
       client
         .from("bank_reconciliations")
-        .select("transaction_id, statement_reference, statement_date")
+        .select("transaction_id, statement_reference, statement_date, statement_description, statement_amount, statement_type, reconciliation_mode, automation_score, automation_reason")
         .eq("company_id", companyId)
         .eq("account_id", accountId)
         .order("statement_date", { ascending: false })
