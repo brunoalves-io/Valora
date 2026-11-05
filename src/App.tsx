@@ -14,6 +14,7 @@ import { Dashboard } from "./components/Dashboard";
 import { FinancialObligationsPage } from "./components/FinancialObligationsPage";
 import { ProposalsPage } from "./components/ProposalsPage";
 import { PlanningPage } from "./components/PlanningPage";
+import { MonthlyClosingPage } from "./components/MonthlyClosingPage";
 import { ReportsPage } from "./components/ReportsPage";
 import { CardsPage } from "./components/CardsPage";
 import { RecurrencesPage } from "./components/RecurrencesPage";
@@ -42,6 +43,7 @@ type Page =
   | "suppliers"
   | "proposals"
   | "planning"
+  | "closing"
   | "reports"
   | "cards"
   | "recurrences"
@@ -65,6 +67,7 @@ const activeNav: Array<[string, Page]> = [
   ["Fornecedores", "suppliers"],
   ["Propostas", "proposals"],
   ["Planejamento", "planning"],
+  ["Fechamento mensal", "closing"],
   ["Relatórios", "reports"],
   ["Cartões", "cards"],
   ["Recorrências", "recurrences"],
@@ -238,6 +241,14 @@ function SidebarIcon({
           <path d="m9.7 12 1.5 1.5 3.2-3.2" />
         </svg>
       );
+    case "closing":
+      return (
+        <svg {...common}>
+          <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+          <path d="M7 3v4M17 3v4M3.5 9h17" />
+          <path d="m8.5 15 2 2 4.5-4.5" />
+        </svg>
+      );
     case "reports":
       return (
         <svg {...common}>
@@ -375,6 +386,8 @@ function CurrentPage({
       return <ProposalsPage />;
     case "planning":
       return <PlanningPage />;
+    case "closing":
+      return <MonthlyClosingPage />;
     case "reports":
       return <ReportsPage />;
     case "cards":
