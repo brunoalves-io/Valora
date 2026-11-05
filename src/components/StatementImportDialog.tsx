@@ -50,6 +50,25 @@ export function StatementImportDialog({
 
   useEffect(() => {
     if (!open) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (
+        event.key === "Escape" &&
+        !parsing &&
+        !checkingDuplicates &&
+        !importing
+      ) {
+        event.preventDefault();
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [open, parsing, checkingDuplicates, importing, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
     setAccountId((current) => current || accounts[0]?.id || "");
   }, [open, accounts]);
 
