@@ -631,12 +631,12 @@ export function FinancialScenarios() {
         }
       >
         <div className="scenario-risk-icon">
-          {model.scenario.firstNegativeDate ? "!" : "✓"}
+          {scenarioNegativeDate ? "!" : "✓"}
         </div>
         <div>
           <strong>
             {model.scenario.firstNegativeDate
-              ? `O cenário leva o caixa ao negativo em ${formatDate(model.scenario.firstNegativeDate)}`
+              ? `O cenário leva o caixa ao negativo em ${formatDate(scenarioNegativeDate)}`
               : scenarioIsNeutral
                 ? "Cenário igual à projeção atual"
                 : "O caixa permanece positivo neste cenário"}
@@ -719,19 +719,19 @@ export function FinancialScenarios() {
               className="scenario-simulated-line"
             />
 
-            {model.scenario.firstNegativeDate && (
+            {scenarioNegativeDate && (
               <circle
                 cx={chart.xForIndex(
                   Math.max(
                     0,
                     model.scenario.daily.findIndex(
-                      (item) => item.date === model.scenario.firstNegativeDate,
+                      (item) => item.date === scenarioNegativeDate,
                     ),
                   ),
                 )}
                 cy={chart.yForValue(
                   model.scenario.daily.find(
-                    (item) => item.date === model.scenario.firstNegativeDate,
+                    (item) => item.date === scenarioNegativeDate,
                   )?.balance ?? 0,
                 )}
                 r="5"
