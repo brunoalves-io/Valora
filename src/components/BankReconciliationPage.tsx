@@ -582,14 +582,123 @@ export function BankReconciliationPage() {
     });
   }, [parsed, reconciledReferences, reconciledTransactionIds, transactions]);
 
+  const automationAnalysis = useMemo(() => {
+    const result: Record<
+      string,
+      {
+        duplicateRisk: boolean;
+        transferRisk: boolean;
+        autoEligible: boolean;
+        autoTransactionId: string | null;
+        autoScore: number;
+        reason: string;
+        isException: boolean;
+      }
+    > = {};
+
+    for (const recommendation of recommendations) {
+      if (recommendation.alreadyReconciled) {
+        result[recommendation.row.id] = {
+          duplicateRisk: false,
+          transferRisk: false,
+          autoEligible: false,
+          autoTransactionId: null,
+          autoScore: 0,
+          reason: "Movimentação já conciliada.",
+          isException: false,
+        };
+        continue;
+      }
+
+      const duplicateRisk =
+        automationSettings.detect_duplicates &&
+        detectPotentialDuplicate(
+          recommendation.row,
+          recommendation.reference,
+          reconciliations,
+        );
+
+      const transferRisk =
+        parsed?.format === "Open Finance" &&
+        automationSettings.detect_transfers &&
+        detectOwnAccountTransfer(
+          recommendation.row,
+          accountId,
+          companyLinkedBankAccounts,
+          companyOpenFinanceFeed,
+        );
+
+      const defaultCandidate = recommendation.defaultChoice.startsWith("__")
+        ? null
+        : recommendation.candidates.find(
+            (candidate) =>
+              candidate.transaction.id === recommendation.defaultChoice,
+          ) ?? null;
+
+      const otherCandidate = recommendation.candidates.find(
+        (candidate) =>
+          candidate.transaction.id !== defaultCandidate?.transaction.id,
+      );
+
+      const safe = evaluateSafeAutoMatch({
+        row: recommendation.row,
+        best: defaultCandidate
+          ? {
+              id: defaultCandidate.transaction.id,
+              description: defaultCandidate.transaction.description,
+              transactionDate: transactionDate(defaultCandidate.transaction),
+              score: defaultCandidate.score,
+            }
+          : null,
+        secondScore: otherCandidate?.score ?? null,
+        minimumScore: automationSettings.minimum_auto_score,
+        duplicateRisk,
+        transferRisk,
+      });
+
+      result[recommendation.row.id] = {
+        duplicateRisk,
+        transferRisk,
+        autoEligible:
+          parsed?.format === "Open Finance" && safe.eligible,
+        autoTransactionId: safe.transactionId,
+        autoScore: safe.score,
+        reason: safe.reason,
+        isException:
+          duplicateRisk ||
+          transferRisk ||
+          !(parsed?.format === "Open Finance" && safe.eligible),
+      };
+    }
+
+    return result;
+  }, [
+    recommendations,
+    automationSettings,
+    reconciliations,
+    parsed?.format,
+    accountId,
+    companyLinkedBankAccounts,
+    companyOpenFinanceFeed,
+  ]);
+
   const effectiveChoices = useMemo(() => {
     const result: Record<string, string> = {};
     for (const recommendation of recommendations) {
-      result[recommendation.row.id] =
-        choices[recommendation.row.id] ?? recommendation.defaultChoice;
+      const rowId = recommendation.row.id;
+      if (Object.prototype.hasOwnProperty.call(choices, rowId)) {
+        result[rowId] = choices[rowId];
+        continue;
+      }
+
+      const analysis = automationAnalysis[rowId];
+      result[rowId] =
+        analysis?.duplicateRisk || analysis?.transferRisk
+          ? "__review__"
+          : recommendation.defaultChoice;
     }
     return result;
-  }, [choices, recommendations]);
+  }, [choices, recommendations, automationAnalysis]);
 
   const transactionById = useMemo(
     () => new Map(transactions.map((transaction) => [transaction.id, transaction])),
@@ -687,6 +796,7 @@ export function BankReconciliationPage() {
       already: 0,
       match: 0,
       create: 0,
+      review: 0,
       skip: 0,
     };
 
@@ -694,6 +804,7 @@ export function BankReconciliationPage() {
       const choice = effectiveChoices[recommendation.row.id];
       if (recommendation.alreadyReconciled || choice === "__done__") result.already += 1;
       else if (choice === "__skip__") result.skip += 1;
+      else if (choice === "__review__") result.review += 1;
       else if (choice === "__new__") result.create += 1;
       else if (choice) result.match += 1;
     }
@@ -732,6 +843,10 @@ export function BankReconciliationPage() {
       const row = recommendation.row;
       const choice = effectiveChoices[row.id];
 
+      const analysis = automationAnalysis[row.id];
+
+      if (exceptionsOnly && !analysis?.isException) return false;
+
       if (typeFilter !== "all" && row.type !== typeFilter) return false;
 
       if (periodFilter !== "all") {
@@ -746,9 +861,11 @@ export function BankReconciliationPage() {
             ? "done"
             : choice === "__skip__"
               ? "skip"
-              : choice === "__new__"
-                ? "new"
-                : "match";
+              : choice === "__review__"
+                ? "review"
+                : choice === "__new__"
+                  ? "new"
+                  : "match";
 
         if (situation !== situationFilter) return false;
       }
@@ -776,6 +893,8 @@ export function BankReconciliationPage() {
     typeFilter,
     periodFilter,
     situationFilter,
+    exceptionsOnly,
+    automationAnalysis,
   ]);
 
   const reconciledPercent = summary.total
