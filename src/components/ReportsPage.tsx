@@ -3,9 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import { CashFlowProjection } from "./CashFlowProjection";
+import { FinancialScenarios } from "./FinancialScenarios";
 
 type ReportBasis = "realized" | "scheduled";
-type ReportView = "cashflow" | "projection" | "dre";
+type ReportView = "cashflow" | "projection" | "scenarios" | "dre";
 type TransactionType = "income" | "expense";
 type DreGroup =
   | "revenue"
@@ -625,7 +626,7 @@ export function ReportsPage() {
           <h1>Relatórios</h1>
           <p>Fluxo de caixa e DRE gerencial com leitura comparativa do negócio.</p>
         </div>
-        {view !== "projection" && (
+        {view !== "projection" && view !== "scenarios" && (
           <button
             className="ghost"
             onClick={exportCsv}
@@ -660,6 +661,16 @@ export function ReportsPage() {
         </button>
         <button
           type="button"
+          className={view === "scenarios" ? "active" : ""}
+          onClick={() => {
+            setView("scenarios");
+            setTypeFilter("all");
+          }}
+        >
+          Cenários
+        </button>
+        <button
+          type="button"
           className={view === "dre" ? "active" : ""}
           onClick={() => {
             setView("dre");
@@ -670,7 +681,7 @@ export function ReportsPage() {
         </button>
       </div>
 
-      {view !== "projection" && (
+      {view !== "projection" && view !== "scenarios" && (
       <section className="panel report-filters">
         <div className="report-basis">
           <span>Visão</span>
@@ -786,6 +797,8 @@ export function ReportsPage() {
         <section className="panel empty-state">Montando relatórios...</section>
       ) : view === "projection" ? (
         <CashFlowProjection />
+      ) : view === "scenarios" ? (
+        <FinancialScenarios />
       ) : view === "cashflow" ? (
         <>
           <section className="metrics report-metrics">
