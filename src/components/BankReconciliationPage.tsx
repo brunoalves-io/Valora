@@ -911,9 +911,97 @@ export function BankReconciliationPage() {
   const totalActionCount =
     reconciliationActionCount + categoryOnlyUpdates.length;
 
+  const autoEligibleRecommendations = useMemo(
+    () =>
+      recommendations.filter(
+        (recommendation) =>
+          !recommendation.alreadyReconciled &&
+          automationAnalysis[recommendation.row.id]?.autoEligible,
+      ),
+    [recommendations, automationAnalysis],
+  );
+
+  const duplicateCount = useMemo(
+    () =>
+      recommendations.filter(
+        (recommendation) =>
+          automationAnalysis[recommendation.row.id]?.duplicateRisk,
+      ).length,
+    [recommendations, automationAnalysis],
+  );
+
+  const transferCount = useMemo(
+    () =>
+      recommendations.filter(
+        (recommendation) =>
+          automationAnalysis[recommendation.row.id]?.transferRisk,
+      ).length,
+    [recommendations, automationAnalysis],
+  );
+
+  const exceptionCount = useMemo(
+    () =>
+      recommendations.filter(
+        (recommendation) =>
+          !recommendation.alreadyReconciled &&
+          automationAnalysis[recommendation.row.id]?.isException,
+      ).length,
+    [recommendations, automationAnalysis],
+  );
+
+  const automaticCompletedCount = useMemo(() => {
+    const currentReferences = new Set(
+      recommendations.map((recommendation) => recommendation.reference),
+    );
+
+    return reconciliations.filter(
+      (item) =>
+        item.reconciliation_mode === "automatic" &&
+        item.statement_reference &&
+        currentReferences.has(item.statement_reference),
+    ).length;
+  }, [recommendations, reconciliations]);
+
   function openRulesManager() {
     setRuleDraft(null);
     setShowRules(true);
+  }
+
+  async function updateAutomationSettings(
+    patch: Partial<AutomationSettings>,
+  ) {
+    if (!supabase || !activeCompany || !canManageRules || automationSavingSettings) {
+      return;
+    }
+
+    const next = { ...automationSettings, ...patch };
+    setAutomationSavingSettings(true);
+    setError("");
+
+    const { data: userResult } = await supabase.auth.getUser();
+    const userId = userResult.user?.id ?? null;
+
+    const { error: settingsError } = await supabase
+      .from("bank_reconciliation_settings")
+      .upsert(
+        {
+          company_id: activeCompany.id,
+          ...next,
+          updated_by: userId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "company_id" },
+      );
+
+    if (settingsError) {
+      setError("Não foi possível salvar as configurações da automação segura.");
+      setAutomationSavingSettings(false);
+      return;
+    }
+
+    setAutomationSettings(next);
+    autoRunKeyRef.current = "";
+    setAutomationSavingSettings(false);
   }
 
   function createRuleFromRow(recommendation: Recommendation) {
@@ -956,17 +1044,39 @@ export function BankReconciliationPage() {
     setError("");
     setSuccess("");
 
-    const externalAccountIds = linkedBankAccounts.map((item) => item.id);
+    const { data: companyAccountData, error: companyAccountError } = await supabase
+      .from("bank_connection_accounts")
+      .select("id, name, local_account_id")
+      .eq("company_id", activeCompany.id)
+      .not("local_account_id", "is", null)
+      .order("name");
+
+    if (companyAccountError) {
+      setError("Não foi possível analisar as contas próprias conectadas.");
+      setLoadingOpenFinance(false);
+      return;
+    }
+
+    const companyAccounts =
+      (companyAccountData ?? []) as CompanyLinkedBankAccount[];
+    const companyExternalIds = companyAccounts.map((item) => item.id);
+
+    if (!companyExternalIds.length) {
+      setError("Nenhuma conta Open Finance vinculada foi encontrada.");
+      setLoadingOpenFinance(false);
+      return;
+    }
+
     const { data, error: feedError } = await supabase
       .from("bank_connection_transactions")
       .select(
         "id, external_account_id, provider_transaction_id, description, movement_type, status, amount, transaction_date",
       )
       .eq("company_id", activeCompany.id)
-      .in("external_account_id", externalAccountIds)
+      .in("external_account_id", companyExternalIds)
       .eq("status", "POSTED")
       .order("transaction_date", { ascending: false })
-      .limit(5000);
+      .limit(10000);
 
     if (feedError) {
       setError("Não foi possível carregar as movimentações do Open Finance.");
@@ -974,7 +1084,16 @@ export function BankReconciliationPage() {
       return;
     }
 
-    const feed = (data ?? []) as OpenFinanceTransaction[];
+    const fullFeed = (data ?? []) as OpenFinanceTransaction[];
+    const selectedExternalIds = new Set(
+      linkedBankAccounts.map((item) => item.id),
+    );
+    const feed = fullFeed.filter((item) =>
+      selectedExternalIds.has(item.external_account_id),
+    );
+
+    setCompanyLinkedBankAccounts(companyAccounts);
+    setCompanyOpenFinanceFeed(fullFeed as CompanyBankMovement[]);
     const rows: StatementImportRow[] = feed
       .filter(
         (item) =>
@@ -1014,6 +1133,7 @@ export function BankReconciliationPage() {
     );
     setChoices({});
     setCategoryChoices({});
+    autoRunKeyRef.current = "";
     setLoadingOpenFinance(false);
   }
 
@@ -1032,6 +1152,9 @@ export function BankReconciliationPage() {
       setFileName(file.name);
       setChoices({});
       setCategoryChoices({});
+      setCompanyOpenFinanceFeed([]);
+      setCompanyLinkedBankAccounts([]);
+      autoRunKeyRef.current = "";
     } catch (parseError) {
       setParsed(null);
       setFileName("");
