@@ -729,6 +729,41 @@ export function BankReconciliationPage() {
     ? Math.round((summary.create / summary.total) * 1000) / 10
     : 0;
 
+  const reconciliationActionCount = summary.match + summary.create;
+  const totalActionCount =
+    reconciliationActionCount + categoryOnlyUpdates.length;
+
+  function openRulesManager() {
+    setRuleDraft(null);
+    setShowRules(true);
+  }
+
+  function createRuleFromRow(recommendation: Recommendation) {
+    const pattern = rulePatternFromDescription(recommendation.row.description);
+    const categoryId =
+      effectiveCategoryChoices[recommendation.row.id] ?? "";
+
+    if (!categoryId) {
+      setError("Escolha uma categoria antes de criar uma regra.");
+      return;
+    }
+
+    if (!pattern) {
+      setError(
+        "Esta descrição é genérica demais para virar regra automaticamente. Abra “Regras” e informe um padrão mais específico.",
+      );
+      return;
+    }
+
+    setRuleDraft({
+      pattern,
+      transactionType: recommendation.row.type,
+      categoryId,
+    });
+    setShowRules(true);
+    setError("");
+  }
+
   async function loadOpenFinanceFeed() {
     if (!supabase || !activeCompany || !accountId || loadingOpenFinance) return;
 
@@ -1024,14 +1059,32 @@ export function BankReconciliationPage() {
             (CSV, Excel ou OFX) com os lançamentos já registrados no Valora.
           </p>
         </div>
-        <button
-          type="button"
-          className="ghost reconciliation-help-button"
-          onClick={() => setShowHelp((current) => !current)}
-        >
-          <span aria-hidden="true">?</span>
-          Como funciona?
-        </button>
+        <div className="reconciliation-header-actions">
+          <button
+            type="button"
+            className="ghost reconciliation-rules-button"
+            onClick={openRulesManager}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h10M18 7h2M4 12h3M11 12h9M4 17h8M16 17h4" />
+              <circle cx="16" cy="7" r="2" />
+              <circle cx="9" cy="12" r="2" />
+              <circle cx="14" cy="17" r="2" />
+            </svg>
+            Regras
+            {categorizationRules.length > 0 && (
+              <span>{categorizationRules.length}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            className="ghost reconciliation-help-button"
+            onClick={() => setShowHelp((current) => !current)}
+          >
+            <span aria-hidden="true">?</span>
+            Como funciona?
+          </button>
+        </div>
       </header>
 
       {showHelp && (
@@ -1042,7 +1095,7 @@ export function BankReconciliationPage() {
           </div>
           <div>
             <strong>2. Revise as sugestões</strong>
-            <span>O Valora compara valor, data e descrição com seus lançamentos.</span>
+            <span>O Valora compara lançamentos e também sugere categorias por regras e histórico.</span>
           </div>
           <div>
             <strong>3. Confirme</strong>
@@ -1382,6 +1435,7 @@ export function BankReconciliationPage() {
                     <th>Data</th>
                     <th>Descrição</th>
                     <th className="center">Tipo</th>
+                    <th>Categoria</th>
                     <th className="right">Valor</th>
                     <th className="center">Situação</th>
                     <th>Ação</th>
@@ -1402,6 +1456,17 @@ export function BankReconciliationPage() {
                           : choice === "__new__"
                             ? "new"
                             : "match";
+                    const selectedCategoryId =
+                      effectiveCategoryChoices[row.id] ?? "";
+                    const categorySuggestion =
+                      categorySuggestions[row.id] ?? null;
+                    const categoryOptions = categories.filter(
+                      (category) =>
+                        category.type === row.type ||
+                        category.type === "both",
+                    );
+                    const safeRulePattern =
+                      rulePatternFromDescription(row.description);
 
                     return (
                       <tr
@@ -1435,6 +1500,60 @@ export function BankReconciliationPage() {
                           <span className={`pill ${row.type}`}>
                             {row.type === "income" ? "Receita" : "Despesa"}
                           </span>
+                        </td>
+                        <td>
+                          <div className="reconciliation-category-cell">
+                            <select
+                              value={selectedCategoryId}
+                              onChange={(event) =>
+                                setCategoryChoices((current) => ({
+                                  ...current,
+                                  [row.id]: event.target.value,
+                                }))
+                              }
+                              disabled={saving || !canManage}
+                            >
+                              <option value="">Sem categoria</option>
+                              {categoryOptions.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                  {category.name}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="reconciliation-category-meta">
+                              {categorySuggestion &&
+                                selectedCategoryId ===
+                                  categorySuggestion.categoryId && (
+                                  <span
+                                    className={
+                                      "category-suggestion-badge " +
+                                      categorySuggestion.source
+                                    }
+                                    title={categorySuggestion.reason}
+                                  >
+                                    {categorySuggestion.source === "rule"
+                                      ? "Regra"
+                                      : categorySuggestion.confidence === "strong"
+                                        ? `Histórico ${categorySuggestion.score}%`
+                                        : `Sugestão ${categorySuggestion.score}%`}
+                                  </span>
+                                )}
+                              {canManageRules &&
+                                selectedCategoryId &&
+                                categorySuggestion?.source !== "rule" &&
+                                safeRulePattern && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      createRuleFromRow(recommendation)
+                                    }
+                                    disabled={saving}
+                                  >
+                                    Criar regra
+                                  </button>
+                                )}
+                            </div>
+                          </div>
                         </td>
                         <td className={`right amount ${row.type}`}>
                           {row.type === "income" ? "+" : "−"} {money.format(row.amount)}
@@ -1502,7 +1621,7 @@ export function BankReconciliationPage() {
 
                   {filteredRecommendations.length === 0 && (
                     <tr>
-                      <td colSpan={6}>
+                      <td colSpan={7}>
                         <div className="reconciliation-filter-empty">
                           <strong>Nenhuma movimentação encontrada</strong>
                           <span>Ajuste a busca ou os filtros para ver outros resultados.</span>
@@ -1529,14 +1648,18 @@ export function BankReconciliationPage() {
                   !canManage ||
                   schemaReady !== true ||
                   hasTransactionConflict ||
-                  summary.match + summary.create === 0
+                  totalActionCount === 0
                 }
               >
                 {saving
-                  ? "Conciliando..."
-                  : summary.match + summary.create === 0 && summary.already === summary.total
+                  ? "Salvando..."
+                  : totalActionCount === 0
                     ? "Tudo conciliado"
-                    : `Confirmar ${summary.match + summary.create} item${summary.match + summary.create === 1 ? "" : "s"}`}
+                    : reconciliationActionCount === 0
+                      ? `Salvar ${categoryOnlyUpdates.length} categoria${categoryOnlyUpdates.length === 1 ? "" : "s"}`
+                      : categoryOnlyUpdates.length > 0
+                        ? `Confirmar ${totalActionCount} alterações`
+                        : `Confirmar ${reconciliationActionCount} item${reconciliationActionCount === 1 ? "" : "s"}`}
               </button>
             </div>
           </section>
@@ -1548,6 +1671,19 @@ export function BankReconciliationPage() {
           )}
         </>
       )}
+
+      <CategorizationRulesDialog
+        open={showRules}
+        categories={categories}
+        rules={categorizationRules}
+        canManage={canManageRules}
+        initialDraft={ruleDraft}
+        onClose={() => {
+          setShowRules(false);
+          setRuleDraft(null);
+        }}
+        onChanged={() => loadCategorizationData()}
+      />
 
       {!parsed && (
         <section className="panel reconciliation-premium-empty">
