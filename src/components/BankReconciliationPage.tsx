@@ -823,6 +823,7 @@ export function BankReconciliationPage() {
       setParsed(null);
       setFileName("");
       setChoices({});
+      setCategoryChoices({});
       setError(
         parseError instanceof Error
           ? parseError.message
@@ -894,11 +895,15 @@ export function BankReconciliationPage() {
 
     const pending = recommendations.filter((recommendation) => {
       const choice = effectiveChoices[recommendation.row.id];
-      return !recommendation.alreadyReconciled && choice !== "__skip__" && choice !== "__done__";
+      return (
+        !recommendation.alreadyReconciled &&
+        choice !== "__skip__" &&
+        choice !== "__done__"
+      );
     });
 
-    if (!pending.length) {
-      setError("Não há itens novos para conciliar.");
+    if (!pending.length && !categoryOnlyUpdates.length) {
+      setError("Não há novas conciliações ou categorias para salvar.");
       return;
     }
 
@@ -907,13 +912,16 @@ export function BankReconciliationPage() {
     setSuccess("");
 
     let completed = 0;
+    let categoriesUpdated = 0;
 
     for (const recommendation of pending) {
       const choice = effectiveChoices[recommendation.row.id];
       const transactionId = choice === "__new__" ? null : choice;
+      const categoryId =
+        effectiveCategoryChoices[recommendation.row.id] || null;
 
       const { error: reconcileError } = await client.rpc(
-        "reconcile_bank_statement_entry",
+        "reconcile_bank_statement_entry_v2",
         {
           p_company_id: companyId,
           p_account_id: accountId,
@@ -924,6 +932,7 @@ export function BankReconciliationPage() {
           p_statement_description: recommendation.row.description,
           p_statement_amount: recommendation.row.amount,
           p_statement_type: recommendation.row.type,
+          p_category_id: categoryId,
         },
       );
 
@@ -939,11 +948,55 @@ export function BankReconciliationPage() {
       completed += 1;
     }
 
+    for (const recommendation of categoryOnlyUpdates) {
+      const reconciliation = reconciliationByReference.get(
+        recommendation.reference,
+      );
+      if (!reconciliation) continue;
+
+      const categoryId =
+        effectiveCategoryChoices[recommendation.row.id] || null;
+
+      const { error: categoryError } = await client
+        .from("transactions")
+        .update({
+          category_id: categoryId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", reconciliation.transaction_id)
+        .eq("company_id", companyId);
+
+      if (categoryError) {
+        setError(
+          `As conciliações foram preservadas, mas a atualização de categorias parou após ${categoriesUpdated} item${categoriesUpdated === 1 ? "" : "s"}.`,
+        );
+        setSaving(false);
+        await reloadReconciliations();
+        await loadCategorizationData();
+        return;
+      }
+
+      categoriesUpdated += 1;
+    }
+
     await reloadReconciliations();
+    await loadCategorizationData();
     setChoices({});
-    setSuccess(
-      `${completed} movimentação${completed === 1 ? "" : "ões"} conciliada${completed === 1 ? "" : "s"} com sucesso.`,
-    );
+    setCategoryChoices({});
+
+    const messages = [];
+    if (completed) {
+      messages.push(
+        `${completed} movimentação${completed === 1 ? "" : "ões"} conciliada${completed === 1 ? "" : "s"}`,
+      );
+    }
+    if (categoriesUpdated) {
+      messages.push(
+        `${categoriesUpdated} categoria${categoriesUpdated === 1 ? "" : "s"} atualizada${categoriesUpdated === 1 ? "" : "s"}`,
+      );
+    }
+
+    setSuccess(`${messages.join(" e ")} com sucesso.`);
     setSaving(false);
   }
 
