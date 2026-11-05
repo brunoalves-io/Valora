@@ -4,7 +4,7 @@ import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 
 type AlertSeverity = "info" | "warning" | "critical";
-type AlertTarget = "payables" | "receivables" | "cards" | "reports";
+type AlertTarget = "payables" | "receivables" | "cards" | "reports" | "planning";
 
 type AlertItem = {
   id: string;
@@ -113,12 +113,20 @@ export function AlertsPage({
     setError("");
 
     if (refresh) {
-      const { error: refreshError } = await supabase.rpc("refresh_company_alerts", {
-        p_company_id: activeCompany.id,
-      });
+      const [
+        { error: refreshError },
+        { error: planningRefreshError },
+      ] = await Promise.all([
+        supabase.rpc("refresh_company_alerts", {
+          p_company_id: activeCompany.id,
+        }),
+        supabase.rpc("refresh_financial_planning_alerts", {
+          p_company_id: activeCompany.id,
+        }),
+      ]);
 
-      if (refreshError) {
-        setError(refreshError.message);
+      if (refreshError || planningRefreshError) {
+        setError(refreshError?.message || planningRefreshError?.message || "Não foi possível atualizar os alertas.");
         setLoading(false);
         return;
       }
@@ -269,7 +277,7 @@ export function AlertsPage({
         <div>
           <p className="eyebrow">AUTOMAÇÕES</p>
           <h1>Alertas</h1>
-          <p>O Valora monitora vencimentos, faturas e projeção de caixa para você.</p>
+          <p>O Valora monitora vencimentos, faturas, caixa, orçamentos e metas para você.</p>
         </div>
         <div className="header-actions">
           {canConfigure && (
@@ -299,7 +307,7 @@ export function AlertsPage({
           <strong className={summary.critical ? "negative-value" : ""}>
             {summary.critical}
           </strong>
-          <small>Vencidos ou caixa crítico</small>
+          <small>Vencidos, caixa ou orçamento crítico</small>
         </article>
         <article className="metric-card">
           <span>Atenção</span>
