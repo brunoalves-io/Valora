@@ -913,12 +913,19 @@ export function BankReconciliationPage() {
 
   const autoEligibleRecommendations = useMemo(
     () =>
-      recommendations.filter(
-        (recommendation) =>
-          !recommendation.alreadyReconciled &&
-          automationAnalysis[recommendation.row.id]?.autoEligible,
-      ),
-    [recommendations, automationAnalysis],
+      recommendations.filter((recommendation) => {
+        if (recommendation.alreadyReconciled) return false;
+
+        const analysis = automationAnalysis[recommendation.row.id];
+        if (!analysis?.autoEligible) return false;
+
+        const explicitChoice = choices[recommendation.row.id];
+        return (
+          !explicitChoice ||
+          explicitChoice === analysis.autoTransactionId
+        );
+      }),
+    [recommendations, automationAnalysis, choices],
   );
 
   const duplicateCount = useMemo(
@@ -1214,7 +1221,7 @@ export function BankReconciliationPage() {
       !automationSettings.safe_auto_reconcile_enabled ||
       automationRunning ||
       schemaReady !== true ||
-      !canManage
+      !canManageRules
     ) {
       return;
     }
@@ -1292,7 +1299,7 @@ export function BankReconciliationPage() {
       schemaReady !== true ||
       automationRunning ||
       saving ||
-      !canManage ||
+      !canManageRules ||
       autoEligibleRecommendations.length === 0
     ) {
       return;
@@ -1316,7 +1323,7 @@ export function BankReconciliationPage() {
     schemaReady,
     automationRunning,
     saving,
-    canManage,
+    canManageRules,
     accountId,
     autoEligibleRecommendations,
   ]);
