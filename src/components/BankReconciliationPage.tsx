@@ -1523,12 +1523,12 @@ export function BankReconciliationPage() {
             <span>Use o Open Finance ou carregue um extrato bancário.</span>
           </div>
           <div>
-            <strong>2. Revise as sugestões</strong>
-            <span>O Valora compara lançamentos e também sugere categorias por regras e histórico.</span>
+            <strong>2. Automação segura</strong>
+            <span>Quando ativada, o Valora concilia apenas matches de alta confiança e registra a decisão como automática.</span>
           </div>
           <div>
-            <strong>3. Confirme</strong>
-            <span>Vincule lançamentos existentes, crie novos ou ignore o que não deve entrar.</span>
+            <strong>3. Revise as exceções</strong>
+            <span>Duplicidades, transferências entre contas próprias e casos ambíguos ficam parados para revisão manual.</span>
           </div>
         </section>
       )}
