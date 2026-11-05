@@ -532,7 +532,11 @@ Deno.serve(async (request) => {
   const companyId =
     typeof payload.companyId === "string" ? payload.companyId.trim() : "";
   const mode =
-    payload.mode === "transaction_draft" ? "transaction_draft" : "chat";
+    payload.mode === "transaction_draft"
+      ? "transaction_draft"
+      : payload.mode === "monthly_close_summary"
+        ? "monthly_close_summary"
+        : "chat";
 
   if (!companyId) {
     return jsonResponse({ error: "companyId is required" }, 400);
@@ -542,6 +546,12 @@ Deno.serve(async (request) => {
   const draftText = sanitizeDraftText(payload.text);
   const today = sanitizeToday(payload.today) || new Date().toISOString().slice(0, 10);
   const conversationId = sanitizeConversationId(payload.conversationId);
+  const monthlyClose =
+    payload.monthlyClose &&
+      typeof payload.monthlyClose === "object" &&
+      !Array.isArray(payload.monthlyClose)
+      ? payload.monthlyClose as Record<string, unknown>
+      : null;
 
   if (
     mode === "chat" &&
@@ -552,6 +562,10 @@ Deno.serve(async (request) => {
 
   if (mode === "transaction_draft" && !draftText) {
     return jsonResponse({ error: "text is required" }, 400);
+  }
+
+  if (mode === "monthly_close_summary" && !monthlyClose) {
+    return jsonResponse({ error: "monthlyClose is required" }, 400);
   }
 
   const baseContextRpc =
@@ -694,7 +708,31 @@ Deno.serve(async (request) => {
           "CONTEXTO DA EMPRESA:",
           JSON.stringify(financialContext),
         ].join("\n")
-      : [
+      : mode === "monthly_close_summary"
+        ? [
+            "Você é o Valora IA em modo de fechamento mensal gerencial.",
+            "Responda sempre em português do Brasil.",
+            "Use EXCLUSIVAMENTE os dados fornecidos em FECHAMENTO MENSAL para afirmar números e comparações.",
+            "O objeto closing é o mês analisado. previous_closing, quando existir, é o fechamento imediatamente anterior.",
+            "Não crie, proponha ou sugira lançamentos financeiros. Este modo é somente analítico.",
+            "Produza um resumo executivo curto, profissional e útil para um gestor.",
+            "Estruture o texto em 4 blocos curtos: Resultado do mês; Evolução; Planejamento; Prioridade para o próximo ciclo.",
+            "Destaque mudanças relevantes de receita, despesa, resultado, saldo, inadimplência, orçamento e metas apenas quando os dados permitirem.",
+            "Se não houver fechamento anterior, diga que ainda não existe base histórica fechada para comparação.",
+            "Não trate este relatório gerencial como demonstração contábil ou fiscal oficial.",
+            "Você deve devolver SOMENTE um objeto JSON válido, sem markdown.",
+            "Formato JSON obrigatório:",
+            JSON.stringify({
+              answer: "texto executivo em português do Brasil",
+              intent: "query",
+              transaction_draft: null,
+              recurrence_draft: null,
+            }),
+            "",
+            "FECHAMENTO MENSAL:",
+            JSON.stringify(monthlyClose),
+          ].join("\n")
+        : [
           "Você é o Valora IA operacional, assistente de gestão financeira empresarial do aplicativo Valora.",
           "Responda sempre em português do Brasil, com linguagem clara, objetiva e útil para um gestor.",
           "Você deve devolver SOMENTE um objeto JSON válido, sem markdown.",
@@ -765,13 +803,25 @@ Deno.serve(async (request) => {
   const contents =
     mode === "transaction_draft"
       ? [{ role: "user", parts: [{ text: draftText }] }]
-      : messages.map((message) => ({
-          role: message.role === "assistant" ? "model" : "user",
-          parts: [{ text: message.content }],
-        }));
+      : mode === "monthly_close_summary"
+        ? [{
+            role: "user",
+            parts: [{
+              text: "Gere o resumo executivo do fechamento mensal fornecido.",
+            }],
+          }]
+        : messages.map((message) => ({
+            role: message.role === "assistant" ? "model" : "user",
+            parts: [{ text: message.content }],
+          }));
 
   const generationConfig: Record<string, unknown> = {
-    maxOutputTokens: mode === "transaction_draft" ? 1000 : 1800,
+    maxOutputTokens:
+      mode === "transaction_draft"
+        ? 1000
+        : mode === "monthly_close_summary"
+          ? 1200
+          : 1800,
     responseMimeType: "application/json",
   };
 
