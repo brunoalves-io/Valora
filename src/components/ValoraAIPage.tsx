@@ -688,7 +688,18 @@ export function ValoraAIPage() {
                       }}
                     >
                       <span className="ai-action-history-icon" aria-hidden="true">
-                        {action.action_type === "create_recurrence" ? "↻" : "+"}
+                        {action.action_type === "create_recurrence" ? (
+                          <svg viewBox="0 0 24 24">
+                            <path d="M19 8a7 7 0 0 0-12.2-2L5 8" />
+                            <path d="M5 4v4h4" />
+                            <path d="M5 16a7 7 0 0 0 12.2 2L19 16" />
+                            <path d="M19 20v-4h-4" />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24">
+                            <path d="M12 5v14M5 12h14" />
+                          </svg>
+                        )}
                       </span>
                       <span className="ai-action-history-copy">
                         <strong>
