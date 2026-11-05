@@ -1,6 +1,11 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
+import {
+  AIOperationCard,
+  type AIOperationAction,
+  type AIActionStatus,
+} from "./AIOperationCard";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 
@@ -29,11 +34,30 @@ type RetryRequest = {
   messages: AIRequestMessage[];
 };
 
+type AIActionLog = {
+  id: string;
+  conversation_id: string | null;
+  action_type: "create_transaction" | "create_recurrence";
+  status: AIActionStatus;
+  summary: string;
+  payload: Record<string, unknown>;
+  entity_type: string | null;
+  entity_id: string | null;
+  error_message: string | null;
+  created_at: string;
+  confirmed_at: string | null;
+};
+
+type NamedItem = {
+  id: string;
+  name: string;
+};
+
 const suggestions = [
-  "Como está meu caixa nos próximos 30 dias?",
-  "Quais despesas mais pesaram neste mês?",
-  "Tenho contas a receber atrasadas?",
-  "Quais riscos financeiros merecem atenção agora?",
+  "Quanto gastei com alimentação nos últimos 90 dias?",
+  "Paguei R$ 189,90 de internet hoje pelo Nubank",
+  "Crie uma conta a pagar de R$ 780 para sexta-feira",
+  "Cadastre uma despesa mensal de R$ 99 com software",
 ];
 
 function conversationTitle(text: string) {
@@ -46,6 +70,21 @@ function formatTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function localToday() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function actionStatusLabel(status: AIActionStatus) {
+  if (status === "confirmed") return "Confirmada";
+  if (status === "cancelled") return "Cancelada";
+  if (status === "failed") return "Falhou";
+  return "Proposta";
 }
 
 function friendlyAIError(message: string, code?: string) {
@@ -73,7 +112,7 @@ function friendlyAIError(message: string, code?: string) {
 }
 
 export function ValoraAIPage() {
-  const { activeCompany } = useCompany();
+  const { activeCompany, activeRole } = useCompany();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -84,8 +123,18 @@ export function ValoraAIPage() {
   const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
   const [pendingConversationDelete, setPendingConversationDelete] = useState<Conversation | null>(null);
   const [retryRequest, setRetryRequest] = useState<RetryRequest | null>(null);
+  const [historyView, setHistoryView] = useState<"conversations" | "actions">("conversations");
+  const [actionLogs, setActionLogs] = useState<AIActionLog[]>([]);
+  const [actionBusyId, setActionBusyId] = useState("");
+  const [accounts, setAccounts] = useState<NamedItem[]>([]);
+  const [categories, setCategories] = useState<NamedItem[]>([]);
+  const [costCenters, setCostCenters] = useState<NamedItem[]>([]);
+  const [partners, setPartners] = useState<NamedItem[]>([]);
+  const [tags, setTags] = useState<NamedItem[]>([]);
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
+
+  const canManage = activeRole === "owner" || activeRole === "admin";
 
   async function loadConversations(selectFirst = false) {
     if (!supabase || !activeCompany) return;
@@ -114,6 +163,67 @@ export function ValoraAIPage() {
     }
   }
 
+  async function loadActionHistory() {
+    if (!supabase || !activeCompany) return;
+
+    const { data, error: historyError } = await supabase
+      .from("ai_action_logs")
+      .select(
+        "id, conversation_id, action_type, status, summary, payload, entity_type, entity_id, error_message, created_at, confirmed_at",
+      )
+      .eq("company_id", activeCompany.id)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (!historyError) {
+      setActionLogs((data ?? []) as AIActionLog[]);
+    }
+  }
+
+  async function loadActionNames() {
+    if (!supabase || !activeCompany) return;
+
+    const companyId = activeCompany.id;
+    const [accountResult, categoryResult, centerResult, partnerResult, tagResult] =
+      await Promise.all([
+        supabase
+          .from("financial_accounts")
+          .select("id, name")
+          .eq("company_id", companyId)
+          .eq("active", true)
+          .order("name"),
+        supabase
+          .from("categories")
+          .select("id, name")
+          .eq("company_id", companyId)
+          .eq("active", true)
+          .order("name"),
+        supabase
+          .from("cost_centers")
+          .select("id, name")
+          .eq("company_id", companyId)
+          .eq("active", true)
+          .order("name"),
+        supabase
+          .from("business_partners")
+          .select("id, name")
+          .eq("company_id", companyId)
+          .eq("active", true)
+          .order("name"),
+        supabase
+          .from("transaction_tags")
+          .select("id, name")
+          .eq("company_id", companyId)
+          .order("name"),
+      ]);
+
+    if (!accountResult.error) setAccounts((accountResult.data ?? []) as NamedItem[]);
+    if (!categoryResult.error) setCategories((categoryResult.data ?? []) as NamedItem[]);
+    if (!centerResult.error) setCostCenters((centerResult.data ?? []) as NamedItem[]);
+    if (!partnerResult.error) setPartners((partnerResult.data ?? []) as NamedItem[]);
+    if (!tagResult.error) setTags((tagResult.data ?? []) as NamedItem[]);
+  }
+
   async function loadMessages(conversationId: string) {
     if (!supabase) return;
 
@@ -140,8 +250,12 @@ export function ValoraAIPage() {
     setMessages([]);
     setQuestion("");
     setRetryRequest(null);
+    setHistoryView("conversations");
+    setActionLogs([]);
     setError("");
     void loadConversations(false);
+    void loadActionHistory();
+    void loadActionNames();
   }, [activeCompany?.id]);
 
   useEffect(() => {
@@ -162,6 +276,22 @@ export function ValoraAIPage() {
   const conversationMap = useMemo(
     () => new Map(conversations.map((item) => [item.id, item])),
     [conversations],
+  );
+
+  const actionLogMap = useMemo(
+    () => new Map(actionLogs.map((item) => [item.id, item])),
+    [actionLogs],
+  );
+
+  const actionNames = useMemo(
+    () => ({
+      accounts: new Map(accounts.map((item) => [item.id, item.name])),
+      categories: new Map(categories.map((item) => [item.id, item.name])),
+      costCenters: new Map(costCenters.map((item) => [item.id, item.name])),
+      partners: new Map(partners.map((item) => [item.id, item.name])),
+      tags: new Map(tags.map((item) => [item.id, item.name])),
+    }),
+    [accounts, categories, costCenters, partners, tags],
   );
 
   function startNewConversation() {
@@ -214,6 +344,8 @@ export function ValoraAIPage() {
       {
         body: {
           companyId: activeCompany?.id,
+          conversationId,
+          today: localToday(),
           messages: historyForAI,
         },
       },
@@ -253,6 +385,10 @@ export function ValoraAIPage() {
           model: aiData.model ?? null,
           fallback_used: aiData.fallbackUsed ?? false,
           generated_at: aiData.generatedAt ?? null,
+          intent: aiData.intent ?? "query",
+          action: aiData.action ?? null,
+          ai_action_id: aiData.actionId ?? null,
+          action_error: aiData.actionError ?? null,
         },
       })
       .select("id, role, content, metadata, created_at")
@@ -268,6 +404,9 @@ export function ValoraAIPage() {
     }
 
     setMessages((current) => [...current, savedAssistant as Message]);
+    if (aiData.actionId) {
+      await loadActionHistory();
+    }
     setRetryRequest(null);
     setError("");
     return true;
@@ -384,6 +523,52 @@ export function ValoraAIPage() {
     if (createdConversation) {
       setActiveConversationId(conversationId);
     }
+  }
+
+  async function confirmAIAction(actionId: string) {
+    if (!supabase || !actionId || actionBusyId) return;
+
+    setActionBusyId(actionId);
+    setError("");
+
+    const { data, error: actionError } = await supabase.rpc(
+      "execute_ai_action",
+      { p_action_id: actionId },
+    );
+
+    const result = data as
+      | { success?: boolean; error?: string; entity_type?: string; entity_id?: string }
+      | null;
+
+    if (actionError || result?.success === false) {
+      setError(
+        result?.error ||
+          actionError?.message ||
+          "Não foi possível confirmar esta ação da Valora IA.",
+      );
+    }
+
+    await loadActionHistory();
+    await loadActionNames();
+    setActionBusyId("");
+  }
+
+  async function cancelAIAction(actionId: string) {
+    if (!supabase || !actionId || actionBusyId) return;
+
+    setActionBusyId(actionId);
+    setError("");
+
+    const { error: cancelError } = await supabase.rpc("cancel_ai_action", {
+      p_action_id: actionId,
+    });
+
+    if (cancelError) {
+      setError(cancelError.message);
+    }
+
+    await loadActionHistory();
+    setActionBusyId("");
   }
 
   function submit(event: FormEvent) {
