@@ -46,6 +46,7 @@ type Transaction = {
   paid_at: string | null;
   category_id: string | null;
   cost_center_id: string | null;
+  account_id: string | null;
 };
 
 type Account = {
@@ -196,14 +197,14 @@ export function PlanningPage() {
         .order("kind"),
       supabase
         .from("transactions")
-        .select("id, type, amount, status, due_date, paid_at, category_id, cost_center_id")
+        .select("id, type, amount, status, due_date, paid_at, category_id, cost_center_id, account_id")
         .eq("company_id", activeCompany.id)
         .eq("status", "paid")
         .gte("paid_at", `${start}T00:00:00`)
         .lt("paid_at", `${next}T00:00:00`),
       supabase
         .from("transactions")
-        .select("id, type, amount, status, due_date, paid_at, category_id, cost_center_id")
+        .select("id, type, amount, status, due_date, paid_at, category_id, cost_center_id, account_id")
         .eq("company_id", activeCompany.id)
         .eq("status", "pending")
         .gte("due_date", start)
@@ -215,7 +216,7 @@ export function PlanningPage() {
         .eq("active", true),
       supabase
         .from("transactions")
-        .select("id, type, amount, status, due_date, paid_at, category_id, cost_center_id")
+        .select("id, type, amount, status, due_date, paid_at, category_id, cost_center_id, account_id")
         .eq("company_id", activeCompany.id)
         .eq("status", "paid"),
     ]);
@@ -329,11 +330,18 @@ export function PlanningPage() {
       (sum, item) => sum + Number(item.opening_balance ?? 0),
       0,
     );
-    const realizedNet = paidTransactions.reduce(
-      (sum, item) =>
-        sum + (item.type === "income" ? Number(item.amount) : -Number(item.amount)),
-      0,
-    );
+    const activeAccountIds = new Set(accounts.map((item) => item.id));
+    const realizedNet = paidTransactions
+      .filter(
+        (item) =>
+          Boolean(item.account_id) &&
+          activeAccountIds.has(item.account_id as string),
+      )
+      .reduce(
+        (sum, item) =>
+          sum + (item.type === "income" ? Number(item.amount) : -Number(item.amount)),
+        0,
+      );
 
     return {
       revenueRealized,
