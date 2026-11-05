@@ -633,7 +633,7 @@ export function FinancialScenarios() {
       <section
         className={
           "scenario-risk " +
-          (model.scenario.firstNegativeDate
+          (scenarioNegativeDate
             ? "danger"
             : model.scenario.minimumBalance < Math.max(100, model.currentBalance * 0.15)
               ? "warning"
@@ -645,7 +645,7 @@ export function FinancialScenarios() {
         </div>
         <div>
           <strong>
-            {model.scenario.firstNegativeDate
+            {scenarioNegativeDate
               ? `O cenário leva o caixa ao negativo em ${formatDate(scenarioNegativeDate)}`
               : scenarioIsNeutral
                 ? "Cenário igual à projeção atual"
@@ -654,7 +654,7 @@ export function FinancialScenarios() {
           <span>
             {riskWorsened
               ? "A hipótese antecipou ou criou um risco de liquidez que não existia no cenário-base."
-              : model.scenario.firstNegativeDate
+              : scenarioNegativeDate
                 ? "Revise as premissas ou planeje reserva de caixa antes desta data."
                 : `Menor saldo estimado: ${money.format(model.scenario.minimumBalance)}.`}
           </span>
