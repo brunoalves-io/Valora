@@ -10989,3 +10989,411 @@ tr:last-child td { border-bottom: 0; }
     flex-direction: column;
   }
 }
+
+
+/* Valora v1.0.37 planning, budgets and goals */
+.planning-header {
+  align-items: flex-end;
+}
+
+.planning-month-picker {
+  display: grid;
+  gap: 5px;
+  min-width: 190px;
+  color: #6f7b8d;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.planning-month-picker input {
+  min-height: 38px;
+  border: 1px solid #d9e0e9;
+  border-radius: 9px;
+  padding: 8px 10px;
+  background: #fff;
+  color: #26344a;
+  outline: none;
+}
+
+.planning-month-picker input:focus {
+  border-color: #46bf91;
+  box-shadow: 0 0 0 3px rgba(70, 191, 145, .12);
+}
+
+.planning-metrics {
+  margin-bottom: 16px;
+}
+
+.planning-forms-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.planning-form-card {
+  min-width: 0;
+}
+
+.planning-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.planning-form-grid.goal {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.planning-form-grid label {
+  display: grid;
+  gap: 6px;
+  color: #59677c;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.planning-form-grid input,
+.planning-form-grid select {
+  width: 100%;
+  min-height: 39px;
+  border: 1px solid #d9e0e9;
+  border-radius: 9px;
+  padding: 9px 10px;
+  background: #fff;
+  color: #253248;
+  outline: none;
+}
+
+.planning-form-grid input:focus,
+.planning-form-grid select:focus,
+.planning-percent-input:focus-within {
+  border-color: #46bf91;
+  box-shadow: 0 0 0 3px rgba(70, 191, 145, .12);
+}
+
+.planning-percent-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 39px;
+  overflow: hidden;
+  border: 1px solid #d9e0e9;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.planning-percent-input input {
+  border: 0;
+  box-shadow: none !important;
+}
+
+.planning-percent-input span {
+  padding: 0 11px;
+  color: #7c8799;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.planning-budget-panel,
+.planning-goals-panel {
+  margin-bottom: 16px;
+}
+
+.planning-budget-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.planning-budget-row {
+  padding: 14px;
+  border: 1px solid #e1e6ed;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.planning-budget-row.warning {
+  border-color: #eddcae;
+  background: #fffdf8;
+}
+
+.planning-budget-row.exceeded {
+  border-color: #efcbd0;
+  background: #fff9fa;
+}
+
+.planning-budget-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.planning-budget-info strong,
+.planning-budget-info span {
+  display: block;
+}
+
+.planning-scope-label {
+  margin-bottom: 4px;
+  color: #8a95a6;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.planning-budget-info > div:first-child strong {
+  color: #35445a;
+  font-size: 12px;
+}
+
+.planning-budget-status {
+  text-align: right;
+}
+
+.planning-budget-status strong {
+  color: #338264;
+  font-size: 9px;
+}
+
+.planning-budget-row.warning .planning-budget-status strong {
+  color: #9a6a12;
+}
+
+.planning-budget-row.exceeded .planning-budget-status strong {
+  color: #b4434e;
+}
+
+.planning-budget-status span {
+  margin-top: 3px;
+  color: #8a95a6;
+  font-size: 8px;
+}
+
+.planning-progress-track {
+  position: relative;
+  height: 8px;
+  margin: 13px 0 11px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf1f4;
+}
+
+.planning-progress-track > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #39ad80;
+}
+
+.planning-budget-row.warning .planning-progress-track > i {
+  background: #d6a13d;
+}
+
+.planning-budget-row.exceeded .planning-progress-track > i {
+  background: #d85d68;
+}
+
+.planning-realized-marker {
+  position: absolute;
+  top: -2px;
+  width: 2px;
+  height: 12px;
+  border-radius: 2px;
+  background: #3c4e64;
+  transform: translateX(-1px);
+}
+
+.planning-budget-values {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.planning-budget-values > div {
+  min-width: 0;
+}
+
+.planning-budget-values span,
+.planning-budget-values strong {
+  display: block;
+}
+
+.planning-budget-values span {
+  color: #8994a6;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.planning-budget-values strong {
+  margin-top: 3px;
+  color: #3c4b61;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.planning-goal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.planning-goal-card {
+  padding: 14px;
+  border: 1px solid #e1e6ed;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.planning-goal-card.warning {
+  border-color: #edd7aa;
+  background: #fffdf7;
+}
+
+.planning-goal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.planning-goal-head span,
+.planning-goal-head strong {
+  display: block;
+}
+
+.planning-goal-head span {
+  color: #818da0;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.planning-goal-head strong {
+  margin-top: 4px;
+  color: #35445a;
+  font-size: 16px;
+}
+
+.planning-goal-head > b {
+  padding: 5px 7px;
+  border-radius: 999px;
+  background: #e9f6f0;
+  color: #25845f;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.planning-goal-card.warning .planning-goal-head > b {
+  background: #fff0cf;
+  color: #956713;
+}
+
+.planning-goal-progress {
+  height: 7px;
+  margin: 13px 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf1f4;
+}
+
+.planning-goal-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #39ad80;
+}
+
+.planning-goal-card.warning .planning-goal-progress i {
+  background: #d5a13c;
+}
+
+.planning-goal-values {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-bottom: 11px;
+}
+
+.planning-goal-values span,
+.planning-goal-values strong {
+  display: block;
+}
+
+.planning-goal-values span {
+  color: #8994a6;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.planning-goal-values strong {
+  margin-top: 3px;
+  color: #3c4b61;
+  font-size: 10px;
+}
+
+.planning-note {
+  display: flex;
+  gap: 9px;
+  padding: 12px 14px;
+  border: 1px solid #dce8e3;
+  border-radius: 12px;
+  background: #f8fcfa;
+  color: #788599;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.planning-note strong {
+  flex: 0 0 auto;
+  color: #3f6f5c;
+}
+
+@media (max-width: 1180px) {
+  .planning-forms-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .planning-budget-values {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .planning-budget-values > button {
+    justify-self: start;
+  }
+
+  .planning-goal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 780px) {
+  .planning-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .planning-month-picker {
+    width: 100%;
+  }
+
+  .planning-form-grid,
+  .planning-form-grid.goal,
+  .planning-goal-grid,
+  .planning-budget-values {
+    grid-template-columns: 1fr;
+  }
+
+  .planning-budget-info,
+  .planning-note {
+    flex-direction: column;
+  }
+
+  .planning-budget-status {
+    text-align: left;
+  }
+}
