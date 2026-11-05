@@ -15,6 +15,14 @@ import {
   type CategorizedHistoryItem,
   type CategorySuggestion,
 } from "../lib/categorization";
+import {
+  detectOwnAccountTransfer,
+  detectPotentialDuplicate,
+  evaluateSafeAutoMatch,
+  type AutomationReconciliationRecord,
+  type CompanyBankMovement,
+  type CompanyLinkedBankAccount,
+} from "../lib/reconciliationAutomation";
 
 type Account = {
   id: string;
@@ -35,16 +43,19 @@ type Transaction = {
   category_id: string | null;
 };
 
-type Reconciliation = {
-  transaction_id: string;
-  statement_reference: string | null;
-  statement_date: string;
-};
+type Reconciliation = AutomationReconciliationRecord;
 
 type LinkedBankAccount = {
   id: string;
   name: string;
   provider_account_id: string;
+};
+
+type AutomationSettings = {
+  safe_auto_reconcile_enabled: boolean;
+  minimum_auto_score: number;
+  detect_duplicates: boolean;
+  detect_transfers: boolean;
 };
 
 type OpenFinanceTransaction = {
@@ -209,11 +220,23 @@ function MovementIcon() {
 export function BankReconciliationPage() {
   const { activeCompany, activeRole } = useCompany();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const autoRunKeyRef = useRef("");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
   const [linkedBankAccounts, setLinkedBankAccounts] = useState<LinkedBankAccount[]>([]);
+  const [companyLinkedBankAccounts, setCompanyLinkedBankAccounts] = useState<CompanyLinkedBankAccount[]>([]);
+  const [companyOpenFinanceFeed, setCompanyOpenFinanceFeed] = useState<CompanyBankMovement[]>([]);
+  const [automationSettings, setAutomationSettings] = useState<AutomationSettings>({
+    safe_auto_reconcile_enabled: false,
+    minimum_auto_score: 92,
+    detect_duplicates: true,
+    detect_transfers: true,
+  });
+  const [automationRunning, setAutomationRunning] = useState(false);
+  const [automationSavingSettings, setAutomationSavingSettings] = useState(false);
+  const [exceptionsOnly, setExceptionsOnly] = useState(false);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [categorizationRules, setCategorizationRules] = useState<CategorizationRule[]>([]);
   const [categorizedHistory, setCategorizedHistory] = useState<CategorizedHistoryItem[]>([]);
@@ -237,7 +260,7 @@ export function BankReconciliationPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
   const [periodFilter, setPeriodFilter] = useState<"all" | "30" | "60" | "90">("all");
   const [situationFilter, setSituationFilter] = useState<
-    "all" | "done" | "match" | "new" | "skip"
+    "all" | "done" | "match" | "new" | "review" | "skip"
   >("all");
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -289,6 +312,39 @@ export function BankReconciliationPage() {
 
   useEffect(() => {
     void loadCategorizationData();
+  }, [activeCompany?.id]);
+
+  async function loadAutomationSettings() {
+    if (!supabase || !activeCompany) return;
+
+    const { data, error: settingsError } = await supabase
+      .from("bank_reconciliation_settings")
+      .select("safe_auto_reconcile_enabled, minimum_auto_score, detect_duplicates, detect_transfers")
+      .eq("company_id", activeCompany.id)
+      .maybeSingle();
+
+    if (settingsError) return;
+
+    if (!data) {
+      setAutomationSettings({
+        safe_auto_reconcile_enabled: false,
+        minimum_auto_score: 92,
+        detect_duplicates: true,
+        detect_transfers: true,
+      });
+      return;
+    }
+
+    setAutomationSettings({
+      safe_auto_reconcile_enabled: Boolean(data.safe_auto_reconcile_enabled),
+      minimum_auto_score: Number(data.minimum_auto_score) || 92,
+      detect_duplicates: data.detect_duplicates !== false,
+      detect_transfers: data.detect_transfers !== false,
+    });
+  }
+
+  useEffect(() => {
+    void loadAutomationSettings();
   }, [activeCompany?.id]);
 
   useEffect(() => {
@@ -361,7 +417,7 @@ export function BankReconciliationPage() {
           .limit(2500),
         client
           .from("bank_reconciliations")
-          .select("transaction_id, statement_reference, statement_date")
+          .select("transaction_id, statement_reference, statement_date, statement_description, statement_amount, statement_type, reconciliation_mode, automation_score, automation_reason")
           .eq("company_id", companyId)
           .eq("account_id", accountId)
           .order("statement_date", { ascending: false })
@@ -426,6 +482,9 @@ export function BankReconciliationPage() {
     setPeriodFilter("all");
     setSituationFilter("all");
     setShowMoreFilters(false);
+    setExceptionsOnly(false);
+    autoRunKeyRef.current = "";
+    setCompanyOpenFinanceFeed([]);
     setSuccess("");
   }, [accountId]);
 
@@ -523,14 +582,123 @@ export function BankReconciliationPage() {
     });
   }, [parsed, reconciledReferences, reconciledTransactionIds, transactions]);
 
+  const automationAnalysis = useMemo(() => {
+    const result: Record<
+      string,
+      {
+        duplicateRisk: boolean;
+        transferRisk: boolean;
+        autoEligible: boolean;
+        autoTransactionId: string | null;
+        autoScore: number;
+        reason: string;
+        isException: boolean;
+      }
+    > = {};
+
+    for (const recommendation of recommendations) {
+      if (recommendation.alreadyReconciled) {
+        result[recommendation.row.id] = {
+          duplicateRisk: false,
+          transferRisk: false,
+          autoEligible: false,
+          autoTransactionId: null,
+          autoScore: 0,
+          reason: "Movimentação já conciliada.",
+          isException: false,
+        };
+        continue;
+      }
+
+      const duplicateRisk =
+        automationSettings.detect_duplicates &&
+        detectPotentialDuplicate(
+          recommendation.row,
+          recommendation.reference,
+          reconciliations,
+        );
+
+      const transferRisk =
+        parsed?.format === "Open Finance" &&
+        automationSettings.detect_transfers &&
+        detectOwnAccountTransfer(
+          recommendation.row,
+          accountId,
+          companyLinkedBankAccounts,
+          companyOpenFinanceFeed,
+        );
+
+      const defaultCandidate = recommendation.defaultChoice.startsWith("__")
+        ? null
+        : recommendation.candidates.find(
+            (candidate) =>
+              candidate.transaction.id === recommendation.defaultChoice,
+          ) ?? null;
+
+      const otherCandidate = recommendation.candidates.find(
+        (candidate) =>
+          candidate.transaction.id !== defaultCandidate?.transaction.id,
+      );
+
+      const safe = evaluateSafeAutoMatch({
+        row: recommendation.row,
+        best: defaultCandidate
+          ? {
+              id: defaultCandidate.transaction.id,
+              description: defaultCandidate.transaction.description,
+              transactionDate: transactionDate(defaultCandidate.transaction),
+              score: defaultCandidate.score,
+            }
+          : null,
+        secondScore: otherCandidate?.score ?? null,
+        minimumScore: automationSettings.minimum_auto_score,
+        duplicateRisk,
+        transferRisk,
+      });
+
+      result[recommendation.row.id] = {
+        duplicateRisk,
+        transferRisk,
+        autoEligible:
+          parsed?.format === "Open Finance" && safe.eligible,
+        autoTransactionId: safe.transactionId,
+        autoScore: safe.score,
+        reason: safe.reason,
+        isException:
+          duplicateRisk ||
+          transferRisk ||
+          !(parsed?.format === "Open Finance" && safe.eligible),
+      };
+    }
+
+    return result;
+  }, [
+    recommendations,
+    automationSettings,
+    reconciliations,
+    parsed?.format,
+    accountId,
+    companyLinkedBankAccounts,
+    companyOpenFinanceFeed,
+  ]);
+
   const effectiveChoices = useMemo(() => {
     const result: Record<string, string> = {};
     for (const recommendation of recommendations) {
-      result[recommendation.row.id] =
-        choices[recommendation.row.id] ?? recommendation.defaultChoice;
+      const rowId = recommendation.row.id;
+      if (Object.prototype.hasOwnProperty.call(choices, rowId)) {
+        result[rowId] = choices[rowId];
+        continue;
+      }
+
+      const analysis = automationAnalysis[rowId];
+      result[rowId] =
+        analysis?.duplicateRisk || analysis?.transferRisk
+          ? "__review__"
+          : recommendation.defaultChoice;
     }
     return result;
-  }, [choices, recommendations]);
+  }, [choices, recommendations, automationAnalysis]);
 
   const transactionById = useMemo(
     () => new Map(transactions.map((transaction) => [transaction.id, transaction])),
@@ -628,6 +796,7 @@ export function BankReconciliationPage() {
       already: 0,
       match: 0,
       create: 0,
+      review: 0,
       skip: 0,
     };
 
@@ -635,6 +804,7 @@ export function BankReconciliationPage() {
       const choice = effectiveChoices[recommendation.row.id];
       if (recommendation.alreadyReconciled || choice === "__done__") result.already += 1;
       else if (choice === "__skip__") result.skip += 1;
+      else if (choice === "__review__") result.review += 1;
       else if (choice === "__new__") result.create += 1;
       else if (choice) result.match += 1;
     }
@@ -673,6 +843,10 @@ export function BankReconciliationPage() {
       const row = recommendation.row;
       const choice = effectiveChoices[row.id];
 
+      const analysis = automationAnalysis[row.id];
+
+      if (exceptionsOnly && !analysis?.isException) return false;
+
       if (typeFilter !== "all" && row.type !== typeFilter) return false;
 
       if (periodFilter !== "all") {
@@ -687,9 +861,11 @@ export function BankReconciliationPage() {
             ? "done"
             : choice === "__skip__"
               ? "skip"
-              : choice === "__new__"
-                ? "new"
-                : "match";
+              : choice === "__review__"
+                ? "review"
+                : choice === "__new__"
+                  ? "new"
+                  : "match";
 
         if (situation !== situationFilter) return false;
       }
@@ -717,6 +893,8 @@ export function BankReconciliationPage() {
     typeFilter,
     periodFilter,
     situationFilter,
+    exceptionsOnly,
+    automationAnalysis,
   ]);
 
   const reconciledPercent = summary.total
@@ -733,9 +911,104 @@ export function BankReconciliationPage() {
   const totalActionCount =
     reconciliationActionCount + categoryOnlyUpdates.length;
 
+  const autoEligibleRecommendations = useMemo(
+    () =>
+      recommendations.filter((recommendation) => {
+        if (recommendation.alreadyReconciled) return false;
+
+        const analysis = automationAnalysis[recommendation.row.id];
+        if (!analysis?.autoEligible) return false;
+
+        const explicitChoice = choices[recommendation.row.id];
+        return (
+          !explicitChoice ||
+          explicitChoice === analysis.autoTransactionId
+        );
+      }),
+    [recommendations, automationAnalysis, choices],
+  );
+
+  const duplicateCount = useMemo(
+    () =>
+      recommendations.filter(
+        (recommendation) =>
+          automationAnalysis[recommendation.row.id]?.duplicateRisk,
+      ).length,
+    [recommendations, automationAnalysis],
+  );
+
+  const transferCount = useMemo(
+    () =>
+      recommendations.filter(
+        (recommendation) =>
+          automationAnalysis[recommendation.row.id]?.transferRisk,
+      ).length,
+    [recommendations, automationAnalysis],
+  );
+
+  const exceptionCount = useMemo(
+    () =>
+      recommendations.filter(
+        (recommendation) =>
+          !recommendation.alreadyReconciled &&
+          automationAnalysis[recommendation.row.id]?.isException,
+      ).length,
+    [recommendations, automationAnalysis],
+  );
+
+  const automaticCompletedCount = useMemo(() => {
+    const currentReferences = new Set(
+      recommendations.map((recommendation) => recommendation.reference),
+    );
+
+    return reconciliations.filter(
+      (item) =>
+        item.reconciliation_mode === "automatic" &&
+        item.statement_reference &&
+        currentReferences.has(item.statement_reference),
+    ).length;
+  }, [recommendations, reconciliations]);
+
   function openRulesManager() {
     setRuleDraft(null);
     setShowRules(true);
+  }
+
+  async function updateAutomationSettings(
+    patch: Partial<AutomationSettings>,
+  ) {
+    if (!supabase || !activeCompany || !canManageRules || automationSavingSettings) {
+      return;
+    }
+
+    const next = { ...automationSettings, ...patch };
+    setAutomationSavingSettings(true);
+    setError("");
+
+    const { data: userResult } = await supabase.auth.getUser();
+    const userId = userResult.user?.id ?? null;
+
+    const { error: settingsError } = await supabase
+      .from("bank_reconciliation_settings")
+      .upsert(
+        {
+          company_id: activeCompany.id,
+          ...next,
+          updated_by: userId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "company_id" },
+      );
+
+    if (settingsError) {
+      setError("Não foi possível salvar as configurações da automação segura.");
+      setAutomationSavingSettings(false);
+      return;
+    }
+
+    setAutomationSettings(next);
+    autoRunKeyRef.current = "";
+    setAutomationSavingSettings(false);
   }
 
   function createRuleFromRow(recommendation: Recommendation) {
@@ -778,17 +1051,39 @@ export function BankReconciliationPage() {
     setError("");
     setSuccess("");
 
-    const externalAccountIds = linkedBankAccounts.map((item) => item.id);
+    const { data: companyAccountData, error: companyAccountError } = await supabase
+      .from("bank_connection_accounts")
+      .select("id, name, local_account_id")
+      .eq("company_id", activeCompany.id)
+      .not("local_account_id", "is", null)
+      .order("name");
+
+    if (companyAccountError) {
+      setError("Não foi possível analisar as contas próprias conectadas.");
+      setLoadingOpenFinance(false);
+      return;
+    }
+
+    const companyAccounts =
+      (companyAccountData ?? []) as CompanyLinkedBankAccount[];
+    const companyExternalIds = companyAccounts.map((item) => item.id);
+
+    if (!companyExternalIds.length) {
+      setError("Nenhuma conta Open Finance vinculada foi encontrada.");
+      setLoadingOpenFinance(false);
+      return;
+    }
+
     const { data, error: feedError } = await supabase
       .from("bank_connection_transactions")
       .select(
         "id, external_account_id, provider_transaction_id, description, movement_type, status, amount, transaction_date",
       )
       .eq("company_id", activeCompany.id)
-      .in("external_account_id", externalAccountIds)
+      .in("external_account_id", companyExternalIds)
       .eq("status", "POSTED")
       .order("transaction_date", { ascending: false })
-      .limit(5000);
+      .limit(10000);
 
     if (feedError) {
       setError("Não foi possível carregar as movimentações do Open Finance.");
@@ -796,7 +1091,16 @@ export function BankReconciliationPage() {
       return;
     }
 
-    const feed = (data ?? []) as OpenFinanceTransaction[];
+    const fullFeed = (data ?? []) as OpenFinanceTransaction[];
+    const selectedExternalIds = new Set(
+      linkedBankAccounts.map((item) => item.id),
+    );
+    const feed = fullFeed.filter((item) =>
+      selectedExternalIds.has(item.external_account_id),
+    );
+
+    setCompanyLinkedBankAccounts(companyAccounts);
+    setCompanyOpenFinanceFeed(fullFeed as CompanyBankMovement[]);
     const rows: StatementImportRow[] = feed
       .filter(
         (item) =>
@@ -836,6 +1140,7 @@ export function BankReconciliationPage() {
     );
     setChoices({});
     setCategoryChoices({});
+    autoRunKeyRef.current = "";
     setLoadingOpenFinance(false);
   }
 
@@ -854,6 +1159,9 @@ export function BankReconciliationPage() {
       setFileName(file.name);
       setChoices({});
       setCategoryChoices({});
+      setCompanyOpenFinanceFeed([]);
+      setCompanyLinkedBankAccounts([]);
+      autoRunKeyRef.current = "";
     } catch (parseError) {
       setParsed(null);
       setFileName("");
@@ -886,7 +1194,7 @@ export function BankReconciliationPage() {
         .limit(2500),
       client
         .from("bank_reconciliations")
-        .select("transaction_id, statement_reference, statement_date")
+        .select("transaction_id, statement_reference, statement_date, statement_description, statement_amount, statement_type, reconciliation_mode, automation_score, automation_reason")
         .eq("company_id", companyId)
         .eq("account_id", accountId)
         .order("statement_date", { ascending: false })
@@ -902,6 +1210,123 @@ export function BankReconciliationPage() {
       setReconciliations((reconciliationResult.data ?? []) as Reconciliation[]);
     }
   }
+
+  async function runSafeAutomation() {
+    if (
+      !supabase ||
+      !activeCompany ||
+      !accountId ||
+      !parsed ||
+      parsed.format !== "Open Finance" ||
+      !automationSettings.safe_auto_reconcile_enabled ||
+      automationRunning ||
+      schemaReady !== true ||
+      !canManageRules
+    ) {
+      return;
+    }
+
+    const eligible = autoEligibleRecommendations;
+    if (!eligible.length) return;
+
+    setAutomationRunning(true);
+    setError("");
+
+    let completed = 0;
+    let firstError = "";
+
+    for (const recommendation of eligible) {
+      const analysis = automationAnalysis[recommendation.row.id];
+      const transactionId = analysis?.autoTransactionId;
+      if (!analysis?.autoEligible || !transactionId) continue;
+
+      const transaction = transactionById.get(transactionId);
+      const categorySuggestion = categorySuggestions[recommendation.row.id];
+      const categoryId =
+        !transaction?.category_id && categorySuggestion?.source === "rule"
+          ? categorySuggestion.categoryId
+          : null;
+
+      const { error: reconcileError } = await supabase.rpc(
+        "reconcile_bank_statement_entry_v3",
+        {
+          p_company_id: activeCompany.id,
+          p_account_id: accountId,
+          p_transaction_id: transactionId,
+          p_source_format: parsed.format,
+          p_statement_reference: recommendation.reference,
+          p_statement_date: recommendation.row.date,
+          p_statement_description: recommendation.row.description,
+          p_statement_amount: recommendation.row.amount,
+          p_statement_type: recommendation.row.type,
+          p_category_id: categoryId,
+          p_reconciliation_mode: "automatic",
+          p_automation_score: analysis.autoScore,
+          p_automation_reason: analysis.reason,
+        },
+      );
+
+      if (reconcileError) {
+        firstError = reconcileError.message;
+        break;
+      }
+
+      completed += 1;
+    }
+
+    await reloadReconciliations();
+    await loadCategorizationData();
+
+    if (completed > 0) {
+      setSuccess(
+        `${completed} movimentação${completed === 1 ? "" : "ões"} conciliada${completed === 1 ? "" : "s"} automaticamente com segurança.`,
+      );
+    }
+
+    if (firstError) {
+      setError(
+        `A automação segura parou após ${completed} item${completed === 1 ? "" : "s"}. ${firstError}`,
+      );
+    }
+
+    setAutomationRunning(false);
+  }
+
+  useEffect(() => {
+    if (
+      parsed?.format !== "Open Finance" ||
+      !automationSettings.safe_auto_reconcile_enabled ||
+      schemaReady !== true ||
+      automationRunning ||
+      saving ||
+      !canManageRules ||
+      autoEligibleRecommendations.length === 0
+    ) {
+      return;
+    }
+
+    const key = [
+      accountId,
+      automationSettings.minimum_auto_score,
+      ...autoEligibleRecommendations.map(
+        (recommendation) => recommendation.reference,
+      ),
+    ].join("|");
+
+    if (autoRunKeyRef.current === key) return;
+    autoRunKeyRef.current = key;
+    void runSafeAutomation();
+  }, [
+    parsed?.format,
+    automationSettings.safe_auto_reconcile_enabled,
+    automationSettings.minimum_auto_score,
+    schemaReady,
+    automationRunning,
+    saving,
+    canManageRules,
+    accountId,
+    autoEligibleRecommendations,
+  ]);
 
   async function confirmReconciliation() {
     if (!supabase || !activeCompany || !accountId || !parsed) return;
@@ -933,6 +1358,7 @@ export function BankReconciliationPage() {
       return (
         !recommendation.alreadyReconciled &&
         choice !== "__skip__" &&
+        choice !== "__review__" &&
         choice !== "__done__"
       );
     });
@@ -956,7 +1382,7 @@ export function BankReconciliationPage() {
         effectiveCategoryChoices[recommendation.row.id] || null;
 
       const { error: reconcileError } = await client.rpc(
-        "reconcile_bank_statement_entry_v2",
+        "reconcile_bank_statement_entry_v3",
         {
           p_company_id: companyId,
           p_account_id: accountId,
@@ -968,6 +1394,9 @@ export function BankReconciliationPage() {
           p_statement_amount: recommendation.row.amount,
           p_statement_type: recommendation.row.type,
           p_category_id: categoryId,
+          p_reconciliation_mode: "manual",
+          p_automation_score: null,
+          p_automation_reason: null,
         },
       );
 
@@ -1094,12 +1523,12 @@ export function BankReconciliationPage() {
             <span>Use o Open Finance ou carregue um extrato bancário.</span>
           </div>
           <div>
-            <strong>2. Revise as sugestões</strong>
-            <span>O Valora compara lançamentos e também sugere categorias por regras e histórico.</span>
+            <strong>2. Automação segura</strong>
+            <span>Quando ativada, o Valora concilia apenas matches de alta confiança e registra a decisão como automática.</span>
           </div>
           <div>
-            <strong>3. Confirme</strong>
-            <span>Vincule lançamentos existentes, crie novos ou ignore o que não deve entrar.</span>
+            <strong>3. Revise as exceções</strong>
+            <span>Duplicidades, transferências entre contas próprias e casos ambíguos ficam parados para revisão manual.</span>
           </div>
         </section>
       )}
@@ -1322,6 +1751,131 @@ export function BankReconciliationPage() {
             </article>
           </section>
 
+          {parsed.format === "Open Finance" && (
+            <section className="reconciliation-automation-panel">
+              <div className="reconciliation-automation-copy">
+                <span className="reconciliation-automation-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 3.5 19 6v5.25c0 4.35-2.75 7.55-7 9.25-4.25-1.7-7-4.9-7-9.25V6l7-2.5Z" />
+                    <path d="m8.8 12.1 2.05 2.05 4.4-4.55" />
+                  </svg>
+                </span>
+                <div>
+                  <div className="reconciliation-automation-title">
+                    <strong>Automação segura</strong>
+                    <span className={automationSettings.safe_auto_reconcile_enabled ? "active" : ""}>
+                      {automationRunning
+                        ? "Executando"
+                        : automationSettings.safe_auto_reconcile_enabled
+                          ? "Ativa"
+                          : "Desativada"}
+                    </span>
+                  </div>
+                  <p>
+                    Concilia sozinho apenas correspondências de alta confiança. Duplicidades,
+                    transferências e casos ambíguos ficam para revisão.
+                  </p>
+                </div>
+              </div>
+
+              <div className="reconciliation-automation-metrics">
+                <div>
+                  <strong>{automaticCompletedCount}</strong>
+                  <span>automáticas</span>
+                </div>
+                <div>
+                  <strong>{autoEligibleRecommendations.length}</strong>
+                  <span>seguras agora</span>
+                </div>
+                <div>
+                  <strong>{exceptionCount}</strong>
+                  <span>para revisar</span>
+                </div>
+                <div className={duplicateCount ? "warning" : ""}>
+                  <strong>{duplicateCount}</strong>
+                  <span>duplicidades</span>
+                </div>
+                <div className={transferCount ? "info" : ""}>
+                  <strong>{transferCount}</strong>
+                  <span>transferências</span>
+                </div>
+              </div>
+
+              <div className="reconciliation-automation-controls">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={automationSettings.safe_auto_reconcile_enabled}
+                  className={
+                    automationSettings.safe_auto_reconcile_enabled
+                      ? "reconciliation-auto-switch active"
+                      : "reconciliation-auto-switch"
+                  }
+                  onClick={() =>
+                    void updateAutomationSettings({
+                      safe_auto_reconcile_enabled:
+                        !automationSettings.safe_auto_reconcile_enabled,
+                    })
+                  }
+                  disabled={!canManageRules || automationSavingSettings || automationRunning}
+                >
+                  <i aria-hidden="true" />
+                  <span>
+                    {automationSettings.safe_auto_reconcile_enabled
+                      ? "Ligada"
+                      : "Desligada"}
+                  </span>
+                </button>
+
+                <label>
+                  Confiança mínima
+                  <select
+                    value={automationSettings.minimum_auto_score}
+                    onChange={(event) =>
+                      void updateAutomationSettings({
+                        minimum_auto_score: Number(event.target.value),
+                      })
+                    }
+                    disabled={!canManageRules || automationSavingSettings || automationRunning}
+                  >
+                    <option value={90}>90%</option>
+                    <option value={92}>92%</option>
+                    <option value={95}>95%</option>
+                    <option value={98}>98%</option>
+                  </select>
+                </label>
+
+                <label className="reconciliation-automation-check">
+                  <input
+                    type="checkbox"
+                    checked={automationSettings.detect_duplicates}
+                    onChange={(event) =>
+                      void updateAutomationSettings({
+                        detect_duplicates: event.target.checked,
+                      })
+                    }
+                    disabled={!canManageRules || automationSavingSettings || automationRunning}
+                  />
+                  Detectar duplicidades
+                </label>
+
+                <label className="reconciliation-automation-check">
+                  <input
+                    type="checkbox"
+                    checked={automationSettings.detect_transfers}
+                    onChange={(event) =>
+                      void updateAutomationSettings({
+                        detect_transfers: event.target.checked,
+                      })
+                    }
+                    disabled={!canManageRules || automationSavingSettings || automationRunning}
+                  />
+                  Detectar transferências
+                </label>
+              </div>
+            </section>
+          )}
+
           {hasTransactionConflict && (
             <div className="reconciliation-conflict">
               O mesmo lançamento foi associado a mais de uma linha. Escolha lançamentos diferentes antes de confirmar.
@@ -1380,6 +1934,20 @@ export function BankReconciliationPage() {
 
             <button
               type="button"
+              className={
+                exceptionsOnly
+                  ? "ghost active reconciliation-exceptions-filter"
+                  : "ghost reconciliation-exceptions-filter"
+              }
+              onClick={() => setExceptionsOnly((current) => !current)}
+              disabled={parsed.format !== "Open Finance"}
+            >
+              Revisar só exceções
+              {exceptionCount > 0 && <span>{exceptionCount}</span>}
+            </button>
+
+            <button
+              type="button"
               className={showMoreFilters ? "ghost active reconciliation-more-filters" : "ghost reconciliation-more-filters"}
               onClick={() => setShowMoreFilters((current) => !current)}
             >
@@ -1395,6 +1963,7 @@ export function BankReconciliationPage() {
                 ["done", "Conciliadas"],
                 ["match", "Vincular existentes"],
                 ["new", "Criar no Valora"],
+                ["review", "Revisar"],
                 ["skip", "Ignoradas"],
               ].map(([value, label]) => (
                 <button
@@ -1403,7 +1972,7 @@ export function BankReconciliationPage() {
                   className={situationFilter === value ? "active" : ""}
                   onClick={() =>
                     setSituationFilter(
-                      value as "all" | "done" | "match" | "new" | "skip",
+                      value as "all" | "done" | "match" | "new" | "review" | "skip",
                     )
                   }
                 >
@@ -1448,14 +2017,28 @@ export function BankReconciliationPage() {
                     const selectedCandidate = recommendation.candidates.find(
                       (candidate) => candidate.transaction.id === choice,
                     );
+                    const analysis = automationAnalysis[row.id];
+                    const reconciliationRecord =
+                      reconciliationByReference.get(recommendation.reference);
+                    const automaticDone =
+                      recommendation.alreadyReconciled &&
+                      reconciliationRecord?.reconciliation_mode === "automatic";
                     const situation =
-                      recommendation.alreadyReconciled || choice === "__done__"
-                        ? "done"
-                        : choice === "__skip__"
-                          ? "skip"
-                          : choice === "__new__"
-                            ? "new"
-                            : "match";
+                      automaticDone
+                        ? "automatic"
+                        : recommendation.alreadyReconciled || choice === "__done__"
+                          ? "done"
+                          : analysis?.transferRisk
+                            ? "transfer"
+                            : analysis?.duplicateRisk
+                              ? "duplicate"
+                              : choice === "__skip__"
+                                ? "skip"
+                                : choice === "__review__"
+                                  ? "review"
+                                  : choice === "__new__"
+                                    ? "new"
+                                    : "match";
                     const selectedCategoryId =
                       effectiveCategoryChoices[row.id] ?? "";
                     const categorySuggestion =
@@ -1561,20 +2144,32 @@ export function BankReconciliationPage() {
                         <td className="center">
                           <span className={`reconciliation-premium-status ${situation}`}>
                             <i aria-hidden="true" />
-                            {situation === "done"
-                              ? "Conciliada"
-                              : situation === "skip"
-                                ? "Ignorar"
-                                : situation === "match"
-                                  ? "Vincular"
-                                  : "A conciliar"}
+                            {situation === "automatic"
+                              ? "Automática"
+                              : situation === "done"
+                                ? "Conciliada"
+                                : situation === "transfer"
+                                  ? "Transferência?"
+                                  : situation === "duplicate"
+                                    ? "Duplicidade?"
+                                    : situation === "review"
+                                      ? "Revisar"
+                                      : situation === "skip"
+                                        ? "Ignorar"
+                                        : situation === "match"
+                                          ? "Vincular"
+                                          : "A conciliar"}
                           </span>
                         </td>
                         <td>
                           {recommendation.alreadyReconciled ? (
                             <div className="reconciliation-done-action">
-                              <strong>Concluído</strong>
-                              <small>Esta movimentação já foi conciliada.</small>
+                              <strong>{automaticDone ? "Conciliada automaticamente" : "Concluído"}</strong>
+                              <small>
+                                {automaticDone
+                                  ? `Automação segura${reconciliationRecord?.automation_score ? ` • ${reconciliationRecord.automation_score}%` : ""}`
+                                  : "Esta movimentação já foi conciliada."}
+                              </small>
                             </div>
                           ) : (
                             <div className="reconciliation-match-cell premium">
@@ -1588,6 +2183,11 @@ export function BankReconciliationPage() {
                                 }
                                 disabled={saving || !canManage}
                               >
+                                {(analysis?.duplicateRisk || analysis?.transferRisk) && (
+                                  <option value="__review__">
+                                    Revisar antes de conciliar
+                                  </option>
+                                )}
                                 <option value="__new__">Importar como novo lançamento</option>
                                 {recommendation.candidates.map((candidate) => (
                                   <option
@@ -1600,11 +2200,17 @@ export function BankReconciliationPage() {
                                 <option value="__skip__">Ignorar esta movimentação</option>
                               </select>
                               <small>
-                                {choice === "__new__"
-                                  ? "Cria um novo lançamento ao confirmar."
-                                  : choice === "__skip__"
-                                    ? "A movimentação ficará fora desta conciliação."
-                                    : selectedCandidate
+                                {choice === "__review__"
+                                  ? analysis?.transferRisk
+                                    ? "Há uma movimentação oposta de mesmo valor em outra conta própria. Revise antes de tratar como receita ou despesa."
+                                    : analysis?.duplicateRisk
+                                      ? "Existe uma conciliação muito parecida. Revise para evitar duplicidade."
+                                      : "Esta movimentação exige revisão."
+                                  : choice === "__new__"
+                                    ? "Cria um novo lançamento ao confirmar."
+                                    : choice === "__skip__"
+                                      ? "A movimentação ficará fora desta conciliação."
+                                      : selectedCandidate
                                       ? recommendation.confidence === "strong"
                                         ? "Sugestão forte por valor, data e descrição."
                                         : recommendation.confidence === "possible"
@@ -1654,7 +2260,9 @@ export function BankReconciliationPage() {
                 {saving
                   ? "Salvando..."
                   : totalActionCount === 0
-                    ? "Tudo conciliado"
+                    ? summary.review > 0
+                      ? `${summary.review} item${summary.review === 1 ? "" : "s"} para revisar`
+                      : "Tudo conciliado"
                     : reconciliationActionCount === 0
                       ? `Salvar ${categoryOnlyUpdates.length} categoria${categoryOnlyUpdates.length === 1 ? "" : "s"}`
                       : categoryOnlyUpdates.length > 0
