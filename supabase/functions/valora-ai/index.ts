@@ -348,9 +348,29 @@ Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const geminiApiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
-  const geminiModel = Deno.env.get("GEMINI_MODEL")?.trim() || "gemini-3.5-flash-lite";
+  const configuredGeminiModel = Deno.env.get("GEMINI_MODEL")?.trim();
+  const configuredGeminiFallbackModel =
+    Deno.env.get("GEMINI_FALLBACK_MODEL")?.trim();
+
+  // Gemini 2.5 generation is no longer available to this project.
+  // Ignore stale environment overrides so an old secret cannot take Valora IA offline.
+  const legacyGeminiModels = new Set([
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+  ]);
+
+  const geminiModel =
+    configuredGeminiModel && !legacyGeminiModels.has(configuredGeminiModel)
+      ? configuredGeminiModel
+      : "gemini-3.5-flash-lite";
+
   const geminiFallbackModel =
-    Deno.env.get("GEMINI_FALLBACK_MODEL")?.trim() || "gemini-2.5-flash-lite";
+    configuredGeminiFallbackModel &&
+      !legacyGeminiModels.has(configuredGeminiFallbackModel) &&
+      configuredGeminiFallbackModel !== geminiModel
+      ? configuredGeminiFallbackModel
+      : "gemini-3.1-flash-lite";
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return jsonResponse({ error: "Supabase function environment is incomplete" }, 500);
@@ -606,7 +626,7 @@ Deno.serve(async (request) => {
       let response: Response;
       try {
         response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+          `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent`,
           {
             method: "POST",
             headers: {
