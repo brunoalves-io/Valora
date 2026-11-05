@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { CategorizationRulesDialog } from "./CategorizationRulesDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import {
@@ -6,6 +7,14 @@ import {
   type StatementImportRow,
   type StatementParseResult,
 } from "../lib/statementImport";
+import {
+  rulePatternFromDescription,
+  suggestCategory,
+  type CategoryOption,
+  type CategorizationRule,
+  type CategorizedHistoryItem,
+  type CategorySuggestion,
+} from "../lib/categorization";
 
 type Account = {
   id: string;
@@ -23,6 +32,7 @@ type Transaction = {
   due_date: string;
   paid_at: string | null;
   account_id: string | null;
+  category_id: string | null;
 };
 
 type Reconciliation = {
@@ -204,9 +214,19 @@ export function BankReconciliationPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
   const [linkedBankAccounts, setLinkedBankAccounts] = useState<LinkedBankAccount[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [categorizationRules, setCategorizationRules] = useState<CategorizationRule[]>([]);
+  const [categorizedHistory, setCategorizedHistory] = useState<CategorizedHistoryItem[]>([]);
   const [parsed, setParsed] = useState<StatementParseResult | null>(null);
   const [fileName, setFileName] = useState("");
   const [choices, setChoices] = useState<Record<string, string>>({});
+  const [categoryChoices, setCategoryChoices] = useState<Record<string, string>>({});
+  const [showRules, setShowRules] = useState(false);
+  const [ruleDraft, setRuleDraft] = useState<{
+    pattern: string;
+    transactionType: "income" | "expense";
+    categoryId: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingAccount, setLoadingAccount] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -225,6 +245,51 @@ export function BankReconciliationPage() {
   const [success, setSuccess] = useState("");
 
   const canManage = activeRole !== "viewer";
+  const canManageRules = activeRole === "owner" || activeRole === "admin";
+
+  async function loadCategorizationData() {
+    if (!supabase || !activeCompany) return;
+
+    const companyId = activeCompany.id;
+    const [categoryResult, ruleResult, historyResult] = await Promise.all([
+      supabase
+        .from("categories")
+        .select("id, name, type, active")
+        .eq("company_id", companyId)
+        .eq("active", true)
+        .order("name"),
+      supabase
+        .from("bank_categorization_rules")
+        .select("id, company_id, pattern, match_mode, transaction_type, category_id, priority, active, created_at, updated_at")
+        .eq("company_id", companyId)
+        .order("priority", { ascending: false })
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("transactions")
+        .select("description, type, category_id")
+        .eq("company_id", companyId)
+        .eq("status", "paid")
+        .not("category_id", "is", null)
+        .order("paid_at", { ascending: false, nullsFirst: false })
+        .limit(5000),
+    ]);
+
+    if (!categoryResult.error) {
+      setCategories((categoryResult.data ?? []) as CategoryOption[]);
+    }
+
+    if (!ruleResult.error) {
+      setCategorizationRules((ruleResult.data ?? []) as CategorizationRule[]);
+    }
+
+    if (!historyResult.error) {
+      setCategorizedHistory((historyResult.data ?? []) as CategorizedHistoryItem[]);
+    }
+  }
+
+  useEffect(() => {
+    void loadCategorizationData();
+  }, [activeCompany?.id]);
 
   useEffect(() => {
     if (!supabase || !activeCompany) return;
@@ -288,7 +353,7 @@ export function BankReconciliationPage() {
       const [transactionResult, reconciliationResult, linkedAccountResult] = await Promise.all([
         client
           .from("transactions")
-          .select("id, description, amount, type, status, due_date, paid_at, account_id")
+          .select("id, description, amount, type, status, due_date, paid_at, account_id, category_id")
           .eq("company_id", companyId)
           .eq("account_id", accountId)
           .eq("status", "paid")
@@ -355,6 +420,7 @@ export function BankReconciliationPage() {
     setParsed(null);
     setFileName("");
     setChoices({});
+    setCategoryChoices({});
     setSearch("");
     setTypeFilter("all");
     setPeriodFilter("all");
@@ -683,7 +749,7 @@ export function BankReconciliationPage() {
     const [transactionResult, reconciliationResult] = await Promise.all([
       client
         .from("transactions")
-        .select("id, description, amount, type, status, due_date, paid_at, account_id")
+        .select("id, description, amount, type, status, due_date, paid_at, account_id, category_id")
         .eq("company_id", companyId)
         .eq("account_id", accountId)
         .eq("status", "paid")
