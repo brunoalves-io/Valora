@@ -25,6 +25,7 @@ import { AlertsPage } from "./components/AlertsPage";
 import { ValoraAIPage } from "./components/ValoraAIPage";
 import { CompanySettingsPage } from "./components/CompanySettingsPage";
 import { CommandPalette } from "./components/CommandPalette";
+import { HelpDrawer } from "./components/HelpDrawer";
 import { TransactionsPage } from "./components/TransactionsPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider, useCompany } from "./contexts/CompanyContext";
@@ -456,6 +457,8 @@ function Workspace() {
   const [newCompanyName, setNewCompanyName] = useState("");
   const [companyMenuError, setCompanyMenuError] = useState("");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [online, setOnline] = useState(() => navigator.onLine);
   const { companies, activeCompany, activeRole, selectCompany, createCompany } = useCompany();
   const { user, signOut } = useAuth();
 
@@ -537,10 +540,33 @@ function Workspace() {
         event.preventDefault();
         setCommandPaletteOpen((open) => !open);
       }
+
+      if (event.key === "F1") {
+        event.preventDefault();
+        setHelpOpen(true);
+      }
     }
 
     window.addEventListener("keydown", handleGlobalShortcut);
     return () => window.removeEventListener("keydown", handleGlobalShortcut);
+  }, []);
+
+  useEffect(() => {
+    function markOnline() {
+      setOnline(true);
+    }
+
+    function markOffline() {
+      setOnline(false);
+    }
+
+    window.addEventListener("online", markOnline);
+    window.addEventListener("offline", markOffline);
+
+    return () => {
+      window.removeEventListener("online", markOnline);
+      window.removeEventListener("offline", markOffline);
+    };
   }, []);
 
   function roleLabel(role: "owner" | "admin" | "member" | "viewer") {
@@ -816,6 +842,15 @@ function Workspace() {
             </div>
           </div>
           <button
+            className="settings"
+            onClick={() => setHelpOpen(true)}
+            title="Ajuda rápida (F1)"
+          >
+            <span className="nav-icon help-nav-icon" aria-hidden="true">?</span>
+            <span className="nav-label">Ajuda</span>
+            <kbd className="sidebar-help-shortcut">F1</kbd>
+          </button>
+          <button
             className={page === "settings" ? "settings active" : "settings"}
             onClick={() => setPage("settings")}
           >
@@ -834,6 +869,15 @@ function Workspace() {
       </aside>
 
       <main className="workspace">
+        {!online && (
+          <div className="offline-banner" role="status">
+            <span aria-hidden="true">!</span>
+            <div>
+              <strong>Sem conexão com a internet</strong>
+              <small>Algumas ações podem falhar até a conexão ser restabelecida. Seus dados na tela não serão apagados.</small>
+            </div>
+          </div>
+        )}
         {activeRole === "viewer" && (
           <div className="viewer-banner">
             Modo somente leitura. Você pode consultar os dados, mas não alterar registros.
@@ -853,6 +897,11 @@ function Workspace() {
         items={commandItems}
         onClose={() => setCommandPaletteOpen(false)}
         onSelect={(target) => setPage(target as Page)}
+      />
+
+      <HelpDrawer
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
       />
     </div>
   );
