@@ -1744,6 +1744,131 @@ export function BankReconciliationPage() {
             </article>
           </section>
 
+          {parsed.format === "Open Finance" && (
+            <section className="reconciliation-automation-panel">
+              <div className="reconciliation-automation-copy">
+                <span className="reconciliation-automation-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 3.5 19 6v5.25c0 4.35-2.75 7.55-7 9.25-4.25-1.7-7-4.9-7-9.25V6l7-2.5Z" />
+                    <path d="m8.8 12.1 2.05 2.05 4.4-4.55" />
+                  </svg>
+                </span>
+                <div>
+                  <div className="reconciliation-automation-title">
+                    <strong>Automação segura</strong>
+                    <span className={automationSettings.safe_auto_reconcile_enabled ? "active" : ""}>
+                      {automationRunning
+                        ? "Executando"
+                        : automationSettings.safe_auto_reconcile_enabled
+                          ? "Ativa"
+                          : "Desativada"}
+                    </span>
+                  </div>
+                  <p>
+                    Concilia sozinho apenas correspondências de alta confiança. Duplicidades,
+                    transferências e casos ambíguos ficam para revisão.
+                  </p>
+                </div>
+              </div>
+
+              <div className="reconciliation-automation-metrics">
+                <div>
+                  <strong>{automaticCompletedCount}</strong>
+                  <span>automáticas</span>
+                </div>
+                <div>
+                  <strong>{autoEligibleRecommendations.length}</strong>
+                  <span>seguras agora</span>
+                </div>
+                <div>
+                  <strong>{exceptionCount}</strong>
+                  <span>para revisar</span>
+                </div>
+                <div className={duplicateCount ? "warning" : ""}>
+                  <strong>{duplicateCount}</strong>
+                  <span>duplicidades</span>
+                </div>
+                <div className={transferCount ? "info" : ""}>
+                  <strong>{transferCount}</strong>
+                  <span>transferências</span>
+                </div>
+              </div>
+
+              <div className="reconciliation-automation-controls">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={automationSettings.safe_auto_reconcile_enabled}
+                  className={
+                    automationSettings.safe_auto_reconcile_enabled
+                      ? "reconciliation-auto-switch active"
+                      : "reconciliation-auto-switch"
+                  }
+                  onClick={() =>
+                    void updateAutomationSettings({
+                      safe_auto_reconcile_enabled:
+                        !automationSettings.safe_auto_reconcile_enabled,
+                    })
+                  }
+                  disabled={!canManageRules || automationSavingSettings || automationRunning}
+                >
+                  <i aria-hidden="true" />
+                  <span>
+                    {automationSettings.safe_auto_reconcile_enabled
+                      ? "Ligada"
+                      : "Desligada"}
+                  </span>
+                </button>
+
+                <label>
+                  Confiança mínima
+                  <select
+                    value={automationSettings.minimum_auto_score}
+                    onChange={(event) =>
+                      void updateAutomationSettings({
+                        minimum_auto_score: Number(event.target.value),
+                      })
+                    }
+                    disabled={!canManageRules || automationSavingSettings || automationRunning}
+                  >
+                    <option value={90}>90%</option>
+                    <option value={92}>92%</option>
+                    <option value={95}>95%</option>
+                    <option value={98}>98%</option>
+                  </select>
+                </label>
+
+                <label className="reconciliation-automation-check">
+                  <input
+                    type="checkbox"
+                    checked={automationSettings.detect_duplicates}
+                    onChange={(event) =>
+                      void updateAutomationSettings({
+                        detect_duplicates: event.target.checked,
+                      })
+                    }
+                    disabled={!canManageRules || automationSavingSettings || automationRunning}
+                  />
+                  Detectar duplicidades
+                </label>
+
+                <label className="reconciliation-automation-check">
+                  <input
+                    type="checkbox"
+                    checked={automationSettings.detect_transfers}
+                    onChange={(event) =>
+                      void updateAutomationSettings({
+                        detect_transfers: event.target.checked,
+                      })
+                    }
+                    disabled={!canManageRules || automationSavingSettings || automationRunning}
+                  />
+                  Detectar transferências
+                </label>
+              </div>
+            </section>
+          )}
+
           {hasTransactionConflict && (
             <div className="reconciliation-conflict">
               O mesmo lançamento foi associado a mais de uma linha. Escolha lançamentos diferentes antes de confirmar.
@@ -1802,6 +1927,20 @@ export function BankReconciliationPage() {
 
             <button
               type="button"
+              className={
+                exceptionsOnly
+                  ? "ghost active reconciliation-exceptions-filter"
+                  : "ghost reconciliation-exceptions-filter"
+              }
+              onClick={() => setExceptionsOnly((current) => !current)}
+              disabled={parsed.format !== "Open Finance"}
+            >
+              Revisar só exceções
+              {exceptionCount > 0 && <span>{exceptionCount}</span>}
+            </button>
+
+            <button
+              type="button"
               className={showMoreFilters ? "ghost active reconciliation-more-filters" : "ghost reconciliation-more-filters"}
               onClick={() => setShowMoreFilters((current) => !current)}
             >
@@ -1817,6 +1956,7 @@ export function BankReconciliationPage() {
                 ["done", "Conciliadas"],
                 ["match", "Vincular existentes"],
                 ["new", "Criar no Valora"],
+                ["review", "Revisar"],
                 ["skip", "Ignoradas"],
               ].map(([value, label]) => (
                 <button
@@ -1825,7 +1965,7 @@ export function BankReconciliationPage() {
                   className={situationFilter === value ? "active" : ""}
                   onClick={() =>
                     setSituationFilter(
-                      value as "all" | "done" | "match" | "new" | "skip",
+                      value as "all" | "done" | "match" | "new" | "review" | "skip",
                     )
                   }
                 >
@@ -1870,14 +2010,28 @@ export function BankReconciliationPage() {
                     const selectedCandidate = recommendation.candidates.find(
                       (candidate) => candidate.transaction.id === choice,
                     );
+                    const analysis = automationAnalysis[row.id];
+                    const reconciliationRecord =
+                      reconciliationByReference.get(recommendation.reference);
+                    const automaticDone =
+                      recommendation.alreadyReconciled &&
+                      reconciliationRecord?.reconciliation_mode === "automatic";
                     const situation =
-                      recommendation.alreadyReconciled || choice === "__done__"
-                        ? "done"
-                        : choice === "__skip__"
-                          ? "skip"
-                          : choice === "__new__"
-                            ? "new"
-                            : "match";
+                      automaticDone
+                        ? "automatic"
+                        : recommendation.alreadyReconciled || choice === "__done__"
+                          ? "done"
+                          : analysis?.transferRisk
+                            ? "transfer"
+                            : analysis?.duplicateRisk
+                              ? "duplicate"
+                              : choice === "__skip__"
+                                ? "skip"
+                                : choice === "__review__"
+                                  ? "review"
+                                  : choice === "__new__"
+                                    ? "new"
+                                    : "match";
                     const selectedCategoryId =
                       effectiveCategoryChoices[row.id] ?? "";
                     const categorySuggestion =
@@ -1983,20 +2137,32 @@ export function BankReconciliationPage() {
                         <td className="center">
                           <span className={`reconciliation-premium-status ${situation}`}>
                             <i aria-hidden="true" />
-                            {situation === "done"
-                              ? "Conciliada"
-                              : situation === "skip"
-                                ? "Ignorar"
-                                : situation === "match"
-                                  ? "Vincular"
-                                  : "A conciliar"}
+                            {situation === "automatic"
+                              ? "Automática"
+                              : situation === "done"
+                                ? "Conciliada"
+                                : situation === "transfer"
+                                  ? "Transferência?"
+                                  : situation === "duplicate"
+                                    ? "Duplicidade?"
+                                    : situation === "review"
+                                      ? "Revisar"
+                                      : situation === "skip"
+                                        ? "Ignorar"
+                                        : situation === "match"
+                                          ? "Vincular"
+                                          : "A conciliar"}
                           </span>
                         </td>
                         <td>
                           {recommendation.alreadyReconciled ? (
                             <div className="reconciliation-done-action">
-                              <strong>Concluído</strong>
-                              <small>Esta movimentação já foi conciliada.</small>
+                              <strong>{automaticDone ? "Conciliada automaticamente" : "Concluído"}</strong>
+                              <small>
+                                {automaticDone
+                                  ? `Automação segura${reconciliationRecord?.automation_score ? ` • ${reconciliationRecord.automation_score}%` : ""}`
+                                  : "Esta movimentação já foi conciliada."}
+                              </small>
                             </div>
                           ) : (
                             <div className="reconciliation-match-cell premium">
@@ -2010,6 +2176,11 @@ export function BankReconciliationPage() {
                                 }
                                 disabled={saving || !canManage}
                               >
+                                {(analysis?.duplicateRisk || analysis?.transferRisk) && (
+                                  <option value="__review__">
+                                    Revisar antes de conciliar
+                                  </option>
+                                )}
                                 <option value="__new__">Importar como novo lançamento</option>
                                 {recommendation.candidates.map((candidate) => (
                                   <option
@@ -2022,11 +2193,17 @@ export function BankReconciliationPage() {
                                 <option value="__skip__">Ignorar esta movimentação</option>
                               </select>
                               <small>
-                                {choice === "__new__"
-                                  ? "Cria um novo lançamento ao confirmar."
-                                  : choice === "__skip__"
-                                    ? "A movimentação ficará fora desta conciliação."
-                                    : selectedCandidate
+                                {choice === "__review__"
+                                  ? analysis?.transferRisk
+                                    ? "Há uma movimentação oposta de mesmo valor em outra conta própria. Revise antes de tratar como receita ou despesa."
+                                    : analysis?.duplicateRisk
+                                      ? "Existe uma conciliação muito parecida. Revise para evitar duplicidade."
+                                      : "Esta movimentação exige revisão."
+                                  : choice === "__new__"
+                                    ? "Cria um novo lançamento ao confirmar."
+                                    : choice === "__skip__"
+                                      ? "A movimentação ficará fora desta conciliação."
+                                      : selectedCandidate
                                       ? recommendation.confidence === "strong"
                                         ? "Sugestão forte por valor, data e descrição."
                                         : recommendation.confidence === "possible"
@@ -2076,7 +2253,9 @@ export function BankReconciliationPage() {
                 {saving
                   ? "Salvando..."
                   : totalActionCount === 0
-                    ? "Tudo conciliado"
+                    ? summary.review > 0
+                      ? `${summary.review} item${summary.review === 1 ? "" : "s"} para revisar`
+                      : "Tudo conciliado"
                     : reconciliationActionCount === 0
                       ? `Salvar ${categoryOnlyUpdates.length} categoria${categoryOnlyUpdates.length === 1 ? "" : "s"}`
                       : categoryOnlyUpdates.length > 0
