@@ -590,17 +590,38 @@ Deno.serve(async (request) => {
     await contextResponse.json() as Record<string, unknown>;
 
   if (mode === "chat") {
-    const cashFlowForecast = await buildCashFlowForecast(
-      supabaseUrl,
-      supabaseAnonKey,
-      authorization,
-      companyId,
-      today,
-      financialContext,
-    );
+    const [cashFlowForecast, planningResponse] = await Promise.all([
+      buildCashFlowForecast(
+        supabaseUrl,
+        supabaseAnonKey,
+        authorization,
+        companyId,
+        today,
+        financialContext,
+      ),
+      fetch(`${supabaseUrl}/rest/v1/rpc/get_financial_planning_context`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabaseAnonKey,
+          Authorization: authorization,
+        },
+        body: JSON.stringify({ p_company_id: companyId }),
+      }),
+    ]);
 
     if (cashFlowForecast) {
       financialContext.cash_flow_forecast = cashFlowForecast;
+    }
+
+    if (planningResponse.ok) {
+      financialContext.financial_planning =
+        await planningResponse.json() as Record<string, unknown>;
+    } else {
+      console.error("Valora AI planning context error", {
+        status: planningResponse.status,
+        detail: (await planningResponse.text()).slice(0, 500),
+      });
     }
   }
 
@@ -682,6 +703,7 @@ Deno.serve(async (request) => {
           "Nunca invente valores, datas, clientes, despesas, saldos, tendências ou IDs.",
           "Diferencie valores realizados, pendentes, vencidos e projetados quando isso for relevante.",
           "Para perguntas sobre caixa futuro, saldo projetado ou risco de ficar negativo em 7, 30, 60 ou 90 dias, use cash_flow_forecast.horizons. Quando existir first_negative_date, informe a data e o minimum_balance; quando não existir, deixe claro que não há saldo negativo projetado no horizonte consultado.",
+          "Para perguntas sobre orçamento, limite disponível, categorias/centros de custo acima do planejado ou metas mensais, use financial_planning. Em budgets, committed é realizado + pendente, remaining é o valor ainda disponível e usage_ratio é a parcela já comprometida. Em goals, current_value é o realizado atual, projected_value é a projeção do mês e on_track indica se a meta está no caminho esperado.",
           "Se a pergunta exigir dados ausentes, diga claramente que o Valora ainda não possui dados suficientes.",
           "A IA NUNCA executa uma alteração por conta própria. Ela apenas responde ou prepara uma proposta para confirmação humana.",
           "As únicas ações mutáveis suportadas aqui são create_transaction e create_recurrence.",
