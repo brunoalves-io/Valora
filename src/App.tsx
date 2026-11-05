@@ -397,7 +397,7 @@ function CurrentPage({
     case "settings":
       return <CompanySettingsPage />;
     default:
-      return <Dashboard onOpenAI={() => onNavigate("ai")} />;
+      return <Dashboard onNavigate={(target) => onNavigate(target)} />;
   }
 }
 
