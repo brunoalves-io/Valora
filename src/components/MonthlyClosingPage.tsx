@@ -975,6 +975,8 @@ export function MonthlyClosingPage() {
             : "Nenhum lançamento será bloqueado ou alterado."
         }
         confirmLabel={selectedClosing ? "Atualizar fechamento" : "Fechar mês"}
+        busyLabel={selectedClosing ? "Atualizando fechamento..." : "Fechando mês..."}
+        tone="primary"
         busy={closing}
         onCancel={() => {
           if (!closing) setPendingClose(false);
