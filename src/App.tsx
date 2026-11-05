@@ -13,6 +13,7 @@ import { CostCentersPage } from "./components/CostCentersPage";
 import { Dashboard } from "./components/Dashboard";
 import { FinancialObligationsPage } from "./components/FinancialObligationsPage";
 import { ProposalsPage } from "./components/ProposalsPage";
+import { PlanningPage } from "./components/PlanningPage";
 import { ReportsPage } from "./components/ReportsPage";
 import { CardsPage } from "./components/CardsPage";
 import { RecurrencesPage } from "./components/RecurrencesPage";
@@ -40,6 +41,7 @@ type Page =
   | "customers"
   | "suppliers"
   | "proposals"
+  | "planning"
   | "reports"
   | "cards"
   | "recurrences"
@@ -62,6 +64,7 @@ const activeNav: Array<[string, Page]> = [
   ["Clientes", "customers"],
   ["Fornecedores", "suppliers"],
   ["Propostas", "proposals"],
+  ["Planejamento", "planning"],
   ["Relatórios", "reports"],
   ["Cartões", "cards"],
   ["Recorrências", "recurrences"],
@@ -226,6 +229,15 @@ function SidebarIcon({
           <path d="M9 12h6M9 16h5" />
         </svg>
       );
+    case "planning":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8.5" />
+          <circle cx="12" cy="12" r="4.5" />
+          <path d="M12 3v3M21 12h-3M12 21v-3M3 12h3" />
+          <path d="m9.7 12 1.5 1.5 3.2-3.2" />
+        </svg>
+      );
     case "reports":
       return (
         <svg {...common}>
@@ -361,6 +373,8 @@ function CurrentPage({
       return <BusinessPartnersPage view="supplier" />;
     case "proposals":
       return <ProposalsPage />;
+    case "planning":
+      return <PlanningPage />;
     case "reports":
       return <ReportsPage />;
     case "cards":
@@ -403,11 +417,16 @@ function Workspace() {
       return;
     }
 
-    const { error: refreshError } = await supabase.rpc("refresh_company_alerts", {
-      p_company_id: activeCompany.id,
-    });
+    const [{ error: refreshError }, { error: planningRefreshError }] = await Promise.all([
+      supabase.rpc("refresh_company_alerts", {
+        p_company_id: activeCompany.id,
+      }),
+      supabase.rpc("refresh_financial_planning_alerts", {
+        p_company_id: activeCompany.id,
+      }),
+    ]);
 
-    if (refreshError) return;
+    if (refreshError || planningRefreshError) return;
 
     const { data, error } = await supabase.rpc("list_company_alerts", {
       p_company_id: activeCompany.id,
