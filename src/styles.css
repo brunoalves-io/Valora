@@ -9347,3 +9347,9 @@ tr:last-child td { border-bottom: 0; }
     width: 100%;
   }
 }
+
+
+/* Keep destructive confirmation above the rules workspace */
+.categorization-rules-backdrop {
+  z-index: 900;
+}
