@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { useDialogFocus } from "./useDialogFocus";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import {
@@ -105,6 +106,7 @@ export function CategorizationRulesDialog({
     });
   }, [open, initialDraft, categories]);
 
+  const dialogRef = useDialogFocus(open);
   if (!open) return null;
 
   function resetForm() {
@@ -259,6 +261,8 @@ export function CategorizationRulesDialog({
         <section
           className="categorization-rules-dialog"
           role="dialog"
+          ref={dialogRef}
+          tabIndex={-1}
           aria-modal="true"
           aria-labelledby="categorization-rules-title"
         >

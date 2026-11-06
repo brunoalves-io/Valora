@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::Serialize;
 use std::path::Path;
 use tauri::Manager;
@@ -18,20 +19,83 @@ struct UpdateCheckResult {
 }
 
 fn updater_config() -> Option<(&'static str, &'static str)> {
-    let pubkey = option_env!("VALORA_UPDATER_PUBLIC_KEY").unwrap_or("").trim();
+    let pubkey = option_env!("VALORA_UPDATER_PUBLIC_KEY")
+        .unwrap_or("")
+        .trim();
     let endpoint = option_env!("VALORA_UPDATER_ENDPOINT").unwrap_or("").trim();
 
-    if pubkey.is_empty() || endpoint.is_empty() {
-        return None;
-    }
+    valid_updater_config(pubkey, endpoint).then_some((pubkey, endpoint))
+}
 
-    Some((pubkey, endpoint))
+fn valid_updater_config(pubkey: &str, endpoint: &str) -> bool {
+    // Match the updater's public-key format; never enable a malformed trust key.
+    let valid_key = STANDARD
+        .decode(pubkey)
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .and_then(|text| minisign_verify::PublicKey::decode(&text).ok())
+        .is_some();
+    valid_key && updater_endpoint(endpoint).is_ok()
 }
 
 fn updater_endpoint(value: &str) -> Result<Url, String> {
-    value
+    let url = value
         .parse::<Url>()
-        .map_err(|_| "O endereço de atualização do Valora é inválido.".to_string())
+        .map_err(|_| "O endereço de atualização do Valora é inválido.".to_string())?;
+    if url.scheme() != "https"
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err(
+            "O endereço de atualização do Valora exige HTTPS sem credenciais na URL.".to_string(),
+        );
+    }
+    Ok(url)
+}
+
+#[cfg(test)]
+mod updater_tests {
+    use super::*;
+
+    // Public test vector from minisign-verify/Tauri, never a production trust key.
+    fn test_public_key() -> String {
+        STANDARD.encode("untrusted comment: minisign public key E7620F1842B4E81F\nRWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3")
+    }
+
+    #[test]
+    fn missing_or_malformed_configuration_is_disabled() {
+        assert!(!valid_updater_config("", ""));
+        assert!(!valid_updater_config(
+            "invalid",
+            "https://example.com/latest.json"
+        ));
+        assert!(!valid_updater_config(
+            &STANDARD.encode("invalid"),
+            "https://example.com/latest.json"
+        ));
+        assert!(!valid_updater_config(&test_public_key(), ""));
+    }
+
+    #[test]
+    fn insecure_or_malformed_endpoints_are_disabled() {
+        for endpoint in [
+            "not a URL",
+            "http://example.com/latest.json",
+            "file:///latest.json",
+            "https://user:password@example.com/latest.json",
+        ] {
+            assert!(!valid_updater_config(&test_public_key(), endpoint));
+        }
+    }
+
+    #[test]
+    fn valid_signed_update_configuration_is_enabled() {
+        assert!(valid_updater_config(
+            &test_public_key(),
+            "https://example.com/latest.json"
+        ));
+    }
 }
 
 #[tauri::command]
@@ -71,7 +135,9 @@ async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateCheckResult, St
 #[tauri::command]
 async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
     let Some((pubkey, endpoint)) = updater_config() else {
-        return Err("As atualizações automáticas ainda não estão ativadas nesta versão.".to_string());
+        return Err(
+            "As atualizações automáticas ainda não estão ativadas nesta versão.".to_string(),
+        );
     };
 
     let updater = app
@@ -118,7 +184,9 @@ async fn save_attachment_file(
         .path()
         .contains("/storage/v1/object/sign/transaction-attachments/")
     {
-        return Err("O endereço recebido não pertence ao armazenamento de anexos do Valora.".to_string());
+        return Err(
+            "O endereço recebido não pertence ao armazenamento de anexos do Valora.".to_string(),
+        );
     }
 
     let safe_name = Path::new(&file_name)
@@ -192,8 +260,28 @@ fn open_external_url(url: String) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_updater::Builder::new().build())
+    let mut context = tauri::generate_context!();
+    let mut builder = tauri::Builder::default();
+    if let Some((pubkey, endpoint)) = updater_config() {
+        // Supply the plugin's required Config before it is deserialized at startup.
+        // Preserve any release-specific updater options supplied by the workflow.
+        let config = context
+            .config_mut()
+            .plugins
+            .0
+            .entry("updater".into())
+            .or_insert_with(|| serde_json::json!({}));
+        if !config.is_object() {
+            *config = serde_json::json!({});
+        }
+        config["pubkey"] = serde_json::json!(pubkey);
+        config["endpoints"] = serde_json::json!([endpoint]);
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    } else {
+        context.config_mut().plugins.0.remove("updater");
+        eprintln!("Valora: atualizações automáticas desabilitadas; chave pública ou endpoint HTTPS ausente/inválido.");
+    }
+    builder
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             check_for_update,
@@ -201,6 +289,6 @@ pub fn run() {
             save_attachment_file,
             open_external_url
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running Valora");
 }

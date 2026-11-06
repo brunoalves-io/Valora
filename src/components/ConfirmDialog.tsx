@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { useDialogFocus } from "./useDialogFocus";
+import { StatusIcon } from "./StatusIcon";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -28,6 +30,9 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useDialogFocus(open);
+  const interaction = useRef({ busy, onCancel });
+  interaction.current = { busy, onCancel };
 
   useEffect(() => {
     if (!open) return;
@@ -36,12 +41,12 @@ export function ConfirmDialog({
     const previousActive = document.activeElement as HTMLElement | null;
 
     document.body.style.overflow = "hidden";
-    window.setTimeout(() => cancelRef.current?.focus(), 0);
+    const focusTimer = window.setTimeout(() => cancelRef.current?.focus(), 0);
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !busy) {
+      if (event.key === "Escape" && !interaction.current.busy) {
         event.preventDefault();
-        onCancel();
+        interaction.current.onCancel();
       }
     }
 
@@ -49,10 +54,11 @@ export function ConfirmDialog({
 
     return () => {
       document.body.style.overflow = previousOverflow;
+      window.clearTimeout(focusTimer);
       window.removeEventListener("keydown", handleKeyDown);
       previousActive?.focus?.();
     };
-  }, [open, busy, onCancel]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -65,6 +71,8 @@ export function ConfirmDialog({
       }}
     >
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         className={"confirm-dialog " + tone}
         role="alertdialog"
         aria-modal="true"
@@ -73,7 +81,7 @@ export function ConfirmDialog({
       >
         <div className="confirm-dialog-content">
           <div className={"confirm-dialog-icon " + tone} aria-hidden="true">
-            {tone === "danger" ? "!" : "✓"}
+            <StatusIcon kind={tone === "danger" ? "attention" : "check"} />
           </div>
           <div className="confirm-dialog-copy">
             <span className="confirm-dialog-kicker">

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { CategorizationRulesDialog } from "./CategorizationRulesDialog";
+import { InterfaceIcon } from "./InterfaceIcon";
+import { StatusIcon } from "./StatusIcon";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import {
@@ -141,36 +143,15 @@ function normalizeSearch(value: string) {
 }
 
 function BankSourceIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3.5 9.25h17" />
-      <path d="M5.5 9.25v8.5M9.75 9.25v8.5M14.25 9.25v8.5M18.5 9.25v8.5" />
-      <path d="M3.5 19.5h17" />
-      <path d="M12 3.5 3.75 7.5h16.5L12 3.5Z" />
-    </svg>
-  );
+  return <InterfaceIcon name="link" />;
 }
 
 function UploadSourceIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M6.5 3.75h7.25l3.75 3.75v12.75H6.5Z" />
-      <path d="M13.75 3.75V7.5h3.75" />
-      <path d="M12 16.5V10.5" />
-      <path d="m9.75 12.75 2.25-2.25 2.25 2.25" />
-    </svg>
-  );
+  return <InterfaceIcon name="upload" />;
 }
 
 function SyncSourceIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M19.25 8.25A7.5 7.5 0 0 0 6.1 6.1L4.5 7.75" />
-      <path d="M4.5 4.75v3h3" />
-      <path d="M4.75 15.75A7.5 7.5 0 0 0 17.9 17.9l1.6-1.65" />
-      <path d="M19.5 19.25v-3h-3" />
-    </svg>
-  );
+  return <InterfaceIcon name="sync" />;
 }
 
 function LedgerIcon() {
@@ -183,12 +164,7 @@ function LedgerIcon() {
 }
 
 function CheckCircleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="8.25" />
-      <path d="m8.5 12.2 2.25 2.25 4.75-5" />
-    </svg>
-  );
+  return <StatusIcon kind="check" />;
 }
 
 function TrendUpIcon() {
@@ -1494,12 +1470,7 @@ export function BankReconciliationPage() {
             className="ghost reconciliation-rules-button"
             onClick={openRulesManager}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 7h10M18 7h2M4 12h3M11 12h9M4 17h8M16 17h4" />
-              <circle cx="16" cy="7" r="2" />
-              <circle cx="9" cy="12" r="2" />
-              <circle cx="14" cy="17" r="2" />
-            </svg>
+            <InterfaceIcon name="rules" />
             Regras
             {categorizationRules.length > 0 && (
               <span>{categorizationRules.length}</span>
@@ -1509,15 +1480,17 @@ export function BankReconciliationPage() {
             type="button"
             className="ghost reconciliation-help-button"
             onClick={() => setShowHelp((current) => !current)}
+            aria-expanded={showHelp}
+            aria-controls={showHelp ? "reconciliation-help" : undefined}
           >
-            <span aria-hidden="true">?</span>
+            <InterfaceIcon name="help" />
             Como funciona?
           </button>
         </div>
       </header>
 
       {showHelp && (
-        <section className="reconciliation-help-panel">
+        <section className="reconciliation-help-panel" id="reconciliation-help" aria-label="Como funciona a conciliação">
           <div>
             <strong>1. Escolha a origem</strong>
             <span>Use o Open Finance ou carregue um extrato bancário.</span>
@@ -1551,22 +1524,20 @@ export function BankReconciliationPage() {
       <section className="panel reconciliation-premium-setup">
         <div className="reconciliation-account-column">
           <div className="reconciliation-section-heading">
-            <strong>Conta ou caixa</strong>
-            <span>Selecione a conta usada nesta conciliação</span>
+            <strong id="reconciliation-account-label">Conta ou caixa</strong>
+            <span id="reconciliation-account-help">Selecione a conta usada nesta conciliação</span>
           </div>
 
           <label className="reconciliation-account-select">
             <span className="reconciliation-account-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M4 10h16" />
-                <path d="M6 10v8M10 10v8M14 10v8M18 10v8" />
-                <path d="M3 20h18M12 3 3 8h18L12 3Z" />
-              </svg>
+              <InterfaceIcon name="bank" />
             </span>
             <select
               value={accountId}
               onChange={(event) => setAccountId(event.target.value)}
               disabled={saving}
+              aria-labelledby="reconciliation-account-label"
+              aria-describedby="reconciliation-account-help"
             >
               <option value="">Selecione uma conta</option>
               {accounts.map((account) => (
@@ -1578,23 +1549,26 @@ export function BankReconciliationPage() {
           </label>
 
           <div
+            role="status"
+            aria-atomic="true"
+            aria-busy={loadingAccount}
             className={
-              linkedBankAccounts.length
+              linkedBankAccounts.length && !loadingAccount && accountId
                 ? "reconciliation-link-state connected"
                 : "reconciliation-link-state"
             }
           >
             <span aria-hidden="true">
-              {linkedBankAccounts.length ? <CheckCircleIcon /> : "!"}
+              {linkedBankAccounts.length && !loadingAccount && accountId ? <CheckCircleIcon /> : <StatusIcon kind="info" />}
             </span>
             <div>
               <strong>
-                {linkedBankAccounts.length
+                {!accountId ? "Selecione uma conta" : loadingAccount ? "Verificando vínculo com Open Finance" : linkedBankAccounts.length
                   ? "Conta vinculada ao Open Finance"
                   : "Conta sem vínculo com Open Finance"}
               </strong>
               <small>
-                {linkedBankAccounts.length
+                {!accountId ? "Escolha a conta para verificar as origens disponíveis." : loadingAccount ? "Consultando as contas bancárias vinculadas." : linkedBankAccounts.length
                   ? `${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} bancária${linkedBankAccounts.length === 1 ? "" : "s"} conectada${linkedBankAccounts.length === 1 ? "" : "s"}`
                   : "Vincule uma conta em Conexões bancárias para usar o feed automático."}
               </small>
@@ -1604,51 +1578,59 @@ export function BankReconciliationPage() {
 
         <div className="reconciliation-source-column">
           <div className="reconciliation-section-heading">
-            <strong>Origem dos dados</strong>
-            <span>Escolha como carregar as movimentações</span>
+            <strong id="reconciliation-source-label">Origem dos dados</strong>
+            <span id="reconciliation-source-help">Escolha como carregar as movimentações</span>
           </div>
 
-          <div className="reconciliation-source-tabs">
-            <button
-              type="button"
-              className={activeSource === "open-finance" ? "active" : ""}
-              onClick={() => void loadOpenFinanceFeed()}
-              disabled={
-                !accountId ||
-                !linkedBankAccounts.length ||
-                loadingOpenFinance ||
-                parsing ||
-                saving
-              }
-            >
+          <fieldset className="reconciliation-source-tabs" aria-labelledby="reconciliation-source-label" aria-describedby="reconciliation-source-help">
+            <label className={"reconciliation-source-option" + (activeSource === "open-finance" ? " active" : "")}>
               <span className="source-tab-icon" aria-hidden="true">
                 <BankSourceIcon />
               </span>
               <span>
-                <strong>Open Finance</strong>
-                <small>{linkedBankAccounts.length ? "Feed bancário conectado" : "Sem conta vinculada"}</small>
+                <strong id="reconciliation-open-finance-label">Open Finance</strong>
+                <small id="reconciliation-open-finance-description">{!accountId ? "Selecione uma conta para verificar o vínculo" : loadingAccount ? "Verificando vínculo bancário" : linkedBankAccounts.length ? "Feed bancário conectado" : "Sem conta vinculada"}</small>
               </span>
-              <i aria-hidden="true" />
-            </button>
+              <input type="radio" name="reconciliation-source" value="open-finance"
+                checked={activeSource === "open-finance"}
+                aria-labelledby="reconciliation-open-finance-label"
+                aria-describedby="reconciliation-open-finance-description"
+                onClick={() => { if (activeSource === "open-finance") void loadOpenFinanceFeed(); }}
+                onChange={() => { if (activeSource !== "open-finance") void loadOpenFinanceFeed(); }}
+                onKeyDown={(event) => {
+                  // A checked radio has no native Space activation; retain the existing refresh action.
+                  if (event.key === " " && activeSource === "open-finance") {
+                    event.preventDefault();
+                    void loadOpenFinanceFeed();
+                  }
+                }}
+                disabled={!accountId || !linkedBankAccounts.length || loadingAccount || loadingOpenFinance || parsing || saving} />
+            </label>
 
-            <span className="reconciliation-source-or">OU</span>
+            <span className="reconciliation-source-or" aria-hidden="true">OU</span>
 
-            <button
-              type="button"
-              className={activeSource === "file" ? "active file" : "file"}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!accountId || parsing || saving}
-            >
+            <label className={"reconciliation-source-option file" + (activeSource === "file" ? " active" : "")}>
               <span className="source-tab-icon" aria-hidden="true">
                 <UploadSourceIcon />
               </span>
               <span>
-                <strong>{activeSource === "file" ? "Trocar extrato" : "Importar arquivo"}</strong>
-                <small>CSV, Excel, ODS, OFX ou QFX</small>
+                <strong id="reconciliation-file-label">{activeSource === "file" ? "Trocar extrato" : "Importar arquivo"}</strong>
+                <small id="reconciliation-file-description">{accountId ? "CSV, Excel, ODS, OFX ou QFX" : "Selecione uma conta para importar o extrato"}</small>
               </span>
-              <i aria-hidden="true" />
-            </button>
-          </div>
+              <input type="radio" name="reconciliation-source" value="file"
+                checked={activeSource === "file"}
+                aria-labelledby="reconciliation-file-label" aria-describedby="reconciliation-file-description"
+                onClick={() => { if (activeSource === "file") fileInputRef.current?.click(); }}
+                onChange={() => { if (activeSource !== "file") fileInputRef.current?.click(); }}
+                onKeyDown={(event) => {
+                  if (event.key === " " && activeSource === "file") {
+                    event.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                disabled={!accountId || loadingAccount || parsing || saving} />
+            </label>
+          </fieldset>
 
           <input
             ref={fileInputRef}
@@ -1656,10 +1638,10 @@ export function BankReconciliationPage() {
             type="file"
             accept=".csv,.txt,.tsv,.xlsx,.xls,.xlsm,.xlsb,.ods,.ofx,.qfx"
             onChange={handleFile}
-            disabled={!accountId || parsing || saving}
+            disabled={!accountId || loadingAccount || parsing || saving}
           />
 
-          <div className={"reconciliation-source-detail " + activeSource}>
+          <div className={"reconciliation-source-detail " + activeSource} aria-busy={loadingOpenFinance}>
             <span className="source-detail-icon" aria-hidden="true">
               {activeSource === "file" ? <UploadSourceIcon /> : <SyncSourceIcon />}
             </span>
@@ -1684,7 +1666,7 @@ export function BankReconciliationPage() {
                 type="button"
                 className="primary"
                 onClick={() => void loadOpenFinanceFeed()}
-                disabled={loadingOpenFinance || saving}
+                disabled={loadingAccount || loadingOpenFinance || saving}
               >
                 {loadingOpenFinance ? "Atualizando..." : "Atualizar dados"}
               </button>
@@ -1694,11 +1676,14 @@ export function BankReconciliationPage() {
       </section>
 
       {loadingAccount && (
-        <div className="reconciliation-loading">Analisando movimentações da conta...</div>
+          <div className="reconciliation-loading" role="status">Analisando movimentações da conta...</div>
       )}
 
-      {error && <div className="form-alert error page-alert">{error}</div>}
-      {success && <div className="form-alert success page-alert">{success}</div>}
+      {error && <div className="form-alert error page-alert" role="alert">{error}</div>}
+      {success && <div className="form-alert success page-alert" role="status">{success}</div>}
+      <p className="reconciliation-status-announcement" role="status" aria-atomic="true">
+        {loadingOpenFinance ? "Carregando movimentações do Open Finance." : parsing ? "Lendo o extrato selecionado." : parsed ? `${parsed.rows.length} movimentações carregadas de ${parsed.format}.` : ""}
+      </p>
 
       {parsed && recommendations.length > 0 && (
         <>
@@ -2295,7 +2280,7 @@ export function BankReconciliationPage() {
 
       {!parsed && (
         <section className="panel reconciliation-premium-empty">
-          <span aria-hidden="true">↔</span>
+          <span aria-hidden="true"><InterfaceIcon name="reconcile" /></span>
           <strong>Escolha uma origem para começar</strong>
           <p>
             O Valora compara valor, data e descrição para encontrar correspondências e preparar a conciliação com segurança.

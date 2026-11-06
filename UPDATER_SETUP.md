@@ -1,5 +1,50 @@
 # Valora Automatic Updates
 
+## Local development and startup configuration
+
+The updater is optional at startup. The repository's `tauri.conf.json` intentionally
+does not contain a placeholder `plugins.updater` configuration. The release workflow
+populates that block when bundling signed releases.
+
+Previously, Rust registered the updater unconditionally. With the block absent,
+Tauri supplied `null` to the plugin's required `Config`, causing startup to fail
+before `check_for_update` could return its disabled state.
+
+Rust now validates the compile-time `VALORA_UPDATER_PUBLIC_KEY` and
+`VALORA_UPDATER_ENDPOINT` before registering the plugin. The public key must decode
+as a Tauri/base64-encoded Minisign public key; the endpoint must be HTTPS, have a
+host, and contain no URL credentials. The validation uses the same `base64` and
+`minisign-verify` crates already present transitively in the updater dependency tree.
+No new crate packages were introduced.
+
+When either value is absent or invalid, Rust skips plugin registration and logs an
+explicit disabled message. `check_for_update` continues returning `enabled: false`,
+`available: false`, the current version, and `version: null`; `install_update`
+continues returning its existing not-enabled error. The frontend contract is unchanged.
+
+When both values are valid, Rust supplies the plugin configuration before startup
+deserialization, preserving other release options. Existing update checking,
+signature verification and `download_and_install` remain in use. No keys or
+endpoints are fabricated and no signature or TLS checks are disabled.
+
+These variables are compiled into the executable (`option_env!`): set them in the
+build process environment and rebuild when configuring a real release. A running
+development executable does not become update-enabled by changing runtime variables.
+
+Validation on Windows (06/11/2026): frontend build passed; three Rust unit tests
+passed (missing/malformed configuration, insecure endpoints, and a public test-vector
+key with HTTPS). `npm.cmd run tauri:dev` compiled and ran without the updater panic,
+logging the disabled state. Windows process inspection confirmed a responsive
+`valora.exe` with native window title `Valora` and a nonzero window handle.
+Visual inspection through the Computer Use runtime was unavailable because its
+Node runtime failed to start. Real signed-update download/installation was not
+executed: no production signing credentials were supplied or fabricated.
+
+The existing `scripts/verify-refinement.mjs` suite also passed with fixture-only
+data, no captured JavaScript errors and no external hosts. Its artifacts are in
+`%TEMP%\valora-phase1-qa-A3D1Gq`.
+`git diff --check` passed. The frontend build retains its existing large-bundle warning.
+
 The automatic updater foundation is implemented in this branch.
 
 ## Security requirement

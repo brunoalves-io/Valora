@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { StatusIcon } from "./StatusIcon";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
@@ -554,8 +555,8 @@ export function MonthlyClosingPage() {
       {error && <div className="form-alert error page-alert">{error}</div>}
 
       <section className={"monthly-close-status " + status}>
-        <i>
-          {status === "closed" ? "✓" : status === "ready" ? "●" : "○"}
+        <i aria-hidden="true">
+          <StatusIcon kind={status === "closed" ? "check" : "info"} />
         </i>
         <div>
           <strong>
