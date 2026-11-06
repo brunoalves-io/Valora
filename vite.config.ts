@@ -17,5 +17,9 @@ export default defineConfig({
           port: 1421,
         }
       : undefined,
+    watch: {
+      // Rust build artifacts can be locked while Cargo compiles the application.
+      ignored: ["**/src-tauri/**"],
+    },
   },
 });
