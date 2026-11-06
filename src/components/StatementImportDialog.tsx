@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useDialogFocus } from "./useDialogFocus";
 import { supabase } from "../lib/supabase";
 import {
   parseStatementFile,
@@ -168,6 +169,7 @@ export function StatementImportDialog({
     );
   }, [rows]);
 
+  const dialogRef = useDialogFocus(open);
   if (!open) return null;
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
@@ -293,6 +295,8 @@ export function StatementImportDialog({
       <section
         className="statement-import-dialog"
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="statement-import-title"
       >

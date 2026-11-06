@@ -598,6 +598,7 @@ export function ValoraAIPage() {
             <button
               type="button"
               className={historyView === "conversations" ? "active" : ""}
+                aria-pressed={historyView === "conversations"}
               onClick={() => setHistoryView("conversations")}
             >
               Conversas
@@ -605,6 +606,7 @@ export function ValoraAIPage() {
             <button
               type="button"
               className={historyView === "actions" ? "active" : ""}
+                aria-pressed={historyView === "actions"}
               onClick={() => setHistoryView("actions")}
             >
               Ações IA
@@ -735,7 +737,7 @@ export function ValoraAIPage() {
             <span className="ai-online-dot">Dados da empresa</span>
           </div>
 
-          <div className="ai-messages">
+          <div className="ai-messages" role="log" aria-label="Conversa com Valora IA" aria-live="polite" aria-busy={loadingMessages}>
             {loadingMessages ? (
               <div className="ai-chat-empty">Abrindo conversa...</div>
             ) : !hasMessages ? (
@@ -849,6 +851,8 @@ export function ValoraAIPage() {
 
           <form className="ai-composer" onSubmit={submit}>
             <textarea
+              aria-label="Mensagem para Valora IA"
+              aria-describedby="ai-composer-help"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               placeholder='Ex.: "Crie uma conta a pagar de R$ 780 para sexta-feira"'
@@ -871,7 +875,7 @@ export function ValoraAIPage() {
             </button>
           </form>
 
-          <p className="ai-disclaimer">
+          <p className="ai-disclaimer" id="ai-composer-help">
             O Valora IA pode interpretar dados incorretamente. Ações financeiras só são
             executadas após sua confirmação e não substituem orientação contábil, fiscal ou jurídica.
           </p>

@@ -1,5 +1,7 @@
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { InterfaceIcon } from "./components/InterfaceIcon";
+import { StatusIcon } from "./components/StatusIcon";
 import valoraLogo from "./assets/valora-logo.svg";
 import { AppUpdateGate } from "./components/AppUpdateGate";
 import { AccountsPage } from "./components/AccountsPage";
@@ -151,7 +153,7 @@ function CompanyAvatar({
 function SidebarIcon({
   name,
 }: {
-  name: Page | "logout";
+  name: Page | "logout" | "help";
 }) {
   const common = {
     width: 18,
@@ -348,6 +350,14 @@ function SidebarIcon({
           <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1v4H21a1.7 1.7 0 0 0-1.6 1Z" />
         </svg>
       );
+    case "help":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.5 9a2.5 2.5 0 0 1 5 .5c0 1.7-2.5 2-2.5 3.5" />
+          <path d="M12 17h.01" />
+        </svg>
+      );
     case "logout":
       return (
         <svg {...common}>
@@ -450,6 +460,8 @@ function CurrentPage({
 }
 
 function Workspace() {
+  const companyTriggerRef = useRef<HTMLButtonElement>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [page, setPage] = useState<Page>("dashboard");
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
@@ -609,8 +621,17 @@ function Workspace() {
   }
 
   return (
-    <div className={activeRole === "viewer" ? "shell role-viewer" : "shell"}>
+    <div className={`shell${activeRole === "viewer" ? " role-viewer" : ""}${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
+      <a className="skip-link" href="#workspace">Ir para o conteúdo</a>
       <aside className="sidebar">
+        <button type="button" className="sidebar-collapse-toggle"
+          aria-label={sidebarCollapsed ? "Expandir navegação" : "Recolher navegação"}
+          aria-expanded={!sidebarCollapsed} aria-controls="primary-navigation"
+          onClick={() => setSidebarCollapsed(value => !value)}>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16" />
+          </svg>
+        </button>
         <div className="brand sidebar-wordmark">
           <div className="sidebar-logo-mark">
             <img src={valoraLogo} alt="" aria-hidden="true" />
@@ -645,12 +666,15 @@ function Workspace() {
             <button
               type="button"
               className={companyMenuOpen ? "company-switcher-trigger open" : "company-switcher-trigger"}
+                ref={companyTriggerRef}
             onClick={() => {
               setCompanyMenuOpen((value) => !value);
               setCompanyMenuError("");
             }}
               aria-expanded={companyMenuOpen}
-              aria-haspopup="menu"
+              aria-controls={companyMenuOpen ? "company-menu" : undefined}
+              aria-label={`Empresa ativa: ${activeCompany?.name ?? "Empresa"}. Trocar empresa`}
+              title={activeCompany?.name ?? "Trocar empresa"}
             >
               <CompanyAvatar company={activeCompany} />
             <span className="company-switcher-name">{activeCompany?.name ?? "Empresa"}</span>
@@ -671,7 +695,15 @@ function Workspace() {
             </button>
 
             {companyMenuOpen && (
-            <div className="company-menu" role="menu">
+            <div className="company-menu" id="company-menu" role="region" aria-label="Empresas vinculadas"
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && !creatingCompany) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setCompanyMenuOpen(false);
+                  companyTriggerRef.current?.focus();
+                }
+              }}>
               <div className="company-menu-heading">
                 <strong>Suas empresas</strong>
                 <span>{companies.length} vinculada(s)</span>
@@ -688,7 +720,7 @@ function Workspace() {
                         : "company-menu-item"
                     }
                     onClick={() => chooseCompany(company.id)}
-                    role="menuitem"
+                    aria-current={company.id === activeCompany?.id ? "true" : undefined}
                   >
                     <CompanyAvatar company={company} variant="menu" />
                     <span className="company-menu-copy">
@@ -696,7 +728,7 @@ function Workspace() {
                       <small>{roleLabel(role)}</small>
                     </span>
                     {company.id === activeCompany?.id && (
-                      <span className="company-menu-check">✓</span>
+                      <span className="company-menu-check" aria-hidden="true"><StatusIcon kind="check" /></span>
                     )}
                   </button>
                 ))}
@@ -729,7 +761,7 @@ function Workspace() {
                       setCompanyMenuError("");
                     }}
                   >
-                    <span className="company-menu-plus">+</span>
+                    <span className="company-menu-plus" aria-hidden="true"><InterfaceIcon name="plus" /></span>
                     <span>
                       <strong>Nova empresa</strong>
                       <small>Crie outro ambiente financeiro separado</small>
@@ -807,7 +839,7 @@ function Workspace() {
           <kbd>Ctrl K</kbd>
         </button>
 
-        <nav aria-label="Navegação principal">
+        <nav id="primary-navigation" aria-label="Navegação principal">
           {navigationSections.map((section) => (
             <div className="nav-section" key={section.label}>
               <span className="nav-section-label">{section.label}</span>
@@ -818,6 +850,7 @@ function Workspace() {
                     key={target}
                     onClick={() => setPage(target)}
                     aria-current={page === target ? "page" : undefined}
+                    aria-label={target === "alerts" && unreadAlerts > 0 ? `${label}, ${unreadAlerts} não lidos` : label}
                     title={label}
                   >
                     <span className="nav-icon">
@@ -837,29 +870,33 @@ function Workspace() {
         <div className="sidebar-footer">
           <div className="user-mini">
             <div className="user-mini-copy">
-              <strong>{user?.user_metadata?.full_name || "Usuário"}</strong>
-              <small>{user?.email}</small>
+              <strong title={user?.user_metadata?.full_name || "Usuário"}>{user?.user_metadata?.full_name || "Usuário"}</strong>
+              <small title={user?.email}>{user?.email}</small>
             </div>
           </div>
           <button
             className="settings"
             onClick={() => setHelpOpen(true)}
             title="Ajuda rápida (F1)"
+            aria-label="Ajuda rápida (F1)"
           >
-            <span className="nav-icon help-nav-icon" aria-hidden="true">?</span>
+            <span className="nav-icon help-nav-icon"><SidebarIcon name="help" /></span>
             <span className="nav-label">Ajuda</span>
             <kbd className="sidebar-help-shortcut">F1</kbd>
           </button>
           <button
             className={page === "settings" ? "settings active" : "settings"}
             onClick={() => setPage("settings")}
+            aria-current={page === "settings" ? "page" : undefined}
+            aria-label="Configurações"
+            title="Configurações"
           >
             <span className="nav-icon">
               <SidebarIcon name="settings" />
             </span>
             <span className="nav-label">Configurações</span>
           </button>
-          <button className="settings sign-out" onClick={() => void signOut()}>
+          <button className="settings sign-out" onClick={() => void signOut()} aria-label="Sair" title="Sair">
             <span className="nav-icon">
               <SidebarIcon name="logout" />
             </span>
@@ -868,28 +905,30 @@ function Workspace() {
         </div>
       </aside>
 
-      <main className="workspace">
-        {!online && (
-          <div className="offline-banner" role="status">
-            <span aria-hidden="true">!</span>
-            <div>
-              <strong>Sem conexão com a internet</strong>
-              <small>Algumas ações podem falhar até a conexão ser restabelecida. Seus dados na tela não serão apagados.</small>
+      <main className="workspace" id="workspace" tabIndex={-1}>
+        <div className="workspace-content">
+          {!online && (
+            <div className="offline-banner" role="status">
+              <span aria-hidden="true">!</span>
+              <div>
+                <strong>Sem conexão com a internet</strong>
+                <small>Algumas ações podem falhar até a conexão ser restabelecida. Seus dados na tela não serão apagados.</small>
+              </div>
             </div>
-          </div>
-        )}
-        {activeRole === "viewer" && (
-          <div className="viewer-banner">
-            Modo somente leitura. Você pode consultar os dados, mas não alterar registros.
-          </div>
-        )}
-        <RecurringSyncGate>
-          <CurrentPage
-            page={page}
-            onNavigate={setPage}
-            onAlertsChanged={() => void refreshAlertCount()}
-          />
-        </RecurringSyncGate>
+          )}
+          {activeRole === "viewer" && (
+            <div className="viewer-banner">
+              Modo somente leitura. Você pode consultar os dados, mas não alterar registros.
+            </div>
+          )}
+          <RecurringSyncGate>
+            <CurrentPage
+              page={page}
+              onNavigate={setPage}
+              onAlertsChanged={() => void refreshAlertCount()}
+            />
+          </RecurringSyncGate>
+        </div>
       </main>
 
       <CommandPalette

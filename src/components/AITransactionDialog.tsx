@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useDialogFocus } from "./useDialogFocus";
 import { supabase } from "../lib/supabase";
 
 type Account = { id: string; name: string };
@@ -307,6 +308,7 @@ export function AITransactionDialog({
     onClose();
   }
 
+  const dialogRef = useDialogFocus(open);
   if (!open) return null;
 
   return (
@@ -314,6 +316,8 @@ export function AITransactionDialog({
       <section
         className="ai-transaction-dialog"
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="ai-transaction-title"
       >

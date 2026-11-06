@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { StatusIcon } from "./StatusIcon";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 
@@ -497,12 +498,8 @@ export function Dashboard({
       ) : (
         <>
           <section className={"executive-status-banner " + executive.riskLevel}>
-            <span className="executive-status-icon">
-              {executive.riskLevel === "healthy"
-                ? "✓"
-                : executive.riskLevel === "critical"
-                  ? "!"
-                  : "•"}
+            <span className="executive-status-icon" aria-hidden="true">
+              <StatusIcon kind={executive.riskLevel === "healthy" ? "check" : "attention"} />
             </span>
             <div>
               <strong>{statusCopy.title}</strong>
@@ -571,7 +568,8 @@ export function Dashboard({
                   </div>
                   <div className="executive-bars-chart">
                     {trend.items.map((item) => (
-                      <div className="executive-bars-column" key={item.month}>
+                      <div className="executive-bars-column" key={item.month} role="img"
+                        aria-label={`${monthShort(item.month)}: receitas ${money.format(item.income)}, despesas ${money.format(item.expense)}, resultado ${money.format(item.result)}`}>
                         <div className="executive-bars-area">
                           <div
                             className="executive-bar income"

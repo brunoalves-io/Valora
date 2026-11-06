@@ -6,6 +6,7 @@ import {
   type ChangeEvent,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useDialogFocus } from "./useDialogFocus";
 import { supabase } from "../lib/supabase";
 
 export type OrganizerTransaction = {
@@ -450,6 +451,7 @@ export function TransactionOrganizerDialog({
     await onChanged();
   }
 
+  const dialogRef = useDialogFocus(open && Boolean(transaction));
   if (!open || !transaction) return null;
 
   return (
@@ -457,6 +459,8 @@ export function TransactionOrganizerDialog({
       <section
         className="transaction-organizer-dialog"
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="transaction-organizer-title"
       >

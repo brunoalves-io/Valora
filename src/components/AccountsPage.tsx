@@ -312,7 +312,7 @@ export function AccountsPage() {
             <article className={account.active ? "account-card" : "account-card inactive"} key={account.id}>
               <small>{kindLabels[account.kind]}</small>
               <h2>{account.name}</h2>
-              <strong>{money.format(balances.get(account.id) ?? 0)}</strong>
+              <strong className={(balances.get(account.id) ?? 0) < 0 ? "negative-value" : undefined}>{money.format(balances.get(account.id) ?? 0)}</strong>
               <div className="account-card-footer">
                 <span>Inicial: {money.format(Number(account.opening_balance))}</span>
                 <div className="record-actions">
