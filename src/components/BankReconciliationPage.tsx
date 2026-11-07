@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { CategorizationRulesDialog } from "./CategorizationRulesDialog";
 import { InterfaceIcon } from "./InterfaceIcon";
 import { StatusIcon } from "./StatusIcon";
+import { OPEN_FINANCE_EMPTY_MESSAGE, reconciliationGuidance } from "./reconciliationGuidance";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
 import {
@@ -811,6 +812,12 @@ export function BankReconciliationPage() {
     return "none";
   }, [parsed, linkedBankAccounts.length]);
 
+  const guidance = reconciliationGuidance({
+    accountId, accountCount: accounts.length, loadingAccount, loadingOpenFinance,
+    parsing, linkedCount: linkedBankAccounts.length,
+    parsedRows: parsed ? parsed.rows.length : null, error,
+  });
+
   const filteredRecommendations = useMemo(() => {
     const normalizedQuery = normalizeSearch(search);
     const now = Date.now();
@@ -1099,9 +1106,7 @@ export function BankReconciliationPage() {
       setFileName("");
       setChoices({});
       setCategoryChoices({});
-      setError(
-        "Nenhuma movimentação confirmada foi encontrada no feed Open Finance desta conta.",
-      );
+      setError(OPEN_FINANCE_EMPTY_MESSAGE);
       setLoadingOpenFinance(false);
       return;
     }
@@ -1521,10 +1526,10 @@ export function BankReconciliationPage() {
         </div>
       )}
 
-      <section className="panel reconciliation-premium-setup">
+      <section className="panel reconciliation-premium-setup" aria-label="Preparar conciliação">
         <div className="reconciliation-account-column">
           <div className="reconciliation-section-heading">
-            <strong id="reconciliation-account-label">Conta ou caixa</strong>
+            <strong id="reconciliation-account-label"><b className="reconciliation-step-number" aria-hidden="true">1</b>Conta ou caixa</strong>
             <span id="reconciliation-account-help">Selecione a conta usada nesta conciliação</span>
           </div>
 
@@ -1578,7 +1583,7 @@ export function BankReconciliationPage() {
 
         <div className="reconciliation-source-column">
           <div className="reconciliation-section-heading">
-            <strong id="reconciliation-source-label">Origem dos dados</strong>
+            <strong id="reconciliation-source-label"><b className="reconciliation-step-number" aria-hidden="true">2</b>Origem dos dados</strong>
             <span id="reconciliation-source-help">Escolha como carregar as movimentações</span>
           </div>
 
@@ -1606,8 +1611,6 @@ export function BankReconciliationPage() {
                 }}
                 disabled={!accountId || !linkedBankAccounts.length || loadingAccount || loadingOpenFinance || parsing || saving} />
             </label>
-
-            <span className="reconciliation-source-or" aria-hidden="true">OU</span>
 
             <label className={"reconciliation-source-option file" + (activeSource === "file" ? " active" : "")}>
               <span className="source-tab-icon" aria-hidden="true">
@@ -1646,19 +1649,20 @@ export function BankReconciliationPage() {
               {activeSource === "file" ? <UploadSourceIcon /> : <SyncSourceIcon />}
             </span>
             <div>
+              <span className="reconciliation-step-caption">3. Carregar movimentações</span>
               <strong>
                 {activeSource === "open-finance"
                   ? "Usar movimentações do Open Finance"
                   : activeSource === "file"
                     ? fileName || "Extrato selecionado"
-                    : "Selecione uma origem para começar"}
+                    : accountId ? "Importar movimentações de um arquivo" : "Selecione uma conta para continuar"}
               </strong>
               <small>
                 {activeSource === "open-finance"
-                  ? `Carrega automaticamente o feed de ${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} bancária${linkedBankAccounts.length === 1 ? "" : "s"} vinculada${linkedBankAccounts.length === 1 ? "" : "s"}.`
+                  ? `Use Atualizar dados para ler o feed de ${linkedBankAccounts.length} conta${linkedBankAccounts.length === 1 ? "" : "s"} bancária${linkedBankAccounts.length === 1 ? "" : "s"} vinculada${linkedBankAccounts.length === 1 ? "" : "s"}.`
                   : activeSource === "file" && parsed
                     ? `${parsed.format} • ${parsed.rows.length} movimentação${parsed.rows.length === 1 ? "" : "ões"} lida${parsed.rows.length === 1 ? "" : "s"}`
-                    : "O Valora compara automaticamente os dados carregados com seus lançamentos."}
+                    : accountId ? "Escolha Importar arquivo para abrir o extrato que deseja analisar." : "As origens disponíveis serão verificadas após a seleção da conta."}
               </small>
             </div>
             {activeSource === "open-finance" && (
@@ -1675,16 +1679,22 @@ export function BankReconciliationPage() {
         </div>
       </section>
 
-      {loadingAccount && (
+      {loadingAccount && parsed && (
           <div className="reconciliation-loading" role="status">Analisando movimentações da conta...</div>
       )}
 
-      {error && <div className="form-alert error page-alert" role="alert">{error}</div>}
+      {error && error !== OPEN_FINANCE_EMPTY_MESSAGE && <div className="form-alert error page-alert" role="alert">{error}</div>}
       {success && <div className="form-alert success page-alert" role="status">{success}</div>}
       <p className="reconciliation-status-announcement" role="status" aria-atomic="true">
-        {loadingOpenFinance ? "Carregando movimentações do Open Finance." : parsing ? "Lendo o extrato selecionado." : parsed ? `${parsed.rows.length} movimentações carregadas de ${parsed.format}.` : ""}
+        {parsed ? loadingOpenFinance ? "Carregando movimentações do Open Finance." : parsing ? "Lendo o extrato selecionado." : `${parsed.rows.length} movimentações carregadas de ${parsed.format}.` : ""}
       </p>
 
+      {parsed && parsed.rows.length > 0 && (
+        <div className="reconciliation-analysis-heading">
+          <span className="reconciliation-step-caption">4. Analisar e conciliar</span>
+          <strong>Revise as correspondências e exceções</strong>
+        </div>
+      )}
       {parsed && recommendations.length > 0 && (
         <>
           <section className="reconciliation-premium-summary">
@@ -2278,13 +2288,14 @@ export function BankReconciliationPage() {
         onChanged={() => loadCategorizationData()}
       />
 
-      {!parsed && (
-        <section className="panel reconciliation-premium-empty">
+      {(!parsed || parsed.rows.length === 0) && (
+        <section className="panel reconciliation-premium-empty" role="status" aria-atomic="true" data-state={guidance.state}>
           <span aria-hidden="true"><InterfaceIcon name="reconcile" /></span>
-          <strong>Escolha uma origem para começar</strong>
-          <p>
-            O Valora compara valor, data e descrição para encontrar correspondências e preparar a conciliação com segurança.
-          </p>
+          <div>
+            <span className="reconciliation-step-caption">4. Analisar e conciliar</span>
+            <strong>{guidance.title}</strong>
+            <p>{guidance.description}</p>
+          </div>
         </section>
       )}
     </>

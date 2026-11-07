@@ -47,6 +47,8 @@ source = source.replace("  const contrast =", `
   results.push('All 21 navigation destinations checked for page overflow at five viewport sizes; fixture data only');
   await page.setViewportSize({width:1920,height:1080});
   await page.getByRole('button',{name:'Recolher navegação',exact:true}).click();
+  // Wait for React to commit the collapse before measuring its layout.
+  await page.waitForFunction(()=>document.querySelector('.shell').classList.contains('sidebar-collapsed') && document.querySelector('.sidebar').getBoundingClientRect().width===76);
   assert.equal(await page.locator('.sidebar').evaluate(n=>n.getBoundingClientRect().width),76);
   assert.equal(await nav.getByRole('button').count(),21);
   await page.getByRole('button',{name:'Expandir navegação',exact:true}).click();
