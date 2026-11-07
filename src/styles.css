@@ -11618,7 +11618,7 @@ tr:last-child td { border-bottom: 0; }
 }
 
 .executive-chart-legend i.expense {
-  background: #9eabb9;
+  background: var(--valora-danger);
 }
 
 .executive-bars-chart {
@@ -11663,7 +11663,7 @@ tr:last-child td { border-bottom: 0; }
 }
 
 .executive-bar.expense {
-  background: linear-gradient(180deg, #b5c0cb, #8f9cab);
+  background: var(--valora-danger);
 }
 
 .executive-bars-column > strong {
