@@ -60,8 +60,8 @@ code, pre { font-family: "SFMono-Regular", Consolas, monospace; }
   color: white;
   font-weight: 800;
 }
-.primary:hover { background: #1fa471; }
-.primary:disabled { opacity: .6; }
+button.primary:hover { background: #1fa471; }
+.primary:disabled, button.confirm-dialog-confirm--primary:disabled { opacity: .6; }
 
 .ghost {
   border: 1px solid #dce2eb;
@@ -13379,7 +13379,7 @@ textarea::placeholder {
   line-height: 1.2;
 }
 
-.primary:hover:not(:disabled) {
+button.primary:hover:not(:disabled) {
   background: var(--valora-primary-hover);
   box-shadow: 0 5px 14px rgba(38, 155, 114, .17);
 }
@@ -14130,12 +14130,12 @@ td strong {
   font-weight: 900;
 }
 
-.confirm-dialog-icon.danger {
+.confirm-dialog-icon.confirm-dialog-icon--danger {
   background: #fcecee;
   color: var(--valora-danger);
 }
 
-.confirm-dialog-icon.primary {
+.confirm-dialog-icon.confirm-dialog-icon--primary {
   background: var(--valora-primary-soft);
   color: var(--valora-primary);
 }
@@ -14177,7 +14177,7 @@ td strong {
   color: #80621f;
 }
 
-.confirm-dialog-warning.primary {
+.confirm-dialog-warning.confirm-dialog-warning--primary {
   border-color: #d6e8e0;
   background: #f5faf8;
   color: #4f7163;
@@ -14194,7 +14194,7 @@ td strong {
   font-weight: 900;
 }
 
-.confirm-dialog-warning.primary > span {
+.confirm-dialog-warning.confirm-dialog-warning--primary > span {
   background: #e5f3ed;
   color: #31775e;
 }
@@ -14238,19 +14238,19 @@ td strong {
   color: #fff;
 }
 
-.confirm-dialog-confirm.danger {
+.confirm-dialog-confirm.confirm-dialog-confirm--danger {
   background: var(--valora-danger);
 }
 
-.confirm-dialog-confirm.danger:hover:not(:disabled) {
+.confirm-dialog-confirm.confirm-dialog-confirm--danger:hover:not(:disabled) {
   background: var(--valora-danger-hover);
 }
 
-.confirm-dialog-confirm.primary {
+.confirm-dialog-confirm.confirm-dialog-confirm--primary {
   background: var(--valora-primary);
 }
 
-.confirm-dialog-confirm.primary:hover:not(:disabled) {
+.confirm-dialog-confirm.confirm-dialog-confirm--primary:hover:not(:disabled) {
   background: var(--valora-primary-hover);
 }
 

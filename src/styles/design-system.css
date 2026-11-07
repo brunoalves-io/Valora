@@ -114,7 +114,7 @@ input::placeholder, textarea::placeholder { color: var(--valora-muted-soft); }
 }
 
 /* Existing class names remain the component API: no action handlers change. */
-button.primary, button.ghost {
+button.primary, button.confirm-dialog-confirm--primary, button.ghost {
   min-height: var(--valora-control-height);
   padding: var(--valora-space-3) var(--valora-space-4);
   border-radius: var(--valora-radius-sm);
@@ -123,13 +123,13 @@ button.primary, button.ghost {
   line-height: 1.3;
   white-space: normal;
 }
-button.primary {
+button.primary, button.confirm-dialog-confirm--primary {
   border: 1px solid transparent;
   background: var(--valora-primary);
   color: var(--valora-on-primary);
   box-shadow: var(--valora-shadow-xs);
 }
-button.primary:hover:not(:disabled) {
+button.primary:hover:not(:disabled), button.confirm-dialog-confirm--primary:hover:not(:disabled) {
   background: var(--valora-primary-hover);
   box-shadow: var(--valora-shadow-sm);
 }
@@ -367,9 +367,9 @@ td strong { color: var(--valora-text); font-weight: var(--valora-weight-semibold
   border-color: var(--valora-border-strong);
   color: var(--valora-text);
 }
-.confirm-dialog-confirm.primary { color: var(--valora-on-primary); }
-.confirm-dialog-confirm.danger { color: #ffffff; background: #a82f41; }
-.confirm-dialog-confirm.danger:hover:not(:disabled) { background: #8e2334; }
+.confirm-dialog-confirm.confirm-dialog-confirm--primary { color: var(--valora-on-primary); }
+.confirm-dialog-confirm.confirm-dialog-confirm--danger { color: #ffffff; background: #a82f41; }
+.confirm-dialog-confirm.confirm-dialog-confirm--danger:hover:not(:disabled) { background: #8e2334; }
 .help-drawer { width: min(32rem, 100%); }
 .help-drawer-header { grid-template-columns: minmax(0, 1fr) var(--valora-control-height); }
 .help-section h3 { font-size: var(--valora-text-body); color: var(--valora-text); }

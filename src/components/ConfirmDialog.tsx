@@ -73,14 +73,14 @@ export function ConfirmDialog({
       <section
         ref={dialogRef}
         tabIndex={-1}
-        className={"confirm-dialog " + tone}
+        className={"confirm-dialog confirm-dialog--" + tone}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-description"
       >
         <div className="confirm-dialog-content">
-          <div className={"confirm-dialog-icon " + tone} aria-hidden="true">
+          <div className={"confirm-dialog-icon confirm-dialog-icon--" + tone} aria-hidden="true">
             <StatusIcon kind={tone === "danger" ? "attention" : "check"} />
           </div>
           <div className="confirm-dialog-copy">
@@ -93,7 +93,7 @@ export function ConfirmDialog({
         </div>
 
         {warning && (
-          <div className={"confirm-dialog-warning " + tone}>
+          <div className={"confirm-dialog-warning confirm-dialog-warning--" + tone}>
             <span aria-hidden="true">i</span>
             <p>{warning}</p>
           </div>
@@ -111,7 +111,7 @@ export function ConfirmDialog({
           </button>
           <button
             type="button"
-            className={"confirm-dialog-confirm " + tone}
+            className={"confirm-dialog-confirm confirm-dialog-confirm--" + tone}
             onClick={onConfirm}
             disabled={busy}
           >
