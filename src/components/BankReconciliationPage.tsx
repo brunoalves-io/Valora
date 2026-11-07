@@ -1906,7 +1906,7 @@ export function BankReconciliationPage() {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar por descrição, valor, data ou referência..."
+                placeholder="Buscar movimentação..." aria-label="Buscar por descrição, valor, data ou referência"
               />
             </label>
 
@@ -1915,6 +1915,7 @@ export function BankReconciliationPage() {
                 type="button"
                 className={typeFilter === "all" ? "active" : ""}
                 onClick={() => setTypeFilter("all")}
+                aria-pressed={typeFilter === "all"}
               >
                 Todos
               </button>
@@ -1922,6 +1923,7 @@ export function BankReconciliationPage() {
                 type="button"
                 className={typeFilter === "expense" ? "active expense" : "expense"}
                 onClick={() => setTypeFilter("expense")}
+                aria-pressed={typeFilter === "expense"}
               >
                 Despesas
               </button>
@@ -1929,13 +1931,16 @@ export function BankReconciliationPage() {
                 type="button"
                 className={typeFilter === "income" ? "active income" : "income"}
                 onClick={() => setTypeFilter("income")}
+                aria-pressed={typeFilter === "income"}
               >
                 Receitas
               </button>
             </div>
 
+            <div className="reconciliation-filter-secondary">
             <select
               className="reconciliation-period-filter"
+              aria-label="Filtrar por período"
               value={periodFilter}
               onChange={(event) =>
                 setPeriodFilter(event.target.value as "all" | "30" | "60" | "90")
@@ -1955,6 +1960,7 @@ export function BankReconciliationPage() {
                   : "ghost reconciliation-exceptions-filter"
               }
               onClick={() => setExceptionsOnly((current) => !current)}
+              aria-pressed={exceptionsOnly}
               disabled={parsed.format !== "Open Finance"}
             >
               Revisar só exceções
@@ -1965,9 +1971,11 @@ export function BankReconciliationPage() {
               type="button"
               className={showMoreFilters ? "ghost active reconciliation-more-filters" : "ghost reconciliation-more-filters"}
               onClick={() => setShowMoreFilters((current) => !current)}
+              aria-expanded={showMoreFilters}
             >
               Mais filtros
             </button>
+            </div>
           </section>
 
           {showMoreFilters && (
