@@ -1747,7 +1747,8 @@ export function BankReconciliationPage() {
           </section>
 
           {parsed.format === "Open Finance" && (
-            <section className="reconciliation-automation-panel">
+            <details className="reconciliation-automation-panel reconciliation-automation-disclosure">
+              <summary className="reconciliation-automation-summary">
               <div className="reconciliation-automation-copy">
                 <span className="reconciliation-automation-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
@@ -1773,7 +1774,10 @@ export function BankReconciliationPage() {
                 </div>
               </div>
 
-              <div className="reconciliation-automation-metrics">
+                <span className="reconciliation-automation-expand">Configurar automação</span>
+              </summary>
+              <div className="reconciliation-automation-settings">
+                <div className="reconciliation-automation-metrics">
                 <div>
                   <strong>{automaticCompletedCount}</strong>
                   <span>automáticas</span>
@@ -1868,7 +1872,8 @@ export function BankReconciliationPage() {
                   Detectar transferências
                 </label>
               </div>
-            </section>
+              </div>
+            </details>
           )}
 
           {hasTransactionConflict && (
@@ -1877,7 +1882,22 @@ export function BankReconciliationPage() {
             </div>
           )}
 
-          <section className="reconciliation-filter-bar">
+          <section className="panel reconciliation-premium-table-panel">
+            <div className="reconciliation-table-heading">
+              <div>
+                <h2>Extrato bancário</h2>
+                <p>
+                  {filteredRecommendations.length === recommendations.length
+                    ? `${recommendations.length} movimentação${recommendations.length === 1 ? "" : "ões"} carregada${recommendations.length === 1 ? "" : "s"}`
+                    : `${filteredRecommendations.length} de ${recommendations.length} movimentações exibidas`}
+                </p>
+              </div>
+              <span className="reconciliation-source-badge">
+                {parsed.format}
+              </span>
+            </div>
+
+          <section className="reconciliation-filter-bar" aria-label="Filtros de movimentações">
             <label className="reconciliation-search">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="11" cy="11" r="6.5" />
@@ -1977,20 +1997,6 @@ export function BankReconciliationPage() {
             </section>
           )}
 
-          <section className="panel reconciliation-premium-table-panel">
-            <div className="reconciliation-table-heading">
-              <div>
-                <h2>Extrato bancário</h2>
-                <p>
-                  {filteredRecommendations.length === recommendations.length
-                    ? `${recommendations.length} movimentação${recommendations.length === 1 ? "" : "ões"} carregada${recommendations.length === 1 ? "" : "s"}`
-                    : `${filteredRecommendations.length} de ${recommendations.length} movimentações exibidas`}
-                </p>
-              </div>
-              <span className="reconciliation-source-badge">
-                {parsed.format}
-              </span>
-            </div>
 
             <div className="table-scroll">
               <table className="reconciliation-premium-table">
