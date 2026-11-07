@@ -56,7 +56,7 @@ export async function verifyIconAccessibility({page,nav,assert,dir,results,accou
   results.push('Nova empresa: icon/copy centers within 1px at four sizes; Tab, Shift+Tab, Enter, Space and Escape restore focus without creating data');
 
   const otherAccount={...account,id:'55555555-5555-4555-8555-555555555555',name:'Caixa sem vínculo',kind:'cash'};
-  let feedError=false; let feedReads=0;
+  let feedError=false; let feedReads=0; let emptyFeed=false; let delayFeed=false;
   await page.route('**/rest/v1/financial_accounts*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([account,otherAccount])}));
   await page.route('**/rest/v1/bank_connection_accounts*',route=>{
     const url=new URL(route.request().url());
@@ -64,9 +64,10 @@ export async function verifyIconAccessibility({page,nav,assert,dir,results,accou
     const data=selected===`eq.${otherAccount.id}`?[]:[{id:'external-1',name:'Conta bancária de teste',provider_account_id:'provider-1',local_account_id:account.id}];
     return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data)});
   });
-  await page.route('**/rest/v1/bank_connection_transactions*',route=>{
+  await page.route('**/rest/v1/bank_connection_transactions*',async route=>{
     feedReads++;
-    return route.fulfill({status:feedError?500:200,contentType:'application/json',body:JSON.stringify(feedError?{message:'Fixture: feed indisponível'}:[{id:'feed-1',external_account_id:'external-1',provider_transaction_id:'movement-1',description:'Movimentação fictícia',movement_type:'income',status:'POSTED',amount:42,transaction_date:'2026-11-01'}])});
+    if(delayFeed) await new Promise(resolve=>setTimeout(resolve,400));
+    return route.fulfill({status:feedError?500:200,contentType:'application/json',body:JSON.stringify(feedError?{message:'Fixture: feed indisponível'}:emptyFeed?[]:[{id:'feed-1',external_account_id:'external-1',provider_transaction_id:'movement-1',description:'Movimentação fictícia',movement_type:'income',status:'POSTED',amount:42,transaction_date:'2026-11-01'}])});
   });
   await nav.getByRole('button',{name:'Conciliação bancária',exact:true}).click();
   const select=page.getByRole('combobox',{name:'Conta ou caixa',exact:true});
@@ -74,9 +75,13 @@ export async function verifyIconAccessibility({page,nav,assert,dir,results,accou
   const source=page.getByRole('group',{name:'Origem dos dados',exact:true});
   const openFinance=source.getByRole('radio',{name:'Open Finance',exact:true});
   const file=source.getByRole('radio',{name:'Importar arquivo',exact:true});
+  const guidance=page.locator('.reconciliation-premium-empty');
+  await select.selectOption('');
+  await page.locator('.reconciliation-premium-empty[data-state="account"]').waitFor();
   await select.selectOption(otherAccount.id);
   await page.getByText('Conta sem vínculo com Open Finance',{exact:true}).waitFor();
   assert(await openFinance.isDisabled() && await file.isEnabled());
+  await page.locator('.reconciliation-premium-empty[data-state="file-ready"]').waitFor();
   ratios.push(...await measureContrast(page.locator('.reconciliation-link-state > span svg')));
   assert.match(await openFinance.getAttribute('aria-describedby'),/description/);
   assert.equal(await source.getByRole('radio').count(),2);
@@ -84,6 +89,8 @@ export async function verifyIconAccessibility({page,nav,assert,dir,results,accou
   await select.selectOption(account.id);
   await page.getByText('Conta vinculada ao Open Finance',{exact:true}).waitFor();
   assert(await openFinance.isEnabled() && await openFinance.isChecked());
+  await page.locator('.reconciliation-premium-empty[data-state="feed-ready"]').waitFor();
+  assert.equal(await page.getByText('Escolha uma origem para começar',{exact:true}).count(),0);
   ratios.push(...await measureContrast(page.locator('.reconciliation-premium-empty svg, .reconciliation-link-state > span svg')));
   await page.screenshot({path:path.join(dir,'icons-reconciliation-empty.png'),fullPage:true});
   await fs.writeFile(path.join(dir,'icons-accessibility-tree.txt'),await source.ariaSnapshot()+'\n'+await page.locator('.reconciliation-link-state').ariaSnapshot());
@@ -102,10 +109,15 @@ export async function verifyIconAccessibility({page,nav,assert,dir,results,accou
   assert(await rules.evaluate(n=>n===document.activeElement));
 
   await openFinance.focus();
+  delayFeed=true;
   const before=feedReads; await page.keyboard.press('Space');
+  await page.locator('.reconciliation-premium-empty[data-state="loading"]').waitFor();
+  assert(await page.getByRole('button',{name:'Atualizando...',exact:true}).isDisabled());
   await page.screenshot({path:path.join(dir,'icons-feed-keyboard.png'),fullPage:true});
   await fs.writeFile(path.join(dir,'icons-feed-diagnostic.json'),JSON.stringify({feedReads,checked:await openFinance.isChecked(),disabled:await openFinance.isDisabled(),text:await page.locator('main').innerText()},null,2));
   await page.getByText('Movimentação fictícia',{exact:true}).waitFor();
+  delayFeed=false;
+  assert.equal(await guidance.count(),0,'Guidance should yield to loaded data');
   assert.equal(feedReads,before+1,'Radio initiated duplicate feed requests');
   assert(await openFinance.isChecked());
   const update=page.getByRole('button',{name:'Atualizar dados',exact:true});
@@ -135,7 +147,7 @@ export async function verifyIconAccessibility({page,nav,assert,dir,results,accou
   assert(ratios.every(n=>n.ratio>=3),JSON.stringify(ratios));
   results.push({essentialIconContrast:ratios,sourceBorderContrast:borders,sourceDescriptionContrast:descriptions,radioBorderContrast:radioBorders});
 
-  for(const [width,height] of [[1920,1080],[3440,1440],[2560,1440],[1366,768],[1536,864],[1280,720],[911,512],[960,540],[480,270]]) {
+  for(const [width,height] of [[1920,1080],[3440,1440],[1440,900],[1280,800],[1000,680],[1536,864],[1280,720],[960,540],[2752,1152],[2293,960],[1720,720],[800,500],[640,400],[480,270]]) {
     await page.setViewportSize({width,height}); await settle();
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Page overflow at '+width);
     const targets=await page.locator('.reconciliation-header-actions button, .reconciliation-source-option, .reconciliation-account-select select, .reconciliation-source-detail > button').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {width:r.width,height:r.height};}));
@@ -160,8 +172,21 @@ export async function verifyIconAccessibility({page,nav,assert,dir,results,accou
   await update.focus(); await page.keyboard.press('Enter');
   await page.getByRole('alert').filter({hasText:/Não foi possível/}).waitFor();
   assert(await openFinance.isChecked());
+  await select.selectOption(otherAccount.id);
+  await page.getByText('Conta sem vínculo com Open Finance',{exact:true}).waitFor();
+  await select.selectOption(account.id);
+  await page.locator('.reconciliation-premium-empty[data-state="feed-ready"]').waitFor();
+  await update.click();
+  await page.locator('.reconciliation-premium-empty[data-state="error"]').waitFor();
+  feedError=false; emptyFeed=true;
+  await update.click();
+  await page.locator('.reconciliation-premium-empty[data-state="empty"]').waitFor();
+  assert.equal(await page.getByRole('alert').count(),0,'Empty feed should be neutral guidance');
+  assert((await guidance.boundingBox()).height<200,'Guidance panel is oversized');
+  await page.screenshot({path:path.join(dir,'reconciliation-context-empty.png'),fullPage:true});
+  results.push('Contextual guidance: no account, file waiting, connected before load, loading, ready, error and empty feed; no false completion');
   results.push('Reconciliation: native radio names/checked/disabled states; Space, ArrowLeft, import chooser, feed read/refresh and error feedback verified with fixtures only');
-  results.push('Decorative SVGs hidden and nonfocusable; >=44px targets; nine viewports including 200%/400% equivalent reflow; focus and essential contrast checked');
+  results.push('Decorative SVGs hidden and nonfocusable; >=44px targets; 14 viewports including minimum Tauri window and 125/150/200% equivalent reflow; focus and essential contrast checked');
   await page.unroute('**/rest/v1/financial_accounts*');
   await page.unroute('**/rest/v1/bank_connection_accounts*');
   await page.unroute('**/rest/v1/bank_connection_transactions*');
