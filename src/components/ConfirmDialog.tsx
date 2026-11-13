@@ -7,6 +7,7 @@ type ConfirmDialogProps = {
   title: string;
   description: string;
   warning?: string;
+  showWarningIcon?: boolean;
   confirmLabel?: string;
   cancelLabel?: string;
   busyLabel?: string;
@@ -21,6 +22,7 @@ export function ConfirmDialog({
   title,
   description,
   warning,
+  showWarningIcon = true,
   confirmLabel = "Confirmar",
   cancelLabel = "Cancelar",
   busyLabel = "Processando...",
@@ -93,8 +95,8 @@ export function ConfirmDialog({
         </div>
 
         {warning && (
-          <div className={"confirm-dialog-warning confirm-dialog-warning--" + tone}>
-            <span aria-hidden="true">i</span>
+          <div className={"confirm-dialog-warning confirm-dialog-warning--" + tone + (showWarningIcon ? "" : " confirm-dialog-warning--no-icon")}>
+            {showWarningIcon && <span aria-hidden="true">i</span>}
             <p>{warning}</p>
           </div>
         )}
