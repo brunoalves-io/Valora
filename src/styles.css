@@ -14183,10 +14183,6 @@ td strong {
   color: #4f7163;
 }
 
-.confirm-dialog-warning--no-icon {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 .confirm-dialog-warning > span {
   width: 20px;
   height: 20px;
