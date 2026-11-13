@@ -519,3 +519,540 @@ td:has(> .record-actions) { vertical-align: middle; }
   .reconciliation-source-tabs > .reconciliation-source-option.active { border-color: Highlight; }
   .reconciliation-source-tabs > .reconciliation-source-option:has(:focus-visible) { outline-color: Highlight; }
 }
+/* Institution → external account → local link: content hierarchy, without nested shadows. */
+.panel.bank-connection-card { container: bank-institution / inline-size; padding: 0; }
+.bank-connection-card .bank-connection-card-header {
+  padding: 24px; align-items: flex-start; border-bottom: 0;
+}
+.bank-connection-card .bank-institution { align-items: flex-start; flex: 1 1 360px; }
+.bank-connection-card .bank-institution > div:last-child { min-width: 0; }
+.bank-connection-card .bank-institution-logo { width: 48px; height: 48px; border-radius: var(--valora-radius-md); }
+.bank-connection-card .bank-institution-logo > span { display: grid; place-items: center; width: 100%; height: 100%; background: var(--valora-surface-hover); color: var(--valora-text-strong); }
+.bank-connection-stats article { background: var(--valora-surface); border-color: var(--valora-border); }
+.bank-connection-stats article > strong { color: var(--valora-text-strong); }
+.bank-privacy-note { background: var(--valora-surface-soft); border-color: var(--valora-border); }
+.bank-connection-card .bank-institution-title h2 {
+  font-size: var(--valora-text-section); color: var(--valora-text-strong); overflow-wrap: anywhere;
+}
+.bank-connection-card .bank-institution-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px;
+  font-size: var(--valora-text-small); color: var(--valora-muted); line-height: 1.5;
+}
+.bank-connection-card .bank-connection-actions { gap: 8px; flex-wrap: wrap; }
+.bank-connection-card .bank-connection-actions button { min-height: 44px; font-size: var(--valora-text-body); padding: 12px 16px; }
+.bank-connection-card .bank-sync-summary {
+  margin: 0 24px 20px; padding: 0; border: 0; background: transparent;
+  color: var(--valora-muted); font-size: var(--valora-text-small); line-height: 1.5;
+}
+.bank-connection-card .bank-connection-error { margin: 0 24px 20px; border-radius: var(--valora-radius-sm); }
+.bank-connection-card .bank-connection-error strong,
+.bank-connection-card .bank-connection-error span { font-size: var(--valora-text-small); line-height: 1.5; }
+.bank-accounts-heading {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; padding: 0 24px 12px;
+}
+.bank-accounts-heading h3 { margin: 0; color: var(--valora-text); font-size: var(--valora-text-body); font-weight: 600; }
+.bank-accounts-heading > span { color: var(--valora-muted); font-size: var(--valora-text-small); }
+.bank-connection-card .bank-external-accounts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 0 24px 24px; }
+.bank-connection-card .bank-external-account,
+.bank-connection-card .bank-external-account:first-child {
+  container: bank-account / inline-size; display: flex; flex-direction: column; gap: 20px;
+  min-width: 0; padding: 20px; border: 1px solid var(--valora-border);
+  border-radius: var(--valora-radius-md); background: var(--valora-surface-soft);
+}
+.bank-connection-card .bank-account-main {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start;
+}
+.bank-connection-card .bank-account-copy { min-width: 0; }
+.bank-connection-card .bank-account-copy > span,
+.bank-connection-card .bank-account-balance > span {
+  color: var(--valora-muted); font-size: var(--valora-text-small); line-height: 1.5;
+  font-weight: 400; text-transform: none; letter-spacing: normal;
+}
+.bank-account-copy h4 { margin: 4px 0 8px; color: var(--valora-text-strong); font-size: 1rem; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.bank-connection-card .bank-account-copy small {
+  display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0;
+  color: var(--valora-muted); font-size: var(--valora-text-small); line-height: 1.5; overflow-wrap: anywhere;
+}
+.bank-connection-card .bank-account-balance { min-width: 0; text-align: right; }
+.bank-connection-card .bank-account-balance strong {
+  margin-top: 4px; color: var(--valora-text-strong); font-size: 1.25rem; font-weight: 600;
+  line-height: 1.4; font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.bank-connection-card .bank-account-balance .negative-value { color: var(--valora-danger); }
+.bank-connection-card .bank-account-footer {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px;
+  margin-top: 0; padding-top: 0; border: 0; align-items: start;
+}
+.bank-account-link { display: grid; gap: 12px; min-width: 0; }
+.bank-link-status { display: flex; align-items: center; gap: 8px; color: var(--valora-muted); font-size: var(--valora-text-small); line-height: 1.5; }
+.bank-link-status.linked { color: var(--valora-primary-ink); }
+.bank-link-status svg { flex: 0 0 18px; width: 18px; height: 18px; }
+.bank-connection-card .bank-account-footer label { min-width: 0; gap: 8px; color: var(--valora-text); font-size: var(--valora-text-small); font-weight: 500; }
+.bank-connection-card .bank-account-footer select {
+  min-width: 0; min-height: 44px; font-size: var(--valora-text-body); padding: 10px 12px;
+  border: 1px solid var(--valora-border-strong); border-radius: var(--valora-radius-sm);
+  background: var(--valora-surface); color: var(--valora-text);
+}
+.bank-connection-card .bank-account-footer select:focus-visible { outline: 2px solid var(--valora-focus-color); outline-offset: 2px; box-shadow: var(--valora-focus); }
+.bank-connection-card .bank-account-latest { padding-top: 16px; border-top: 1px solid var(--valora-border); }
+.bank-account-feed-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.bank-account-feed-heading > span,
+.bank-connection-card .bank-account-feed-heading > small { margin: 0; font-size: var(--valora-text-small); font-weight: 400; line-height: 1.5; color: var(--valora-muted); }
+.bank-connection-card .bank-account-latest strong {
+  margin-top: 8px; white-space: normal; overflow: visible; overflow-wrap: anywhere;
+  color: var(--valora-text); font-size: var(--valora-text-body); font-weight: 500; line-height: 1.5;
+}
+.bank-connection-card .bank-account-latest small { font-size: var(--valora-text-small); color: var(--valora-muted); line-height: 1.5; }
+@container bank-institution (min-width: 1000px) {
+  .bank-connection-card .bank-external-accounts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container bank-institution (min-width: 1900px) {
+  .bank-connection-card .bank-external-accounts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container bank-account (max-width: 540px) {
+  .bank-connection-card .bank-account-main { grid-template-columns: minmax(0, 1fr); }
+  .bank-connection-card .bank-account-balance { text-align: left; }
+}
+@media (max-width: 620px) {
+  .bank-connection-card .bank-connection-card-header { padding: 16px; }
+  .bank-connection-card .bank-institution { flex-basis: auto; }
+  .bank-accounts-heading { padding-inline: 16px; }
+  .bank-connection-card .bank-external-accounts { padding: 0 16px 16px; }
+  .bank-connection-card .bank-sync-summary, .bank-connection-card .bank-connection-error { margin-inline: 16px; }
+  .bank-connection-card .bank-external-account,
+  .bank-connection-card .bank-external-account:first-child { padding: 16px; }
+}
+/* Reconciliation preparation remains a single workspace, with four visible stages. */
+.panel.reconciliation-premium-setup {
+  display: grid; grid-template-columns: minmax(280px, .8fr) minmax(0, 1.6fr);
+  gap: 32px; max-width: 1800px; padding: 24px; align-items: start;
+}
+.reconciliation-premium-setup .reconciliation-account-column,
+.reconciliation-premium-setup .reconciliation-source-column {
+  min-width: 0; padding: 0; border: 0; background: transparent;
+}
+.reconciliation-premium-setup .reconciliation-section-heading { display: grid; gap: 8px; margin-bottom: 16px; }
+.reconciliation-premium-setup .reconciliation-section-heading strong {
+  display: flex; align-items: center; gap: 8px; color: var(--valora-text-strong); font-size: var(--valora-text-body); line-height: 1.5;
+}
+.reconciliation-step-number {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px;
+  border-radius: var(--valora-radius-sm); background: var(--valora-surface-hover);
+  color: var(--valora-muted); font-size: var(--valora-text-small); font-weight: 600;
+}
+.reconciliation-premium-setup .reconciliation-section-heading > span { font-size: var(--valora-text-small); color: var(--valora-muted); line-height: 1.5; }
+.reconciliation-premium-setup .reconciliation-account-select {
+  grid-template-columns: 32px minmax(0, 1fr); gap: 8px; min-height: 56px; padding: 6px 12px;
+  background: var(--valora-surface); border: 1px solid var(--valora-border-strong); border-radius: var(--valora-radius-md);
+}
+.reconciliation-premium-setup .reconciliation-account-select select { min-height: 44px; height: auto; font-size: var(--valora-text-body); font-weight: 600; }
+.reconciliation-premium-setup .reconciliation-account-icon { background: transparent; color: var(--valora-muted); }
+.reconciliation-premium-setup .reconciliation-link-state,
+.reconciliation-premium-setup .reconciliation-link-state.connected {
+  grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: start;
+  margin-top: 16px; padding: 0; min-height: 0; border: 0; background: transparent;
+}
+.reconciliation-premium-setup .reconciliation-link-state > span,
+.reconciliation-premium-setup .reconciliation-link-state.connected > span { width: 20px; height: 20px; background: transparent; color: var(--valora-muted); }
+.reconciliation-premium-setup .reconciliation-link-state.connected > span { color: var(--valora-primary-ink); }
+.reconciliation-premium-setup .reconciliation-link-state strong,
+.reconciliation-premium-setup .reconciliation-link-state.connected strong { font-size: var(--valora-text-small); color: var(--valora-text); font-weight: 500; line-height: 1.5; }
+.reconciliation-premium-setup .reconciliation-link-state small { margin-top: 4px; font-size: var(--valora-text-small); color: var(--valora-muted); line-height: 1.5; }
+.reconciliation-premium-setup .reconciliation-source-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.reconciliation-premium-setup .reconciliation-source-option,
+.reconciliation-premium-setup .reconciliation-source-option.active {
+  grid-template-columns: 32px minmax(0, 1fr) 24px; gap: 12px;
+  min-height: 96px; padding: 16px; border-radius: var(--valora-radius-md);
+  background: var(--valora-surface); border-color: var(--valora-border-strong);
+}
+.reconciliation-premium-setup .reconciliation-source-option.active { background: var(--valora-surface-soft); border-color: var(--valora-primary-ink); padding: 15px; }
+.reconciliation-premium-setup .source-tab-icon,
+.reconciliation-premium-setup .reconciliation-source-option.active .source-tab-icon {
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 4px;
+  background: transparent; color: var(--valora-muted);
+}
+.reconciliation-premium-setup .reconciliation-source-option.active .source-tab-icon { color: var(--valora-primary-ink); }
+.reconciliation-premium-setup .reconciliation-source-detail {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  padding: 16px 0 0; margin-top: 16px; border: 0; border-top: 1px solid var(--valora-border);
+  border-radius: 0; background: transparent;
+}
+.reconciliation-premium-setup .source-detail-icon,
+.reconciliation-premium-setup .reconciliation-source-detail.file .source-detail-icon,
+.reconciliation-premium-setup .reconciliation-source-detail.open-finance .source-detail-icon { width: 32px; height: 32px; background: transparent; color: var(--valora-muted); }
+.reconciliation-step-caption { display: block; font-size: var(--valora-text-small); color: var(--valora-muted); font-weight: 500; line-height: 1.5; }
+.reconciliation-premium-setup .reconciliation-source-detail strong { margin-top: 4px; color: var(--valora-text); font-size: var(--valora-text-body); line-height: 1.5; }
+.reconciliation-premium-setup .reconciliation-source-detail small { margin-top: 4px; font-size: var(--valora-text-small); color: var(--valora-muted); line-height: 1.5; }
+.reconciliation-premium-setup .reconciliation-source-detail > .primary { grid-column: auto; width: auto; justify-self: end; }
+.panel.reconciliation-premium-empty {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; gap: 12px;
+  justify-items: stretch;
+  max-width: 1800px; min-height: 0; padding: 20px 24px; text-align: left;
+  background: var(--valora-surface-soft); border-color: var(--valora-border); box-shadow: none;
+}
+.panel.reconciliation-premium-empty > div { min-width: 0; }
+.panel.reconciliation-premium-empty > span { width: 32px; height: 32px; padding: 4px; border-radius: var(--valora-radius-sm); background: transparent; color: var(--valora-muted); }
+.panel.reconciliation-premium-empty > span > svg { width: 24px; height: 24px; }
+.panel.reconciliation-premium-empty strong { display: block; margin-top: 4px; font-size: var(--valora-text-body); color: var(--valora-text-strong); line-height: 1.5; }
+.panel.reconciliation-premium-empty p { max-width: 100%; margin: 4px 0 0; font-size: var(--valora-text-small); color: var(--valora-muted); line-height: 1.5; }
+.reconciliation-analysis-heading { display: grid; gap: 4px; margin-block: 24px 16px; }
+.reconciliation-analysis-heading strong { font-size: var(--valora-text-body); color: var(--valora-text-strong); }
+@media (max-width: 1200px) {
+  .panel.reconciliation-premium-setup { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+}
+@media (max-width: 760px) {
+  .panel.reconciliation-premium-setup { padding: 16px; }
+  .reconciliation-premium-setup .reconciliation-source-tabs { grid-template-columns: minmax(0, 1fr); }
+  .reconciliation-premium-setup .reconciliation-source-detail { grid-template-columns: 32px minmax(0, 1fr); }
+  .reconciliation-premium-setup .reconciliation-source-detail > .primary { grid-column: 2; justify-self: start; }
+  .panel.reconciliation-premium-empty { padding: 16px; }
+}
+
+
+/* Reconciliation workspace v2 | calm, review-first visual hierarchy.
+   Keep all financial operations and permissions in the existing React handlers. */
+.reconciliation-analysis-heading {
+  max-width: 1800px;
+  margin: 26px 0 12px;
+  padding: 0;
+  gap: 3px;
+}
+.reconciliation-analysis-heading .reconciliation-step-caption {
+  color: var(--valora-primary-ink);
+  font-size: var(--valora-text-small);
+  letter-spacing: .01em;
+}
+.reconciliation-analysis-heading > strong {
+  color: var(--valora-text-strong);
+  font-size: clamp(18px, 1.35vw, 21px);
+  font-weight: 650;
+  letter-spacing: -.018em;
+  line-height: 1.35;
+}
+
+/* Results are a compact, easily scannable status strip, not four competing dashboards. */
+.reconciliation-premium-summary {
+  max-width: 1800px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.reconciliation-premium-summary article {
+  grid-template-columns: 36px minmax(0, 1fr);
+  min-height: 108px;
+  padding: 16px 18px;
+  border-color: var(--valora-border);
+  border-radius: var(--valora-radius-md);
+  box-shadow: none;
+}
+.reconciliation-premium-summary .summary-icon {
+  width: 36px; height: 36px;
+  background: var(--valora-surface-hover);
+  border-radius: 10px;
+}
+.reconciliation-premium-summary article span:not(.summary-icon) {
+  color: var(--valora-muted);
+  font-size: var(--valora-text-small);
+  font-weight: 550;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.35;
+}
+.reconciliation-premium-summary article strong {
+  font-size: 25px;
+  font-weight: 650;
+  color: var(--valora-text-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.16;
+}
+.reconciliation-premium-summary article small {
+  font-size: var(--valora-text-small);
+  color: var(--valora-muted);
+  line-height: 1.45;
+}
+.reconciliation-premium-summary article > div > i { margin-top: 9px; height: 3px; }
+
+/* Advanced automation is discoverable, without occupying the review workspace.
+   Native details/summary provides keyboard and screen-reader disclosure behavior. */
+.reconciliation-automation-panel.reconciliation-automation-disclosure {
+  display: block;
+  max-width: 1800px;
+  padding: 0;
+  margin: 0 0 16px;
+  overflow: hidden;
+  border: 1px solid var(--valora-border);
+  border-radius: var(--valora-radius-md);
+  background: var(--valora-surface);
+  box-shadow: none;
+}
+.reconciliation-automation-disclosure > .reconciliation-automation-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 15px 18px;
+  cursor: pointer;
+  list-style: none;
+  background: var(--valora-surface-soft);
+  transition: background .14s ease;
+}
+.reconciliation-automation-disclosure > summary::-webkit-details-marker { display: none; }
+.reconciliation-automation-disclosure > summary::marker { content: ""; }
+.reconciliation-automation-disclosure > summary:hover { background: var(--valora-surface-hover); }
+.reconciliation-automation-disclosure > summary:focus-visible {
+  outline: 3px solid var(--valora-focus-color);
+  outline-offset: -3px;
+}
+.reconciliation-automation-disclosure .reconciliation-automation-copy {
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.reconciliation-automation-disclosure .reconciliation-automation-icon {
+  display: grid;
+  place-items: center;
+  width: 34px; height: 34px;
+  background: var(--valora-primary-soft);
+  border-radius: 10px;
+}
+.reconciliation-automation-disclosure .reconciliation-automation-title strong {
+  font-size: var(--valora-text-body);
+  font-weight: 650;
+  color: var(--valora-text-strong);
+}
+.reconciliation-automation-disclosure .reconciliation-automation-title > span {
+  font-size: var(--valora-text-small);
+  font-weight: 600;
+}
+.reconciliation-automation-disclosure .reconciliation-automation-copy p {
+  max-width: 680px;
+  color: var(--valora-muted);
+  font-size: var(--valora-text-small);
+  line-height: 1.5;
+}
+.reconciliation-automation-expand {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--valora-primary-ink);
+  font-size: var(--valora-text-small);
+  font-weight: 650;
+}
+.reconciliation-automation-expand::after {
+  content: "";
+  display: block;
+  width: 8px; height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform .16s ease;
+}
+.reconciliation-automation-disclosure[open] .reconciliation-automation-expand::after {
+  transform: rotate(225deg);
+}
+.reconciliation-automation-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, auto);
+  gap: 24px;
+  align-items: center;
+  padding: 18px;
+  border-top: 1px solid var(--valora-border);
+  background: var(--valora-surface);
+}
+.reconciliation-automation-disclosure .reconciliation-automation-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  min-width: 0;
+}
+.reconciliation-automation-disclosure .reconciliation-automation-metrics > div,
+.reconciliation-automation-disclosure .reconciliation-automation-metrics > div.warning,
+.reconciliation-automation-disclosure .reconciliation-automation-metrics > div.info {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-right: 1px solid var(--valora-border);
+  border-radius: 0;
+  background: transparent;
+}
+.reconciliation-automation-disclosure .reconciliation-automation-metrics > div:last-child { border-right: 0; }
+.reconciliation-automation-disclosure .reconciliation-automation-metrics strong {
+  color: var(--valora-text-strong);
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+.reconciliation-automation-disclosure .reconciliation-automation-metrics span {
+  white-space: normal;
+  color: var(--valora-muted);
+  font-size: var(--valora-text-small);
+  font-weight: 450;
+  line-height: 1.4;
+  text-align: center;
+}
+.reconciliation-automation-disclosure .reconciliation-automation-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 10px 18px;
+}
+.reconciliation-automation-disclosure .reconciliation-auto-switch,
+.reconciliation-automation-disclosure .reconciliation-automation-controls select {
+  min-height: 44px;
+  font-size: var(--valora-text-small);
+}
+.reconciliation-automation-disclosure .reconciliation-automation-controls > label:not(.reconciliation-automation-check),
+.reconciliation-automation-disclosure .reconciliation-automation-check {
+  font-size: var(--valora-text-small);
+  color: var(--valora-text);
+  font-weight: 500;
+  line-height: 1.45;
+}
+.reconciliation-automation-disclosure .reconciliation-automation-check { min-height: 44px; }
+.reconciliation-automation-disclosure .reconciliation-automation-check input { width: 17px; height: 17px; flex: 0 0 17px; }
+
+/* Place search and filters within the statement surface. */
+section.panel.reconciliation-premium-table-panel {
+  max-width: 1800px;
+  padding: 0;
+  border: 1px solid var(--valora-border);
+  border-radius: var(--valora-radius-md);
+  box-shadow: none;
+}
+.reconciliation-table-heading {
+  padding: 20px 22px 14px;
+  border-bottom: 0;
+}
+.reconciliation-table-heading h2 {
+  font-size: 19px;
+  font-weight: 650;
+  color: var(--valora-text-strong);
+  line-height: 1.3;
+}
+.reconciliation-table-heading p {
+  font-size: var(--valora-text-small);
+  color: var(--valora-muted);
+  line-height: 1.5;
+}
+.reconciliation-source-badge {
+  font-size: var(--valora-text-small);
+  font-weight: 600;
+}
+.reconciliation-premium-table-panel .reconciliation-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 12px;
+  padding: 0 22px 20px;
+  margin: 0;
+  border-bottom: 1px solid var(--valora-border);
+}
+.reconciliation-premium-table-panel .reconciliation-search {
+  min-height: 44px;
+  border-color: var(--valora-border-strong);
+}
+.reconciliation-premium-table-panel .reconciliation-search input {
+  height: 42px;
+  font-size: var(--valora-text-body);
+}
+.reconciliation-premium-table-panel .reconciliation-type-filters { gap: 6px; }
+.reconciliation-premium-table-panel .reconciliation-type-filters button {
+  min-height: 44px;
+  padding: 9px 14px;
+  color: var(--valora-text);
+  font-weight: 550;
+  font-size: var(--valora-text-small);
+}
+.reconciliation-filter-secondary {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+.reconciliation-premium-table-panel .reconciliation-period-filter,
+.reconciliation-premium-table-panel .reconciliation-exceptions-filter,
+.reconciliation-premium-table-panel .reconciliation-more-filters {
+  min-height: 44px;
+  font-size: var(--valora-text-small);
+  white-space: nowrap;
+}
+.reconciliation-premium-table-panel .reconciliation-advanced-filters {
+  margin: 0;
+  padding: 14px 22px;
+  border: 0;
+  border-bottom: 1px solid var(--valora-border);
+  border-radius: 0;
+  background: var(--valora-surface-soft);
+}
+.reconciliation-premium-table-panel .reconciliation-advanced-filters button { min-height: 36px; font-size: var(--valora-text-small); }
+.reconciliation-premium-table-panel .reconciliation-advanced-filters > span { font-size: var(--valora-text-small); }
+.reconciliation-premium-table-panel .table-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.reconciliation-premium-table-panel .reconciliation-premium-table th {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .02em;
+}
+.reconciliation-premium-table-panel .reconciliation-premium-table td {
+  font-size: var(--valora-text-small);
+  padding-top: 16px;
+  padding-bottom: 16px;
+  vertical-align: middle;
+}
+.reconciliation-premium-table-panel .reconciliation-premium-table .amount {
+  font-size: var(--valora-text-body);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.reconciliation-premium-table-panel .reconciliation-description-cell strong,
+.reconciliation-premium-table-panel .reconciliation-date-cell strong {
+  font-size: var(--valora-text-small);
+  font-weight: 600;
+  line-height: 1.45;
+}
+.reconciliation-premium-table-panel .reconciliation-description-cell small,
+.reconciliation-premium-table-panel .reconciliation-date-cell small,
+.reconciliation-premium-table-panel .reconciliation-match-cell small {
+  font-size: 11px;
+  line-height: 1.45;
+}
+.reconciliation-premium-table-panel .reconciliation-category-cell select,
+.reconciliation-premium-table-panel .reconciliation-match-cell select {
+  min-height: 44px;
+  font-size: var(--valora-text-small);
+}
+.reconciliation-premium-table-panel .reconciliation-actions.premium {
+  gap: 18px;
+  padding: 16px 22px;
+  border-top: 1px solid var(--valora-border);
+  background: var(--valora-surface-soft);
+}
+.reconciliation-premium-table-panel .reconciliation-actions.premium > span { font-size: var(--valora-text-small); }
+.reconciliation-premium-table-panel .reconciliation-actions.premium > button.primary { min-height: 44px; font-size: var(--valora-text-body); font-weight: 600; }
+
+@media (max-width: 1200px) {
+  .reconciliation-automation-settings { grid-template-columns: minmax(0, 1fr); }
+  .reconciliation-premium-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .reconciliation-premium-summary { grid-template-columns: minmax(0, 1fr); }
+  .reconciliation-automation-disclosure > .reconciliation-automation-summary { align-items: flex-start; flex-wrap: wrap; }
+  .reconciliation-automation-expand { margin-left: 46px; }
+  .reconciliation-automation-disclosure .reconciliation-automation-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .reconciliation-automation-disclosure .reconciliation-automation-metrics > div { border: 0; }
+  .reconciliation-premium-table-panel .reconciliation-filter-bar { grid-template-columns: minmax(0, 1fr); padding-inline: 16px; }
+  .reconciliation-premium-table-panel .reconciliation-type-filters { flex-wrap: wrap; }
+  .reconciliation-filter-secondary { grid-column: 1; justify-content: flex-start; }
+  .reconciliation-table-heading { padding-inline: 16px; }
+  .reconciliation-premium-table-panel .reconciliation-actions.premium { padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reconciliation-automation-disclosure > summary,
+  .reconciliation-automation-expand::after { transition: none; }
+}

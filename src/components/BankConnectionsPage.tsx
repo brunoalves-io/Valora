@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useCompany } from "../contexts/CompanyContext";
 import { supabase } from "../lib/supabase";
+import { StatusIcon } from "./StatusIcon";
 
 type ProviderConfig = {
   provider: string;
@@ -130,7 +131,7 @@ function accountTypeLabel(type: ExternalAccount["account_type"]) {
 
 function statusLabel(status: BankConnection["status"]) {
   if (status === "active") return "Conectada";
-  if (status === "pending") return "Atualizando";
+  if (status === "pending") return "Atualização pendente";
   if (status === "revoked") return "Revogada";
   return "Atenção";
 }
@@ -589,8 +590,8 @@ export function BankConnectionsPage() {
         )}
       </header>
 
-      {error && <div className="form-alert error page-alert">{error}</div>}
-      {success && <div className="form-alert success page-alert">{success}</div>}
+      {error && <div className="form-alert error page-alert" role="alert">{error}</div>}
+      {success && <div className="form-alert success page-alert" role="status">{success}</div>}
 
       {!canManage && (
         <div className="bank-readonly-note">
@@ -666,11 +667,12 @@ export function BankConnectionsPage() {
             const run = latestRunByConnection.get(connection.id);
 
             return (
-              <section className="panel bank-connection-card" key={connection.id}>
+              <section className="panel bank-connection-card" key={connection.id} aria-labelledby={`bank-institution-${connection.id}`} aria-busy={syncingId === connection.id}>
                 <div className="bank-connection-card-header">
                   <div className="bank-institution">
                     <div
                       className="bank-institution-logo"
+                      aria-hidden="true"
                       style={
                         connection.institution_primary_color
                           ? { background: connection.institution_primary_color }
@@ -691,16 +693,18 @@ export function BankConnectionsPage() {
                     </div>
                     <div>
                       <div className="bank-institution-title">
-                        <h2>{connection.institution_name}</h2>
-                        <span className={"bank-status " + connection.status}>
-                          {statusLabel(connection.status)}
+                        <h2 id={`bank-institution-${connection.id}`}>{connection.institution_name}</h2>
+                        <span className={"bank-status " + connection.status} role="status">
+                          {syncingId === connection.id ? "Sincronizando..." : statusLabel(connection.status)}
                         </span>
                       </div>
-                      <p>
+                      <p className="bank-institution-meta">
+                        <span>
                         {connection.connection_type === "open_finance"
                           ? "Open Finance regulado"
-                          : "Conector financeiro"}{" "}
-                        · Última sincronização: {formatDateTime(connection.last_successful_sync_at)}
+                          : "Conector financeiro"}
+                        </span>
+                        <span>Última sincronização: {formatDateTime(connection.last_successful_sync_at)}</span>
                       </p>
                     </div>
                   </div>
@@ -740,6 +744,10 @@ export function BankConnectionsPage() {
                   </div>
                 )}
 
+                <div className="bank-accounts-heading">
+                  <h3>Contas encontradas</h3>
+                  <span>{accounts.length} {accounts.length === 1 ? "conta ou cartão" : "contas e cartões"}</span>
+                </div>
                 <div className="bank-external-accounts">
                   {accounts.length === 0 ? (
                     <div className="bank-account-empty">
@@ -751,30 +759,36 @@ export function BankConnectionsPage() {
                       const count = transactionCounts.get(account.id) ?? 0;
 
                       return (
-                        <article className="bank-external-account" key={account.id}>
+                        <article className="bank-external-account" key={account.id} aria-labelledby={`bank-account-${account.id}`}>
                           <div className="bank-account-main">
                             <div className="bank-account-copy">
                               <span>{accountTypeLabel(account.account_type)}</span>
-                              <strong>{account.name}</strong>
+                              <h4 id={`bank-account-${account.id}`}>{account.name}</h4>
                               <small>
-                                {account.number_masked || "Número não informado"} · {account.currency_code}
+                                <span>{account.number_masked || "Número não informado"}</span>
+                                <span>Moeda: {account.currency_code}</span>
                               </small>
                             </div>
                             <div className="bank-account-balance">
                               <span>Saldo informado</span>
-                              <strong>
+                              <strong className={account.balance !== null && Number(account.balance) < 0 ? "negative-value" : undefined}>
                                 {account.balance === null
                                   ? "Indisponível"
                                   : money.format(Number(account.balance))}
                               </strong>
-                              <small>{count} movimentação(ões) no feed</small>
                             </div>
                           </div>
 
                           <div className="bank-account-footer">
+                            <div className="bank-account-link">
+                              <div className={"bank-link-status" + (account.local_account_id ? " linked" : "")}>
+                                <StatusIcon kind={account.local_account_id ? "check" : "info"} />
+                                <span>{account.local_account_id ? "Vinculada ao Valora" : "Sem vínculo com o Valora"}</span>
+                              </div>
                             <label>
-                              Vincular à conta do Valora
+                              {account.local_account_id ? "Conta correspondente no Valora" : "Selecione uma conta do Valora"}
                               <select
+                                aria-label={`Conta do Valora para ${account.name}${account.number_masked ? ` (${account.number_masked})` : ""}`}
                                 value={account.local_account_id ?? ""}
                                 onChange={(event) =>
                                   void linkLocalAccount(account, event.target.value)
@@ -789,9 +803,13 @@ export function BankConnectionsPage() {
                                 ))}
                               </select>
                             </label>
+                            </div>
 
                             <div className="bank-account-latest">
-                              <span>Movimentação mais recente</span>
+                              <div className="bank-account-feed-heading">
+                                <span>Última movimentação</span>
+                                <small>{count} movimentação(ões) no feed</small>
+                              </div>
                               {latest ? (
                                 <>
                                   <strong>{latest.description}</strong>
