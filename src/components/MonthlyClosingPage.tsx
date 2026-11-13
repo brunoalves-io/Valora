@@ -970,6 +970,7 @@ export function MonthlyClosingPage() {
             ? `O snapshot de ${monthLabel(selectedStart)} será recalculado com os dados atuais.`
             : `O Valora registrará a fotografia gerencial de ${monthLabel(selectedStart)} no histórico de performance.`
         }
+        showWarningIcon={false}
         warning={
           selectedClosing
             ? "O resumo da Valora IA será limpo para evitar manter uma análise baseada em números antigos."
